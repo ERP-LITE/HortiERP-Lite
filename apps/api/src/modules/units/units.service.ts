@@ -1,8 +1,40 @@
-import { and, asc, eq, isNull } from 'drizzle-orm'
+import { and, asc, eq, isNull, ne, sql } from 'drizzle-orm'
 import { db } from '../../db/client.js'
 import { units } from '../../db/schema/index.js'
 import { AppError } from '../../shared/errors/AppError.js'
 import type { CreateUnitInput, UpdateUnitInput } from './units.schema.js'
+
+async function assertUniqueName(companyId: string, name: string, excludeId?: string) {
+  const conditions = [
+    eq(units.companyId, companyId),
+    isNull(units.deletedAt),
+    sql`lower(${units.name}) = lower(${name})`,
+  ]
+  if (excludeId) conditions.push(ne(units.id, excludeId))
+
+  const [existing] = await db
+    .select({ id: units.id })
+    .from(units)
+    .where(and(...conditions))
+
+  if (existing) throw AppError.duplicate('name', 'Já existe uma unidade com esse nome')
+}
+
+async function assertUniqueAbbreviation(companyId: string, abbreviation: string, excludeId?: string) {
+  const conditions = [
+    eq(units.companyId, companyId),
+    isNull(units.deletedAt),
+    sql`lower(${units.abbreviation}) = lower(${abbreviation})`,
+  ]
+  if (excludeId) conditions.push(ne(units.id, excludeId))
+
+  const [existing] = await db
+    .select({ id: units.id })
+    .from(units)
+    .where(and(...conditions))
+
+  if (existing) throw AppError.duplicate('abbreviation', 'Já existe uma unidade com essa abreviação')
+}
 
 export async function listUnits(companyId: string) {
   return db
@@ -24,6 +56,9 @@ export async function getUnit(companyId: string, id: string) {
 }
 
 export async function createUnit(companyId: string, userId: string, data: CreateUnitInput) {
+  await assertUniqueName(companyId, data.name)
+  await assertUniqueAbbreviation(companyId, data.abbreviation)
+
   const [unit] = await db
     .insert(units)
     .values({ ...data, companyId, createdBy: userId })
@@ -34,6 +69,8 @@ export async function createUnit(companyId: string, userId: string, data: Create
 
 export async function updateUnit(companyId: string, userId: string, id: string, data: UpdateUnitInput) {
   await getUnit(companyId, id)
+  if (data.name) await assertUniqueName(companyId, data.name, id)
+  if (data.abbreviation) await assertUniqueAbbreviation(companyId, data.abbreviation, id)
 
   const [unit] = await db
     .update(units)

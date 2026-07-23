@@ -7,7 +7,9 @@ import BaseInput from '@/components/ui/BaseInput.vue'
 import BaseSelect from '@/components/ui/BaseSelect.vue'
 import BaseModal from '@/components/ui/BaseModal.vue'
 import BaseBadge from '@/components/ui/BaseBadge.vue'
-import { getApiErrorMessage } from '@/services/api'
+import BaseToggle from '@/components/ui/BaseToggle.vue'
+import { getApiErrorMessage, getApiFieldErrors } from '@/services/api'
+import { confirmDelete, toastError, toastSuccess } from '@/lib/alerts'
 import { listCategories } from '@/services/categoriesService'
 import { listUnits } from '@/services/unitsService'
 import { createProduct, deleteProduct, listProducts, updateProduct } from '@/services/productsService'
@@ -22,6 +24,7 @@ const errorMessage = ref('')
 const modalOpen = ref(false)
 const editingId = ref<string | null>(null)
 const saving = ref(false)
+const fieldErrors = ref<Record<string, string>>({})
 
 const emptyForm = {
   categoryId: '',
@@ -68,6 +71,7 @@ async function loadAll() {
 function openCreateModal() {
   editingId.value = null
   form.value = { ...emptyForm }
+  fieldErrors.value = {}
   modalOpen.value = true
 }
 
@@ -84,10 +88,21 @@ function openEditModal(product: Product) {
     minStock: product.minStock,
     active: product.active,
   }
+  fieldErrors.value = {}
   modalOpen.value = true
 }
 
+function validate(): boolean {
+  fieldErrors.value = {}
+  if (!form.value.name.trim()) fieldErrors.value.name = 'Informe o nome do produto'
+  if (!form.value.categoryId) fieldErrors.value.categoryId = 'Selecione a categoria'
+  if (!form.value.unitId) fieldErrors.value.unitId = 'Selecione a unidade'
+  return Object.keys(fieldErrors.value).length === 0
+}
+
 async function handleSubmit() {
+  if (!validate()) return
+
   saving.value = true
   try {
     const payload = {
@@ -104,26 +119,38 @@ async function handleSubmit() {
 
     if (editingId.value) {
       await updateProduct(editingId.value, payload)
+      toastSuccess('Produto atualizado com sucesso')
     } else {
       await createProduct(payload)
+      toastSuccess('Produto criado com sucesso')
     }
     modalOpen.value = false
     await loadAll()
   } catch (error) {
-    errorMessage.value = getApiErrorMessage(error, 'Não foi possível salvar o produto')
+    const apiFieldErrors = getApiFieldErrors(error)
+    if (Object.keys(apiFieldErrors).length > 0) {
+      fieldErrors.value = apiFieldErrors
+    } else {
+      errorMessage.value = getApiErrorMessage(error, 'Não foi possível salvar o produto')
+    }
   } finally {
     saving.value = false
   }
 }
 
 async function handleDelete(product: Product) {
-  if (!confirm(`Excluir o produto "${product.name}"?`)) return
+  const confirmed = await confirmDelete({
+    title: `Excluir o produto "${product.name}"?`,
+    text: 'Essa ação não pode ser desfeita.',
+  })
+  if (!confirmed) return
 
   try {
     await deleteProduct(product.id)
     await loadAll()
+    toastSuccess('Produto excluído com sucesso')
   } catch (error) {
-    errorMessage.value = getApiErrorMessage(error, 'Não foi possível excluir o produto')
+    toastError(getApiErrorMessage(error, 'Não foi possível excluir o produto'))
   }
 }
 
@@ -184,18 +211,20 @@ onMounted(loadAll)
                 {{ product.active ? 'Ativo' : 'Inativo' }}
               </BaseBadge>
             </td>
-            <td class="px-4 py-3 text-right space-x-3 whitespace-nowrap">
+            <td class="px-4 py-3 text-right space-x-1 whitespace-nowrap">
               <button
-                class="inline-flex items-center gap-1 text-sm text-primary-600 hover:underline dark:text-primary-400"
+                class="inline-flex items-center justify-center h-8 w-8 rounded-lg text-primary-600 hover:bg-primary-50 dark:text-primary-400 dark:hover:bg-primary-900/30"
+                title="Editar"
                 @click="openEditModal(product)"
               >
-                <Pencil :size="14" /> Editar
+                <Pencil :size="16" />
               </button>
               <button
-                class="inline-flex items-center gap-1 text-sm text-red-600 hover:underline dark:text-red-400"
+                class="inline-flex items-center justify-center h-8 w-8 rounded-lg text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/30"
+                title="Excluir"
                 @click="handleDelete(product)"
               >
-                <Trash2 :size="14" /> Excluir
+                <Trash2 :size="16" />
               </button>
             </td>
           </tr>
@@ -205,15 +234,25 @@ onMounted(loadAll)
 
     <BaseModal :open="modalOpen" :title="editingId ? 'Editar produto' : 'Novo produto'" @close="modalOpen = false">
       <form class="space-y-4" @submit.prevent="handleSubmit">
-        <BaseInput v-model="form.name" label="Nome" required />
+        <BaseInput v-model="form.name" label="Nome" :error="fieldErrors.name" />
 
         <div class="grid grid-cols-2 gap-4">
-          <BaseSelect v-model="form.categoryId" label="Categoria" :options="categoryOptions" required />
-          <BaseSelect v-model="form.unitId" label="Unidade" :options="unitOptions" required />
+          <BaseSelect
+            v-model="form.categoryId"
+            label="Categoria"
+            :options="categoryOptions"
+            :error="fieldErrors.categoryId"
+          />
+          <BaseSelect
+            v-model="form.unitId"
+            label="Unidade"
+            :options="unitOptions"
+            :error="fieldErrors.unitId"
+          />
         </div>
 
         <div class="grid grid-cols-2 gap-4">
-          <BaseInput v-model="form.sku" label="SKU (opcional)" />
+          <BaseInput v-model="form.sku" label="SKU (opcional)" :error="fieldErrors.sku" />
           <BaseInput v-model="form.barcode" label="Código de barras (opcional)" />
         </div>
 
@@ -223,14 +262,7 @@ onMounted(loadAll)
           <BaseInput v-model="form.minStock" type="number" step="0.001" label="Estoque mínimo" required />
         </div>
 
-        <label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
-          <input
-            v-model="form.active"
-            type="checkbox"
-            class="rounded border-gray-300 text-primary-600 dark:border-gray-600 dark:bg-gray-800"
-          />
-          Produto ativo
-        </label>
+        <BaseToggle v-model="form.active" label="Produto ativo" />
 
         <div class="flex justify-end gap-2 pt-2">
           <BaseButton variant="secondary" type="button" @click="modalOpen = false">Cancelar</BaseButton>

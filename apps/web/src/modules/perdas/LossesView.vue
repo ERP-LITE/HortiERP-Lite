@@ -8,6 +8,7 @@ import BaseSelect from '@/components/ui/BaseSelect.vue'
 import BaseModal from '@/components/ui/BaseModal.vue'
 import BaseBadge from '@/components/ui/BaseBadge.vue'
 import { getApiErrorMessage } from '@/services/api'
+import { toastSuccess } from '@/lib/alerts'
 import { listProducts } from '@/services/productsService'
 import { createLoss, listLosses } from '@/services/lossesService'
 import type { Loss, LossReason, Product } from '@/types'
@@ -68,6 +69,7 @@ async function handleSubmit() {
     })
     modalOpen.value = false
     await loadAll()
+    toastSuccess('Perda registrada com sucesso')
   } catch (error) {
     errorMessage.value = getApiErrorMessage(error, 'Não foi possível registrar a perda')
   } finally {

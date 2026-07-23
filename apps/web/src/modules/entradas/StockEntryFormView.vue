@@ -7,6 +7,7 @@ import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
 import BaseSelect from '@/components/ui/BaseSelect.vue'
 import { getApiErrorMessage } from '@/services/api'
+import { toastSuccess } from '@/lib/alerts'
 import { listProducts } from '@/services/productsService'
 import { createStockEntry } from '@/services/stockEntriesService'
 import type { Product } from '@/types'
@@ -64,6 +65,7 @@ async function handleSubmit() {
           unitCost: item.unitCost ? Number(item.unitCost) : undefined,
         })),
     })
+    toastSuccess('Entrada registrada com sucesso')
     router.push({ name: 'entradas' })
   } catch (error) {
     errorMessage.value = getApiErrorMessage(error, 'Não foi possível registrar a entrada')

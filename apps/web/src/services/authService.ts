@@ -15,3 +15,7 @@ export async function fetchMe() {
   const { data } = await api.get<{ user: AuthUser }>('/auth/me')
   return data.user
 }
+
+export async function changePassword(currentPassword: string, newPassword: string) {
+  await api.patch('/auth/password', { currentPassword, newPassword })
+}

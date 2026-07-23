@@ -1,12 +1,14 @@
 export class AppError extends Error {
   statusCode: number
   code: string
+  issues?: Record<string, string[]>
 
-  constructor(message: string, statusCode = 400, code = 'BAD_REQUEST') {
+  constructor(message: string, statusCode = 400, code = 'BAD_REQUEST', issues?: Record<string, string[]>) {
     super(message)
     this.name = 'AppError'
     this.statusCode = statusCode
     this.code = code
+    this.issues = issues
   }
 
   static notFound(message = 'Recurso não encontrado') {
@@ -23,5 +25,9 @@ export class AppError extends Error {
 
   static conflict(message = 'Conflito de dados') {
     return new AppError(message, 409, 'CONFLICT')
+  }
+
+  static duplicate(field: string, message: string) {
+    return new AppError(message, 409, 'DUPLICATE_ENTRY', { [field]: [message] })
   }
 }

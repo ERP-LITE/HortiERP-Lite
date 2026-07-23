@@ -1,13 +1,16 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
-import { Pencil, Plus, Trash2 } from '@lucide/vue'
+import { Pencil, Plus, Trash2, Wand2 } from '@lucide/vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
 import BaseSelect from '@/components/ui/BaseSelect.vue'
 import BaseModal from '@/components/ui/BaseModal.vue'
 import BaseBadge from '@/components/ui/BaseBadge.vue'
-import { getApiErrorMessage } from '@/services/api'
+import BaseToggle from '@/components/ui/BaseToggle.vue'
+import { getApiErrorMessage, getApiFieldErrors } from '@/services/api'
+import { confirmDelete, toastError, toastSuccess } from '@/lib/alerts'
+import { generateRandomPassword } from '@/lib/password'
 import { createUser, deleteUser, listUsers, updateUser } from '@/services/usersService'
 import type { User, UserRole } from '@/types'
 
@@ -24,6 +27,7 @@ const errorMessage = ref('')
 const modalOpen = ref(false)
 const editingId = ref<string | null>(null)
 const saving = ref(false)
+const fieldErrors = ref<Record<string, string>>({})
 
 const emptyForm = { name: '', email: '', password: '', role: 'operador' as UserRole, active: true }
 const form = ref({ ...emptyForm })
@@ -42,41 +46,77 @@ async function loadUsers() {
 function openCreateModal() {
   editingId.value = null
   form.value = { ...emptyForm }
+  fieldErrors.value = {}
   modalOpen.value = true
 }
 
 function openEditModal(user: User) {
   editingId.value = user.id
   form.value = { name: user.name, email: user.email, password: '', role: user.role, active: user.active }
+  fieldErrors.value = {}
   modalOpen.value = true
 }
 
+function validate(): boolean {
+  fieldErrors.value = {}
+  if (!form.value.name.trim()) fieldErrors.value.name = 'Informe o nome'
+  if (!form.value.email.trim()) fieldErrors.value.email = 'Informe o e-mail'
+  if (!editingId.value && !form.value.password.trim()) fieldErrors.value.password = 'Informe a senha'
+  return Object.keys(fieldErrors.value).length === 0
+}
+
+async function handleGeneratePassword() {
+  const password = generateRandomPassword()
+  form.value.password = password
+
+  try {
+    await navigator.clipboard.writeText(password)
+    toastSuccess('Senha gerada e copiada para a área de transferência')
+  } catch {
+    toastSuccess('Senha gerada')
+  }
+}
+
 async function handleSubmit() {
+  if (!validate()) return
+
   saving.value = true
   try {
     if (editingId.value) {
       const payload = { ...form.value, password: form.value.password || undefined }
       await updateUser(editingId.value, payload)
+      toastSuccess('Usuário atualizado com sucesso')
     } else {
       await createUser(form.value)
+      toastSuccess('Usuário criado com sucesso')
     }
     modalOpen.value = false
     await loadUsers()
   } catch (error) {
-    errorMessage.value = getApiErrorMessage(error, 'Não foi possível salvar o usuário')
+    const apiFieldErrors = getApiFieldErrors(error)
+    if (Object.keys(apiFieldErrors).length > 0) {
+      fieldErrors.value = apiFieldErrors
+    } else {
+      errorMessage.value = getApiErrorMessage(error, 'Não foi possível salvar o usuário')
+    }
   } finally {
     saving.value = false
   }
 }
 
 async function handleDelete(user: User) {
-  if (!confirm(`Excluir o usuário "${user.name}"?`)) return
+  const confirmed = await confirmDelete({
+    title: `Excluir o usuário "${user.name}"?`,
+    text: 'Essa ação não pode ser desfeita.',
+  })
+  if (!confirmed) return
 
   try {
     await deleteUser(user.id)
     await loadUsers()
+    toastSuccess('Usuário excluído com sucesso')
   } catch (error) {
-    errorMessage.value = getApiErrorMessage(error, 'Não foi possível excluir o usuário')
+    toastError(getApiErrorMessage(error, 'Não foi possível excluir o usuário'))
   }
 }
 
@@ -132,18 +172,20 @@ onMounted(loadUsers)
                 {{ user.active ? 'Ativo' : 'Inativo' }}
               </BaseBadge>
             </td>
-            <td class="px-4 py-3 text-right space-x-3 whitespace-nowrap">
+            <td class="px-4 py-3 text-right space-x-1 whitespace-nowrap">
               <button
-                class="inline-flex items-center gap-1 text-sm text-primary-600 hover:underline dark:text-primary-400"
+                class="inline-flex items-center justify-center h-8 w-8 rounded-lg text-primary-600 hover:bg-primary-50 dark:text-primary-400 dark:hover:bg-primary-900/30"
+                title="Editar"
                 @click="openEditModal(user)"
               >
-                <Pencil :size="14" /> Editar
+                <Pencil :size="16" />
               </button>
               <button
-                class="inline-flex items-center gap-1 text-sm text-red-600 hover:underline dark:text-red-400"
+                class="inline-flex items-center justify-center h-8 w-8 rounded-lg text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/30"
+                title="Excluir"
                 @click="handleDelete(user)"
               >
-                <Trash2 :size="14" /> Excluir
+                <Trash2 :size="16" />
               </button>
             </td>
           </tr>
@@ -153,24 +195,26 @@ onMounted(loadUsers)
 
     <BaseModal :open="modalOpen" :title="editingId ? 'Editar usuário' : 'Novo usuário'" @close="modalOpen = false">
       <form class="space-y-4" @submit.prevent="handleSubmit">
-        <BaseInput v-model="form.name" label="Nome" required />
-        <BaseInput v-model="form.email" type="email" label="E-mail" required />
-        <BaseInput
-          v-model="form.password"
-          type="password"
-          :label="editingId ? 'Nova senha (opcional)' : 'Senha'"
-          :required="!editingId"
-        />
+        <BaseInput v-model="form.name" label="Nome" :error="fieldErrors.name" />
+        <BaseInput v-model="form.email" type="email" label="E-mail" :error="fieldErrors.email" />
+        <div>
+          <BaseInput
+            v-model="form.password"
+            type="password"
+            :label="editingId ? 'Nova senha (opcional)' : 'Senha'"
+            :error="fieldErrors.password"
+          />
+          <button
+            type="button"
+            class="mt-1.5 inline-flex items-center gap-1 text-xs text-primary-600 hover:underline dark:text-primary-400"
+            @click="handleGeneratePassword"
+          >
+            <Wand2 :size="12" /> Gerar senha aleatória
+          </button>
+        </div>
         <BaseSelect v-model="form.role" label="Perfil" :options="roleOptions" required />
 
-        <label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
-          <input
-            v-model="form.active"
-            type="checkbox"
-            class="rounded border-gray-300 text-primary-600 dark:border-gray-600 dark:bg-gray-800"
-          />
-          Usuário ativo
-        </label>
+        <BaseToggle v-model="form.active" label="Usuário ativo" />
 
         <div class="flex justify-end gap-2 pt-2">
           <BaseButton variant="secondary" type="button" @click="modalOpen = false">Cancelar</BaseButton>

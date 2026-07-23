@@ -1,8 +1,24 @@
-import { and, asc, eq, isNull } from 'drizzle-orm'
+import { and, asc, eq, isNull, ne, sql } from 'drizzle-orm'
 import { db } from '../../db/client.js'
 import { categories } from '../../db/schema/index.js'
 import { AppError } from '../../shared/errors/AppError.js'
 import type { CreateCategoryInput, UpdateCategoryInput } from './categories.schema.js'
+
+async function assertUniqueName(companyId: string, name: string, excludeId?: string) {
+  const conditions = [
+    eq(categories.companyId, companyId),
+    isNull(categories.deletedAt),
+    sql`lower(${categories.name}) = lower(${name})`,
+  ]
+  if (excludeId) conditions.push(ne(categories.id, excludeId))
+
+  const [existing] = await db
+    .select({ id: categories.id })
+    .from(categories)
+    .where(and(...conditions))
+
+  if (existing) throw AppError.duplicate('name', 'Já existe uma categoria com esse nome')
+}
 
 export async function listCategories(companyId: string) {
   return db
@@ -24,6 +40,8 @@ export async function getCategory(companyId: string, id: string) {
 }
 
 export async function createCategory(companyId: string, userId: string, data: CreateCategoryInput) {
+  await assertUniqueName(companyId, data.name)
+
   const [category] = await db
     .insert(categories)
     .values({ ...data, companyId, createdBy: userId })
@@ -34,6 +52,7 @@ export async function createCategory(companyId: string, userId: string, data: Cr
 
 export async function updateCategory(companyId: string, userId: string, id: string, data: UpdateCategoryInput) {
   await getCategory(companyId, id)
+  if (data.name) await assertUniqueName(companyId, data.name, id)
 
   const [category] = await db
     .update(categories)

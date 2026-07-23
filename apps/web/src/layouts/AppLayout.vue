@@ -5,7 +5,6 @@ import {
   AlertTriangle,
   BarChart3,
   LayoutDashboard,
-  LogOut,
   Menu,
   PackagePlus,
   Ruler,
@@ -15,6 +14,7 @@ import {
   Warehouse,
 } from '@lucide/vue'
 import ThemeToggle from '@/components/ui/ThemeToggle.vue'
+import AppUserMenu from '@/components/AppUserMenu.vue'
 import { useAuthStore } from '@/stores/auth'
 
 const auth = useAuthStore()
@@ -43,11 +43,6 @@ const navItems = computed(() => {
 function isActive(name: string) {
   return route.name === name
 }
-
-function handleLogout() {
-  auth.logout()
-  window.location.href = '/login'
-}
 </script>
 
 <template>
@@ -63,7 +58,10 @@ function handleLogout() {
       :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full'"
     >
       <div class="h-16 flex items-center px-6 border-b border-gray-200 dark:border-gray-800">
-        <span class="text-lg font-bold text-primary-700 dark:text-primary-400">HortiERP Lite</span>
+        <RouterLink :to="{ name: 'dashboard' }" class="flex items-center gap-2">
+          <img src="/favicon.svg" alt="" class="h-8 w-8 rounded-md" />
+          <span class="text-lg font-bold text-primary-700 dark:text-primary-400">HortiERP Lite</span>
+        </RouterLink>
       </div>
       <nav class="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
         <RouterLink
@@ -94,17 +92,7 @@ function handleLogout() {
         <div class="hidden lg:block" />
         <div class="flex items-center gap-3">
           <ThemeToggle />
-          <div class="text-right">
-            <p class="text-sm font-medium text-gray-900 dark:text-gray-100">{{ auth.user?.name }}</p>
-            <p class="text-xs text-gray-500 dark:text-gray-400 capitalize">{{ auth.user?.role }}</p>
-          </div>
-          <button
-            class="inline-flex items-center gap-1.5 text-sm font-medium text-gray-500 hover:text-red-600 dark:text-gray-400 dark:hover:text-red-400 transition-colors"
-            @click="handleLogout"
-          >
-            <LogOut :size="16" />
-            Sair
-          </button>
+          <AppUserMenu />
         </div>
       </header>
 

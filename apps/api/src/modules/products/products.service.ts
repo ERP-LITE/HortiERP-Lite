@@ -1,8 +1,42 @@
-import { and, asc, eq, isNull } from 'drizzle-orm'
+import { and, asc, eq, isNull, ne, sql } from 'drizzle-orm'
 import { db } from '../../db/client.js'
 import { categories, products, units } from '../../db/schema/index.js'
 import { AppError } from '../../shared/errors/AppError.js'
 import type { CreateProductInput, UpdateProductInput } from './products.schema.js'
+
+async function assertUniqueName(companyId: string, name: string, excludeId?: string) {
+  const conditions = [
+    eq(products.companyId, companyId),
+    isNull(products.deletedAt),
+    sql`lower(${products.name}) = lower(${name})`,
+  ]
+  if (excludeId) conditions.push(ne(products.id, excludeId))
+
+  const [existing] = await db
+    .select({ id: products.id })
+    .from(products)
+    .where(and(...conditions))
+
+  if (existing) throw AppError.duplicate('name', 'Já existe um produto com esse nome')
+}
+
+async function assertUniqueSku(companyId: string, sku: string | undefined, excludeId?: string) {
+  if (!sku) return
+
+  const conditions = [
+    eq(products.companyId, companyId),
+    isNull(products.deletedAt),
+    sql`lower(${products.sku}) = lower(${sku})`,
+  ]
+  if (excludeId) conditions.push(ne(products.id, excludeId))
+
+  const [existing] = await db
+    .select({ id: products.id })
+    .from(products)
+    .where(and(...conditions))
+
+  if (existing) throw AppError.duplicate('sku', 'Já existe um produto com esse SKU')
+}
 
 async function assertCategoryAndUnitBelongToCompany(
   companyId: string,
@@ -49,6 +83,8 @@ export async function getProduct(companyId: string, id: string) {
 
 export async function createProduct(companyId: string, userId: string, data: CreateProductInput) {
   await assertCategoryAndUnitBelongToCompany(companyId, data.categoryId, data.unitId)
+  await assertUniqueName(companyId, data.name)
+  await assertUniqueSku(companyId, data.sku)
 
   const [product] = await db
     .insert(products)
@@ -73,6 +109,8 @@ export async function createProduct(companyId: string, userId: string, data: Cre
 export async function updateProduct(companyId: string, userId: string, id: string, data: UpdateProductInput) {
   await getProduct(companyId, id)
   await assertCategoryAndUnitBelongToCompany(companyId, data.categoryId, data.unitId)
+  if (data.name) await assertUniqueName(companyId, data.name, id)
+  if (data.sku !== undefined) await assertUniqueSku(companyId, data.sku, id)
 
   const [product] = await db
     .update(products)
