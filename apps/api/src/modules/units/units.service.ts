@@ -1,39 +1,38 @@
-import { and, asc, eq, isNull, ne, sql } from 'drizzle-orm'
+import { and, asc, eq, isNull } from 'drizzle-orm'
 import { db } from '../../db/client.js'
 import { units } from '../../db/schema/index.js'
 import { AppError } from '../../shared/errors/AppError.js'
+import { assertUniqueField } from '../../shared/db/assertUniqueField.js'
 import type { CreateUnitInput, UpdateUnitInput } from './units.schema.js'
 
-async function assertUniqueName(companyId: string, name: string, excludeId?: string) {
-  const conditions = [
-    eq(units.companyId, companyId),
-    isNull(units.deletedAt),
-    sql`lower(${units.name}) = lower(${name})`,
-  ]
-  if (excludeId) conditions.push(ne(units.id, excludeId))
-
-  const [existing] = await db
-    .select({ id: units.id })
-    .from(units)
-    .where(and(...conditions))
-
-  if (existing) throw AppError.duplicate('name', 'Já existe uma unidade com esse nome')
+function assertUniqueName(companyId: string, name: string, excludeId?: string) {
+  return assertUniqueField({
+    table: units,
+    idColumn: units.id,
+    valueColumn: units.name,
+    companyIdColumn: units.companyId,
+    companyId,
+    deletedAtColumn: units.deletedAt,
+    value: name,
+    excludeId,
+    field: 'name',
+    message: 'Já existe uma unidade com esse nome',
+  })
 }
 
-async function assertUniqueAbbreviation(companyId: string, abbreviation: string, excludeId?: string) {
-  const conditions = [
-    eq(units.companyId, companyId),
-    isNull(units.deletedAt),
-    sql`lower(${units.abbreviation}) = lower(${abbreviation})`,
-  ]
-  if (excludeId) conditions.push(ne(units.id, excludeId))
-
-  const [existing] = await db
-    .select({ id: units.id })
-    .from(units)
-    .where(and(...conditions))
-
-  if (existing) throw AppError.duplicate('abbreviation', 'Já existe uma unidade com essa abreviação')
+function assertUniqueAbbreviation(companyId: string, abbreviation: string, excludeId?: string) {
+  return assertUniqueField({
+    table: units,
+    idColumn: units.id,
+    valueColumn: units.abbreviation,
+    companyIdColumn: units.companyId,
+    companyId,
+    deletedAtColumn: units.deletedAt,
+    value: abbreviation,
+    excludeId,
+    field: 'abbreviation',
+    message: 'Já existe uma unidade com essa abreviação',
+  })
 }
 
 export async function listUnits(companyId: string) {

@@ -1,41 +1,40 @@
-import { and, asc, eq, isNull, ne, sql } from 'drizzle-orm'
+import { and, asc, eq, isNull } from 'drizzle-orm'
 import { db } from '../../db/client.js'
 import { categories, products, units } from '../../db/schema/index.js'
 import { AppError } from '../../shared/errors/AppError.js'
+import { assertUniqueField } from '../../shared/db/assertUniqueField.js'
 import type { CreateProductInput, UpdateProductInput } from './products.schema.js'
 
-async function assertUniqueName(companyId: string, name: string, excludeId?: string) {
-  const conditions = [
-    eq(products.companyId, companyId),
-    isNull(products.deletedAt),
-    sql`lower(${products.name}) = lower(${name})`,
-  ]
-  if (excludeId) conditions.push(ne(products.id, excludeId))
-
-  const [existing] = await db
-    .select({ id: products.id })
-    .from(products)
-    .where(and(...conditions))
-
-  if (existing) throw AppError.duplicate('name', 'Já existe um produto com esse nome')
+function assertUniqueName(companyId: string, name: string, excludeId?: string) {
+  return assertUniqueField({
+    table: products,
+    idColumn: products.id,
+    valueColumn: products.name,
+    companyIdColumn: products.companyId,
+    companyId,
+    deletedAtColumn: products.deletedAt,
+    value: name,
+    excludeId,
+    field: 'name',
+    message: 'Já existe um produto com esse nome',
+  })
 }
 
-async function assertUniqueSku(companyId: string, sku: string | undefined, excludeId?: string) {
+function assertUniqueSku(companyId: string, sku: string | undefined, excludeId?: string) {
   if (!sku) return
 
-  const conditions = [
-    eq(products.companyId, companyId),
-    isNull(products.deletedAt),
-    sql`lower(${products.sku}) = lower(${sku})`,
-  ]
-  if (excludeId) conditions.push(ne(products.id, excludeId))
-
-  const [existing] = await db
-    .select({ id: products.id })
-    .from(products)
-    .where(and(...conditions))
-
-  if (existing) throw AppError.duplicate('sku', 'Já existe um produto com esse SKU')
+  return assertUniqueField({
+    table: products,
+    idColumn: products.id,
+    valueColumn: products.sku,
+    companyIdColumn: products.companyId,
+    companyId,
+    deletedAtColumn: products.deletedAt,
+    value: sku,
+    excludeId,
+    field: 'sku',
+    message: 'Já existe um produto com esse SKU',
+  })
 }
 
 async function assertCategoryAndUnitBelongToCompany(
