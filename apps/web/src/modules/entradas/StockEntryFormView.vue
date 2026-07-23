@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { Plus, Trash2 } from '@lucide/vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
@@ -78,9 +79,12 @@ onMounted(loadProducts)
   <div>
     <PageHeader title="Nova entrada de mercadoria" subtitle="Registre o recebimento de produtos no estoque" />
 
-    <p v-if="errorMessage" class="text-sm text-red-600 mb-4">{{ errorMessage }}</p>
+    <p v-if="errorMessage" class="text-sm text-red-600 dark:text-red-400 mb-4">{{ errorMessage }}</p>
 
-    <form class="bg-white rounded-xl border border-gray-200 p-6 space-y-6" @submit.prevent="handleSubmit">
+    <form
+      class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6 space-y-6"
+      @submit.prevent="handleSubmit"
+    >
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <BaseInput v-model="supplierName" label="Fornecedor (opcional)" />
         <BaseInput v-model="notes" label="Observações (opcional)" />
@@ -88,9 +92,13 @@ onMounted(loadProducts)
 
       <div>
         <div class="flex items-center justify-between mb-2">
-          <h3 class="text-sm font-semibold text-gray-700">Itens</h3>
-          <button type="button" class="text-sm text-primary-600 hover:underline" @click="addItem">
-            + Adicionar item
+          <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300">Itens</h3>
+          <button
+            type="button"
+            class="inline-flex items-center gap-1 text-sm text-primary-600 hover:underline dark:text-primary-400"
+            @click="addItem"
+          >
+            <Plus :size="14" /> Adicionar item
           </button>
         </div>
 
@@ -98,18 +106,18 @@ onMounted(loadProducts)
           <div
             v-for="(item, index) in items"
             :key="index"
-            class="grid grid-cols-1 sm:grid-cols-[2fr_1fr_1fr_auto] gap-3 items-end border border-gray-100 rounded-lg p-3"
+            class="grid grid-cols-1 sm:grid-cols-[2fr_1fr_1fr_auto] gap-3 items-end border border-gray-100 dark:border-gray-700 rounded-lg p-3"
           >
             <BaseSelect v-model="item.productId" label="Produto" :options="productOptions" required />
             <BaseInput v-model="item.quantity" type="number" step="0.001" label="Quantidade" required />
             <BaseInput v-model="item.unitCost" type="number" step="0.01" label="Custo unit. (opcional)" />
             <button
               type="button"
-              class="text-sm text-red-600 hover:underline mb-2"
+              class="inline-flex items-center gap-1 text-sm text-red-600 hover:underline dark:text-red-400 mb-2 disabled:opacity-40 disabled:pointer-events-none"
               :disabled="items.length === 1"
               @click="removeItem(index)"
             >
-              Remover
+              <Trash2 :size="14" /> Remover
             </button>
           </div>
         </div>
