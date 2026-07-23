@@ -1,0 +1,80 @@
+import { and, desc, eq } from 'drizzle-orm'
+import { db } from '../../db/client.js'
+import { losses, products, stockMovements } from '../../db/schema/index.js'
+import { AppError } from '../../shared/errors/AppError.js'
+import type { CreateLossInput } from './losses.schema.js'
+
+export async function listLosses(companyId: string) {
+  return db.query.losses.findMany({
+    where: eq(losses.companyId, companyId),
+    with: { product: true },
+    orderBy: desc(losses.lossDate),
+  })
+}
+
+export async function getLoss(companyId: string, id: string) {
+  const loss = await db.query.losses.findFirst({
+    where: and(eq(losses.id, id), eq(losses.companyId, companyId)),
+    with: { product: true },
+  })
+
+  if (!loss) throw AppError.notFound('Registro de perda não encontrado')
+
+  return loss
+}
+
+export async function createLoss(companyId: string, userId: string, data: CreateLossInput) {
+  return db.transaction(async (tx) => {
+    const [product] = await tx
+      .select()
+      .from(products)
+      .where(and(eq(products.id, data.productId), eq(products.companyId, companyId)))
+
+    if (!product) {
+      throw AppError.notFound('Produto não encontrado')
+    }
+
+    const currentStock = Number(product.currentStock)
+
+    if (data.quantity > currentStock) {
+      throw new AppError(
+        `Quantidade de perda (${data.quantity}) maior que o estoque disponível (${currentStock})`,
+        422,
+        'INSUFFICIENT_STOCK',
+      )
+    }
+
+    const [loss] = await tx
+      .insert(losses)
+      .values({
+        companyId,
+        productId: data.productId,
+        quantity: data.quantity.toString(),
+        reason: data.reason,
+        notes: data.notes,
+        lossDate: data.lossDate ?? new Date(),
+        createdBy: userId,
+      })
+      .returning()
+
+    const newStock = currentStock - data.quantity
+
+    await tx
+      .update(products)
+      .set({ currentStock: newStock.toString(), updatedAt: new Date(), updatedBy: userId })
+      .where(eq(products.id, data.productId))
+
+    await tx.insert(stockMovements).values({
+      companyId,
+      productId: data.productId,
+      type: 'perda',
+      quantity: (-data.quantity).toString(),
+      balanceAfter: newStock.toString(),
+      referenceType: 'loss',
+      referenceId: loss.id,
+      createdBy: userId,
+    })
+
+    return loss
+  })
+}

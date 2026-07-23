@@ -1,0 +1,67 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: hortierp-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: hortierp
+      POSTGRES_PASSWORD: hortierp
+      POSTGRES_DB: hortierp_lite
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hortierp -d hortierp_lite"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+      target: dev
+    container_name: hortierp-api
+    restart: unless-stopped
+    env_file:
+      - apps/api/.env
+    environment:
+      DATABASE_URL: postgres://hortierp:hortierp@postgres:5432/hortierp_lite
+    ports:
+      - "3333:3333"
+    volumes:
+      - ./apps/api:/app/apps/api
+      - /app/apps/api/node_modules
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      target: dev
+    container_name: hortierp-web
+    restart: unless-stopped
+    env_file:
+      - apps/web/.env
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./apps/web:/app/apps/web
+      - /app/apps/web/node_modules
+    depends_on:
+      - api
+
+  # Redis é opcional e não é usado no MVP. Preparado para uso futuro
+  # (cache, filas, sessões). Descomente quando necessário.
+  # redis:
+  #   image: redis:7-alpine
+  #   container_name: hortierp-redis
+  #   restart: unless-stopped
+  #   ports:
+  #     - "6379:6379"
+
+volumes:
+  postgres_data:
