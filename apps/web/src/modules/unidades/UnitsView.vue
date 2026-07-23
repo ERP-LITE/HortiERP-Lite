@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
+import { Pencil, Plus, Trash2 } from '@lucide/vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
@@ -75,34 +76,48 @@ onMounted(loadUnits)
   <div>
     <PageHeader title="Unidades de medida" subtitle="Ex.: quilograma, unidade, dúzia, caixa">
       <template #actions>
-        <BaseButton @click="openCreateModal">+ Nova unidade</BaseButton>
+        <BaseButton @click="openCreateModal"><Plus :size="16" /> Nova unidade</BaseButton>
       </template>
     </PageHeader>
 
-    <p v-if="errorMessage" class="text-sm text-red-600 mb-4">{{ errorMessage }}</p>
+    <p v-if="errorMessage" class="text-sm text-red-600 dark:text-red-400 mb-4">{{ errorMessage }}</p>
 
-    <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
-      <table class="min-w-full divide-y divide-gray-200">
-        <thead class="bg-gray-50">
+    <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+      <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+        <thead class="bg-gray-50 dark:bg-gray-900/60">
           <tr>
-            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nome</th>
-            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Abreviação</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Nome</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+              Abreviação
+            </th>
             <th class="px-4 py-3" />
           </tr>
         </thead>
-        <tbody class="divide-y divide-gray-100">
+        <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
           <tr v-if="loading">
-            <td colspan="3" class="px-4 py-6 text-center text-sm text-gray-500">Carregando...</td>
+            <td colspan="3" class="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">Carregando...</td>
           </tr>
           <tr v-else-if="units.length === 0">
-            <td colspan="3" class="px-4 py-6 text-center text-sm text-gray-500">Nenhuma unidade cadastrada.</td>
+            <td colspan="3" class="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">
+              Nenhuma unidade cadastrada.
+            </td>
           </tr>
           <tr v-for="unit in units" v-else :key="unit.id">
-            <td class="px-4 py-3 text-sm font-medium text-gray-900">{{ unit.name }}</td>
-            <td class="px-4 py-3 text-sm text-gray-500">{{ unit.abbreviation }}</td>
-            <td class="px-4 py-3 text-right space-x-2 whitespace-nowrap">
-              <button class="text-sm text-primary-600 hover:underline" @click="openEditModal(unit)">Editar</button>
-              <button class="text-sm text-red-600 hover:underline" @click="handleDelete(unit)">Excluir</button>
+            <td class="px-4 py-3 text-sm font-medium text-gray-900 dark:text-gray-100">{{ unit.name }}</td>
+            <td class="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">{{ unit.abbreviation }}</td>
+            <td class="px-4 py-3 text-right space-x-3 whitespace-nowrap">
+              <button
+                class="inline-flex items-center gap-1 text-sm text-primary-600 hover:underline dark:text-primary-400"
+                @click="openEditModal(unit)"
+              >
+                <Pencil :size="14" /> Editar
+              </button>
+              <button
+                class="inline-flex items-center gap-1 text-sm text-red-600 hover:underline dark:text-red-400"
+                @click="handleDelete(unit)"
+              >
+                <Trash2 :size="14" /> Excluir
+              </button>
             </td>
           </tr>
         </tbody>

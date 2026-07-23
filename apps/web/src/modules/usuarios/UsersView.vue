@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
+import { Pencil, Plus, Trash2 } from '@lucide/vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
@@ -86,42 +87,64 @@ onMounted(loadUsers)
   <div>
     <PageHeader title="Usuários" subtitle="Gerencie os acessos ao sistema">
       <template #actions>
-        <BaseButton @click="openCreateModal">+ Novo usuário</BaseButton>
+        <BaseButton @click="openCreateModal"><Plus :size="16" /> Novo usuário</BaseButton>
       </template>
     </PageHeader>
 
-    <p v-if="errorMessage" class="text-sm text-red-600 mb-4">{{ errorMessage }}</p>
+    <p v-if="errorMessage" class="text-sm text-red-600 dark:text-red-400 mb-4">{{ errorMessage }}</p>
 
-    <div class="bg-white rounded-xl border border-gray-200 overflow-x-auto">
-      <table class="min-w-full divide-y divide-gray-200">
-        <thead class="bg-gray-50">
+    <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-x-auto">
+      <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+        <thead class="bg-gray-50 dark:bg-gray-900/60">
           <tr>
-            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nome</th>
-            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">E-mail</th>
-            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Perfil</th>
-            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Nome</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+              E-mail
+            </th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+              Perfil
+            </th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+              Status
+            </th>
             <th class="px-4 py-3" />
           </tr>
         </thead>
-        <tbody class="divide-y divide-gray-100">
+        <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
           <tr v-if="loading">
-            <td colspan="5" class="px-4 py-6 text-center text-sm text-gray-500">Carregando...</td>
+            <td colspan="5" class="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">Carregando...</td>
           </tr>
           <tr v-else-if="users.length === 0">
-            <td colspan="5" class="px-4 py-6 text-center text-sm text-gray-500">Nenhum usuário cadastrado.</td>
+            <td colspan="5" class="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">
+              Nenhum usuário cadastrado.
+            </td>
           </tr>
           <tr v-for="user in users" v-else :key="user.id">
-            <td class="px-4 py-3 text-sm font-medium text-gray-900 whitespace-nowrap">{{ user.name }}</td>
-            <td class="px-4 py-3 text-sm text-gray-500 whitespace-nowrap">{{ user.email }}</td>
-            <td class="px-4 py-3 text-sm text-gray-500 capitalize whitespace-nowrap">{{ user.role }}</td>
+            <td class="px-4 py-3 text-sm font-medium text-gray-900 dark:text-gray-100 whitespace-nowrap">
+              {{ user.name }}
+            </td>
+            <td class="px-4 py-3 text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">{{ user.email }}</td>
+            <td class="px-4 py-3 text-sm text-gray-500 dark:text-gray-400 capitalize whitespace-nowrap">
+              {{ user.role }}
+            </td>
             <td class="px-4 py-3 whitespace-nowrap">
               <BaseBadge :variant="user.active ? 'success' : 'neutral'">
                 {{ user.active ? 'Ativo' : 'Inativo' }}
               </BaseBadge>
             </td>
-            <td class="px-4 py-3 text-right space-x-2 whitespace-nowrap">
-              <button class="text-sm text-primary-600 hover:underline" @click="openEditModal(user)">Editar</button>
-              <button class="text-sm text-red-600 hover:underline" @click="handleDelete(user)">Excluir</button>
+            <td class="px-4 py-3 text-right space-x-3 whitespace-nowrap">
+              <button
+                class="inline-flex items-center gap-1 text-sm text-primary-600 hover:underline dark:text-primary-400"
+                @click="openEditModal(user)"
+              >
+                <Pencil :size="14" /> Editar
+              </button>
+              <button
+                class="inline-flex items-center gap-1 text-sm text-red-600 hover:underline dark:text-red-400"
+                @click="handleDelete(user)"
+              >
+                <Trash2 :size="14" /> Excluir
+              </button>
             </td>
           </tr>
         </tbody>
@@ -140,8 +163,12 @@ onMounted(loadUsers)
         />
         <BaseSelect v-model="form.role" label="Perfil" :options="roleOptions" required />
 
-        <label class="flex items-center gap-2 text-sm text-gray-700">
-          <input v-model="form.active" type="checkbox" class="rounded border-gray-300 text-primary-600" />
+        <label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+          <input
+            v-model="form.active"
+            type="checkbox"
+            class="rounded border-gray-300 text-primary-600 dark:border-gray-600 dark:bg-gray-800"
+          />
           Usuário ativo
         </label>
 

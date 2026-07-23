@@ -38,7 +38,7 @@ async function handleSubmit() {
       <BaseInput v-model="email" type="email" label="E-mail" placeholder="seu@email.com" required />
       <BaseInput v-model="password" type="password" label="Senha" placeholder="••••••••" required />
 
-      <p v-if="errorMessage" class="text-sm text-red-600">{{ errorMessage }}</p>
+      <p v-if="errorMessage" class="text-sm text-red-600 dark:text-red-400">{{ errorMessage }}</p>
 
       <BaseButton type="submit" class="w-full" :disabled="loading">
         {{ loading ? 'Entrando...' : 'Entrar' }}

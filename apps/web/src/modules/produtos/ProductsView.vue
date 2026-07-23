@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import { Pencil, Plus, Trash2 } from '@lucide/vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
@@ -133,34 +134,46 @@ onMounted(loadAll)
   <div>
     <PageHeader title="Produtos" subtitle="Cadastro de produtos do estoque">
       <template #actions>
-        <BaseButton @click="openCreateModal">+ Novo produto</BaseButton>
+        <BaseButton @click="openCreateModal"><Plus :size="16" /> Novo produto</BaseButton>
       </template>
     </PageHeader>
 
-    <p v-if="errorMessage" class="text-sm text-red-600 mb-4">{{ errorMessage }}</p>
+    <p v-if="errorMessage" class="text-sm text-red-600 dark:text-red-400 mb-4">{{ errorMessage }}</p>
 
-    <div class="bg-white rounded-xl border border-gray-200 overflow-x-auto">
-      <table class="min-w-full divide-y divide-gray-200">
-        <thead class="bg-gray-50">
+    <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-x-auto">
+      <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+        <thead class="bg-gray-50 dark:bg-gray-900/60">
           <tr>
-            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Produto</th>
-            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Categoria</th>
-            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Estoque</th>
-            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+              Produto
+            </th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+              Categoria
+            </th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+              Estoque
+            </th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Status</th>
             <th class="px-4 py-3" />
           </tr>
         </thead>
-        <tbody class="divide-y divide-gray-100">
+        <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
           <tr v-if="loading">
-            <td colspan="5" class="px-4 py-6 text-center text-sm text-gray-500">Carregando...</td>
+            <td colspan="5" class="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">Carregando...</td>
           </tr>
           <tr v-else-if="products.length === 0">
-            <td colspan="5" class="px-4 py-6 text-center text-sm text-gray-500">Nenhum produto cadastrado.</td>
+            <td colspan="5" class="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">
+              Nenhum produto cadastrado.
+            </td>
           </tr>
           <tr v-for="product in products" v-else :key="product.id">
-            <td class="px-4 py-3 text-sm font-medium text-gray-900 whitespace-nowrap">{{ product.name }}</td>
-            <td class="px-4 py-3 text-sm text-gray-500 whitespace-nowrap">{{ categoryName(product.categoryId) }}</td>
-            <td class="px-4 py-3 text-sm text-gray-700 whitespace-nowrap">
+            <td class="px-4 py-3 text-sm font-medium text-gray-900 dark:text-gray-100 whitespace-nowrap">
+              {{ product.name }}
+            </td>
+            <td class="px-4 py-3 text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">
+              {{ categoryName(product.categoryId) }}
+            </td>
+            <td class="px-4 py-3 text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap">
               {{ Number(product.currentStock) }} {{ unitAbbreviation(product.unitId) }}
               <BaseBadge v-if="Number(product.currentStock) <= Number(product.minStock)" variant="warning" class="ml-1">
                 baixo
@@ -171,9 +184,19 @@ onMounted(loadAll)
                 {{ product.active ? 'Ativo' : 'Inativo' }}
               </BaseBadge>
             </td>
-            <td class="px-4 py-3 text-right space-x-2 whitespace-nowrap">
-              <button class="text-sm text-primary-600 hover:underline" @click="openEditModal(product)">Editar</button>
-              <button class="text-sm text-red-600 hover:underline" @click="handleDelete(product)">Excluir</button>
+            <td class="px-4 py-3 text-right space-x-3 whitespace-nowrap">
+              <button
+                class="inline-flex items-center gap-1 text-sm text-primary-600 hover:underline dark:text-primary-400"
+                @click="openEditModal(product)"
+              >
+                <Pencil :size="14" /> Editar
+              </button>
+              <button
+                class="inline-flex items-center gap-1 text-sm text-red-600 hover:underline dark:text-red-400"
+                @click="handleDelete(product)"
+              >
+                <Trash2 :size="14" /> Excluir
+              </button>
             </td>
           </tr>
         </tbody>
@@ -200,8 +223,12 @@ onMounted(loadAll)
           <BaseInput v-model="form.minStock" type="number" step="0.001" label="Estoque mínimo" required />
         </div>
 
-        <label class="flex items-center gap-2 text-sm text-gray-700">
-          <input v-model="form.active" type="checkbox" class="rounded border-gray-300 text-primary-600" />
+        <label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+          <input
+            v-model="form.active"
+            type="checkbox"
+            class="rounded border-gray-300 text-primary-600 dark:border-gray-600 dark:bg-gray-800"
+          />
           Produto ativo
         </label>
 
