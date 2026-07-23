@@ -5,7 +5,7 @@ import PageHeader from '@/components/ui/PageHeader.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
 import BaseModal from '@/components/ui/BaseModal.vue'
-import { getApiErrorMessage, getApiFieldErrors } from '@/services/api'
+import { getApiErrorMessage, resolveFormError } from '@/services/api'
 import { confirmDelete, toastError, toastSuccess } from '@/lib/alerts'
 import {
   createCategory,
@@ -72,12 +72,9 @@ async function handleSubmit() {
     modalOpen.value = false
     await loadCategories()
   } catch (error) {
-    const apiFieldErrors = getApiFieldErrors(error)
-    if (Object.keys(apiFieldErrors).length > 0) {
-      fieldErrors.value = apiFieldErrors
-    } else {
-      errorMessage.value = getApiErrorMessage(error, 'Não foi possível salvar a categoria')
-    }
+    const result = resolveFormError(error, 'Não foi possível salvar a categoria')
+    fieldErrors.value = result.fieldErrors
+    errorMessage.value = result.message
   } finally {
     saving.value = false
   }
@@ -134,12 +131,19 @@ onMounted(loadCategories)
               Nenhuma categoria cadastrada.
             </td>
           </tr>
-          <tr v-for="category in categories" v-else :key="category.id">
+          <tr
+            v-for="category in categories"
+            v-else
+            :key="category.id"
+            class="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/40"
+            title="Duplo clique para editar"
+            @dblclick="openEditModal(category)"
+          >
             <td class="px-4 py-3 text-sm font-medium text-gray-900 dark:text-gray-100">{{ category.name }}</td>
             <td class="px-4 py-3 text-sm text-gray-500 dark:text-gray-400 hidden sm:table-cell">
               {{ category.description || '—' }}
             </td>
-            <td class="px-4 py-3 text-right space-x-1 whitespace-nowrap">
+            <td class="px-4 py-3 text-right space-x-1 whitespace-nowrap" @dblclick.stop>
               <button
                 class="inline-flex items-center justify-center h-8 w-8 rounded-lg text-primary-600 hover:bg-primary-50 dark:text-primary-400 dark:hover:bg-primary-900/30"
                 title="Editar"

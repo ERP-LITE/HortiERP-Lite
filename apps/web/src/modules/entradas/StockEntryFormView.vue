@@ -27,15 +27,18 @@ const errorMessage = ref('')
 const supplierName = ref('')
 const notes = ref('')
 const items = ref<ItemRow[]>([{ productId: '', quantity: '', unitCost: '' }])
+const itemErrors = ref<{ productId?: string; quantity?: string }[]>([])
 
 const productOptions = computed(() => products.value.map((p) => ({ value: p.id, label: p.name })))
 
 function addItem() {
   items.value.push({ productId: '', quantity: '', unitCost: '' })
+  itemErrors.value = []
 }
 
 function removeItem(index: number) {
   items.value.splice(index, 1)
+  itemErrors.value = []
 }
 
 async function loadProducts() {
@@ -49,21 +52,32 @@ async function loadProducts() {
   }
 }
 
+function validate(): boolean {
+  itemErrors.value = items.value.map((item) => {
+    const rowErrors: { productId?: string; quantity?: string } = {}
+    if (!item.productId) rowErrors.productId = 'Selecione o produto'
+    if (!item.quantity || Number(item.quantity) <= 0) rowErrors.quantity = 'Informe uma quantidade maior que zero'
+    return rowErrors
+  })
+
+  return itemErrors.value.every((rowErrors) => Object.keys(rowErrors).length === 0)
+}
+
 async function handleSubmit() {
   errorMessage.value = ''
+  if (!validate()) return
+
   saving.value = true
 
   try {
     await createStockEntry({
       supplierName: supplierName.value || undefined,
       notes: notes.value || undefined,
-      items: items.value
-        .filter((item) => item.productId && item.quantity)
-        .map((item) => ({
-          productId: item.productId,
-          quantity: Number(item.quantity),
-          unitCost: item.unitCost ? Number(item.unitCost) : undefined,
-        })),
+      items: items.value.map((item) => ({
+        productId: item.productId,
+        quantity: Number(item.quantity),
+        unitCost: item.unitCost ? Number(item.unitCost) : undefined,
+      })),
     })
     toastSuccess('Entrada registrada com sucesso')
     router.push({ name: 'entradas' })
@@ -97,10 +111,11 @@ onMounted(loadProducts)
           <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300">Itens</h3>
           <button
             type="button"
-            class="inline-flex items-center gap-1 text-sm text-primary-600 hover:underline dark:text-primary-400"
+            class="inline-flex items-center justify-center h-8 w-8 rounded-lg text-primary-600 hover:bg-primary-50 dark:text-primary-400 dark:hover:bg-primary-900/30"
+            title="Adicionar item"
             @click="addItem"
           >
-            <Plus :size="14" /> Adicionar item
+            <Plus :size="16" />
           </button>
         </div>
 
@@ -108,19 +123,34 @@ onMounted(loadProducts)
           <div
             v-for="(item, index) in items"
             :key="index"
-            class="grid grid-cols-1 sm:grid-cols-[2fr_1fr_1fr_auto] gap-3 items-end border border-gray-100 dark:border-gray-700 rounded-lg p-3"
+            class="grid grid-cols-1 sm:grid-cols-[2fr_1fr_1fr_auto] gap-3 items-start border border-gray-100 dark:border-gray-700 rounded-lg p-3"
           >
-            <BaseSelect v-model="item.productId" label="Produto" :options="productOptions" required />
-            <BaseInput v-model="item.quantity" type="number" step="0.001" label="Quantidade" required />
+            <BaseSelect
+              v-model="item.productId"
+              label="Produto"
+              :options="productOptions"
+              :error="itemErrors[index]?.productId"
+            />
+            <BaseInput
+              v-model="item.quantity"
+              type="number"
+              step="0.001"
+              label="Quantidade"
+              :error="itemErrors[index]?.quantity"
+            />
             <BaseInput v-model="item.unitCost" type="number" step="0.01" label="Custo unit. (opcional)" />
-            <button
-              type="button"
-              class="inline-flex items-center gap-1 text-sm text-red-600 hover:underline dark:text-red-400 mb-2 disabled:opacity-40 disabled:pointer-events-none"
-              :disabled="items.length === 1"
-              @click="removeItem(index)"
-            >
-              <Trash2 :size="14" /> Remover
-            </button>
+            <div class="flex flex-col">
+              <span class="block text-sm font-medium mb-1 invisible">Remover</span>
+              <button
+                type="button"
+                class="inline-flex items-center justify-center h-9 w-9 rounded-lg text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/30 disabled:opacity-40 disabled:pointer-events-none"
+                title="Remover item"
+                :disabled="items.length === 1"
+                @click="removeItem(index)"
+              >
+                <Trash2 :size="16" />
+              </button>
+            </div>
           </div>
         </div>
       </div>

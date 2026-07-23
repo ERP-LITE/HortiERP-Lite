@@ -7,7 +7,7 @@ import BaseInput from '@/components/ui/BaseInput.vue'
 import BaseSelect from '@/components/ui/BaseSelect.vue'
 import BaseModal from '@/components/ui/BaseModal.vue'
 import BaseBadge from '@/components/ui/BaseBadge.vue'
-import { getApiErrorMessage } from '@/services/api'
+import { getApiErrorMessage, resolveFormError } from '@/services/api'
 import { toastSuccess } from '@/lib/alerts'
 import { listProducts } from '@/services/productsService'
 import { createLoss, listLosses } from '@/services/lossesService'
@@ -31,6 +31,7 @@ const errorMessage = ref('')
 const modalOpen = ref(false)
 const saving = ref(false)
 const form = ref({ productId: '', quantity: '', reason: '' as LossReason | '', notes: '' })
+const fieldErrors = ref<Record<string, string>>({})
 
 const productOptions = computed(() => products.value.map((p) => ({ value: p.id, label: p.name })))
 
@@ -53,10 +54,22 @@ async function loadAll() {
 
 function openCreateModal() {
   form.value = { productId: '', quantity: '', reason: '', notes: '' }
+  fieldErrors.value = {}
   modalOpen.value = true
 }
 
+function validate(): boolean {
+  fieldErrors.value = {}
+  if (!form.value.productId) fieldErrors.value.productId = 'Selecione o produto'
+  if (!form.value.quantity || Number(form.value.quantity) <= 0) {
+    fieldErrors.value.quantity = 'Informe uma quantidade maior que zero'
+  }
+  if (!form.value.reason) fieldErrors.value.reason = 'Selecione o motivo'
+  return Object.keys(fieldErrors.value).length === 0
+}
+
 async function handleSubmit() {
+  if (!validate()) return
   if (!form.value.reason) return
 
   saving.value = true
@@ -71,7 +84,9 @@ async function handleSubmit() {
     await loadAll()
     toastSuccess('Perda registrada com sucesso')
   } catch (error) {
-    errorMessage.value = getApiErrorMessage(error, 'Não foi possível registrar a perda')
+    const result = resolveFormError(error, 'Não foi possível registrar a perda')
+    fieldErrors.value = result.fieldErrors
+    errorMessage.value = result.message
   } finally {
     saving.value = false
   }
@@ -143,9 +158,15 @@ onMounted(loadAll)
 
     <BaseModal :open="modalOpen" title="Registrar perda" @close="modalOpen = false">
       <form class="space-y-4" @submit.prevent="handleSubmit">
-        <BaseSelect v-model="form.productId" label="Produto" :options="productOptions" required />
-        <BaseInput v-model="form.quantity" type="number" step="0.001" label="Quantidade" required />
-        <BaseSelect v-model="form.reason" label="Motivo" :options="reasonOptions" required />
+        <BaseSelect v-model="form.productId" label="Produto" :options="productOptions" :error="fieldErrors.productId" />
+        <BaseInput
+          v-model="form.quantity"
+          type="number"
+          step="0.001"
+          label="Quantidade"
+          :error="fieldErrors.quantity"
+        />
+        <BaseSelect v-model="form.reason" label="Motivo" :options="reasonOptions" :error="fieldErrors.reason" />
         <BaseInput v-model="form.notes" label="Observações (opcional)" />
 
         <div class="flex justify-end gap-2 pt-2">

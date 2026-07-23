@@ -52,3 +52,17 @@ export function getApiFieldErrors(error: unknown): Record<string, string> {
 
   return fieldErrors
 }
+
+/**
+ * Splits an API error into either per-field messages (when the backend
+ * flagged specific fields) or a single fallback message, so form views don't
+ * each repeat the same field-errors-vs-generic-message branching.
+ */
+export function resolveFormError(error: unknown, fallback: string): { fieldErrors: Record<string, string>; message: string } {
+  const fieldErrors = getApiFieldErrors(error)
+  if (Object.keys(fieldErrors).length > 0) {
+    return { fieldErrors, message: '' }
+  }
+
+  return { fieldErrors: {}, message: getApiErrorMessage(error, fallback) }
+}

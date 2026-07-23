@@ -1,22 +1,23 @@
 import bcrypt from 'bcryptjs'
-import { and, asc, eq, isNull, ne, sql } from 'drizzle-orm'
+import { and, asc, eq, isNull } from 'drizzle-orm'
 import { db } from '../../db/client.js'
 import { users } from '../../db/schema/index.js'
 import { AppError } from '../../shared/errors/AppError.js'
+import { assertUniqueField } from '../../shared/db/assertUniqueField.js'
 import type { CreateUserInput, UpdateUserInput } from './users.schema.js'
 
 // email is globally unique at the DB level (not scoped by company), so the
 // duplicate check below intentionally ignores deletedAt and companyId too.
-async function assertUniqueEmail(email: string, excludeId?: string) {
-  const conditions = [sql`lower(${users.email}) = lower(${email})`]
-  if (excludeId) conditions.push(ne(users.id, excludeId))
-
-  const [existing] = await db
-    .select({ id: users.id })
-    .from(users)
-    .where(and(...conditions))
-
-  if (existing) throw AppError.duplicate('email', 'Já existe um usuário com esse e-mail')
+function assertUniqueEmail(email: string, excludeId?: string) {
+  return assertUniqueField({
+    table: users,
+    idColumn: users.id,
+    valueColumn: users.email,
+    value: email,
+    excludeId,
+    field: 'email',
+    message: 'Já existe um usuário com esse e-mail',
+  })
 }
 
 function isUniqueViolation(error: unknown): boolean {
