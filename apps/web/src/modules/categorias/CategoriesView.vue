@@ -5,7 +5,8 @@ import PageHeader from '@/components/ui/PageHeader.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
 import BaseModal from '@/components/ui/BaseModal.vue'
-import { getApiErrorMessage } from '@/services/api'
+import { getApiErrorMessage, getApiFieldErrors } from '@/services/api'
+import { confirmDelete, toastError, toastSuccess } from '@/lib/alerts'
 import {
   createCategory,
   deleteCategory,
@@ -23,6 +24,7 @@ const modalOpen = ref(false)
 const editingId = ref<string | null>(null)
 const form = ref<CategoryInput>({ name: '', description: '' })
 const saving = ref(false)
+const fieldErrors = ref<Record<string, string>>({})
 
 async function loadCategories() {
   loading.value = true
@@ -38,40 +40,62 @@ async function loadCategories() {
 function openCreateModal() {
   editingId.value = null
   form.value = { name: '', description: '' }
+  fieldErrors.value = {}
   modalOpen.value = true
 }
 
 function openEditModal(category: Category) {
   editingId.value = category.id
   form.value = { name: category.name, description: category.description ?? '' }
+  fieldErrors.value = {}
   modalOpen.value = true
 }
 
+function validate(): boolean {
+  fieldErrors.value = {}
+  if (!form.value.name.trim()) fieldErrors.value.name = 'Informe o nome da categoria'
+  return Object.keys(fieldErrors.value).length === 0
+}
+
 async function handleSubmit() {
+  if (!validate()) return
+
   saving.value = true
   try {
     if (editingId.value) {
       await updateCategory(editingId.value, form.value)
+      toastSuccess('Categoria atualizada com sucesso')
     } else {
       await createCategory(form.value)
+      toastSuccess('Categoria criada com sucesso')
     }
     modalOpen.value = false
     await loadCategories()
   } catch (error) {
-    errorMessage.value = getApiErrorMessage(error, 'Não foi possível salvar a categoria')
+    const apiFieldErrors = getApiFieldErrors(error)
+    if (Object.keys(apiFieldErrors).length > 0) {
+      fieldErrors.value = apiFieldErrors
+    } else {
+      errorMessage.value = getApiErrorMessage(error, 'Não foi possível salvar a categoria')
+    }
   } finally {
     saving.value = false
   }
 }
 
 async function handleDelete(category: Category) {
-  if (!confirm(`Excluir a categoria "${category.name}"?`)) return
+  const confirmed = await confirmDelete({
+    title: `Excluir a categoria "${category.name}"?`,
+    text: 'Essa ação não pode ser desfeita.',
+  })
+  if (!confirmed) return
 
   try {
     await deleteCategory(category.id)
     await loadCategories()
+    toastSuccess('Categoria excluída com sucesso')
   } catch (error) {
-    errorMessage.value = getApiErrorMessage(error, 'Não foi possível excluir a categoria')
+    toastError(getApiErrorMessage(error, 'Não foi possível excluir a categoria'))
   }
 }
 
@@ -115,18 +139,20 @@ onMounted(loadCategories)
             <td class="px-4 py-3 text-sm text-gray-500 dark:text-gray-400 hidden sm:table-cell">
               {{ category.description || '—' }}
             </td>
-            <td class="px-4 py-3 text-right space-x-3 whitespace-nowrap">
+            <td class="px-4 py-3 text-right space-x-1 whitespace-nowrap">
               <button
-                class="inline-flex items-center gap-1 text-sm text-primary-600 hover:underline dark:text-primary-400"
+                class="inline-flex items-center justify-center h-8 w-8 rounded-lg text-primary-600 hover:bg-primary-50 dark:text-primary-400 dark:hover:bg-primary-900/30"
+                title="Editar"
                 @click="openEditModal(category)"
               >
-                <Pencil :size="14" /> Editar
+                <Pencil :size="16" />
               </button>
               <button
-                class="inline-flex items-center gap-1 text-sm text-red-600 hover:underline dark:text-red-400"
+                class="inline-flex items-center justify-center h-8 w-8 rounded-lg text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/30"
+                title="Excluir"
                 @click="handleDelete(category)"
               >
-                <Trash2 :size="14" /> Excluir
+                <Trash2 :size="16" />
               </button>
             </td>
           </tr>
@@ -136,7 +162,7 @@ onMounted(loadCategories)
 
     <BaseModal :open="modalOpen" :title="editingId ? 'Editar categoria' : 'Nova categoria'" @close="modalOpen = false">
       <form class="space-y-4" @submit.prevent="handleSubmit">
-        <BaseInput v-model="form.name" label="Nome" required />
+        <BaseInput v-model="form.name" label="Nome" :error="fieldErrors.name" />
         <BaseInput v-model="form.description" label="Descrição" />
         <div class="flex justify-end gap-2 pt-2">
           <BaseButton variant="secondary" type="button" @click="modalOpen = false">Cancelar</BaseButton>

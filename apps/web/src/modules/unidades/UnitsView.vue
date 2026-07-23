@@ -5,7 +5,8 @@ import PageHeader from '@/components/ui/PageHeader.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
 import BaseModal from '@/components/ui/BaseModal.vue'
-import { getApiErrorMessage } from '@/services/api'
+import { getApiErrorMessage, getApiFieldErrors } from '@/services/api'
+import { confirmDelete, toastError, toastSuccess } from '@/lib/alerts'
 import { createUnit, deleteUnit, listUnits, updateUnit, type UnitInput } from '@/services/unitsService'
 import type { Unit } from '@/types'
 
@@ -17,6 +18,7 @@ const modalOpen = ref(false)
 const editingId = ref<string | null>(null)
 const form = ref<UnitInput>({ name: '', abbreviation: '' })
 const saving = ref(false)
+const fieldErrors = ref<Record<string, string>>({})
 
 async function loadUnits() {
   loading.value = true
@@ -32,40 +34,63 @@ async function loadUnits() {
 function openCreateModal() {
   editingId.value = null
   form.value = { name: '', abbreviation: '' }
+  fieldErrors.value = {}
   modalOpen.value = true
 }
 
 function openEditModal(unit: Unit) {
   editingId.value = unit.id
   form.value = { name: unit.name, abbreviation: unit.abbreviation }
+  fieldErrors.value = {}
   modalOpen.value = true
 }
 
+function validate(): boolean {
+  fieldErrors.value = {}
+  if (!form.value.name.trim()) fieldErrors.value.name = 'Informe o nome da unidade'
+  if (!form.value.abbreviation.trim()) fieldErrors.value.abbreviation = 'Informe a abreviação'
+  return Object.keys(fieldErrors.value).length === 0
+}
+
 async function handleSubmit() {
+  if (!validate()) return
+
   saving.value = true
   try {
     if (editingId.value) {
       await updateUnit(editingId.value, form.value)
+      toastSuccess('Unidade atualizada com sucesso')
     } else {
       await createUnit(form.value)
+      toastSuccess('Unidade criada com sucesso')
     }
     modalOpen.value = false
     await loadUnits()
   } catch (error) {
-    errorMessage.value = getApiErrorMessage(error, 'Não foi possível salvar a unidade')
+    const apiFieldErrors = getApiFieldErrors(error)
+    if (Object.keys(apiFieldErrors).length > 0) {
+      fieldErrors.value = apiFieldErrors
+    } else {
+      errorMessage.value = getApiErrorMessage(error, 'Não foi possível salvar a unidade')
+    }
   } finally {
     saving.value = false
   }
 }
 
 async function handleDelete(unit: Unit) {
-  if (!confirm(`Excluir a unidade "${unit.name}"?`)) return
+  const confirmed = await confirmDelete({
+    title: `Excluir a unidade "${unit.name}"?`,
+    text: 'Essa ação não pode ser desfeita.',
+  })
+  if (!confirmed) return
 
   try {
     await deleteUnit(unit.id)
     await loadUnits()
+    toastSuccess('Unidade excluída com sucesso')
   } catch (error) {
-    errorMessage.value = getApiErrorMessage(error, 'Não foi possível excluir a unidade')
+    toastError(getApiErrorMessage(error, 'Não foi possível excluir a unidade'))
   }
 }
 
@@ -105,18 +130,20 @@ onMounted(loadUnits)
           <tr v-for="unit in units" v-else :key="unit.id">
             <td class="px-4 py-3 text-sm font-medium text-gray-900 dark:text-gray-100">{{ unit.name }}</td>
             <td class="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">{{ unit.abbreviation }}</td>
-            <td class="px-4 py-3 text-right space-x-3 whitespace-nowrap">
+            <td class="px-4 py-3 text-right space-x-1 whitespace-nowrap">
               <button
-                class="inline-flex items-center gap-1 text-sm text-primary-600 hover:underline dark:text-primary-400"
+                class="inline-flex items-center justify-center h-8 w-8 rounded-lg text-primary-600 hover:bg-primary-50 dark:text-primary-400 dark:hover:bg-primary-900/30"
+                title="Editar"
                 @click="openEditModal(unit)"
               >
-                <Pencil :size="14" /> Editar
+                <Pencil :size="16" />
               </button>
               <button
-                class="inline-flex items-center gap-1 text-sm text-red-600 hover:underline dark:text-red-400"
+                class="inline-flex items-center justify-center h-8 w-8 rounded-lg text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/30"
+                title="Excluir"
                 @click="handleDelete(unit)"
               >
-                <Trash2 :size="14" /> Excluir
+                <Trash2 :size="16" />
               </button>
             </td>
           </tr>
@@ -126,8 +153,8 @@ onMounted(loadUnits)
 
     <BaseModal :open="modalOpen" :title="editingId ? 'Editar unidade' : 'Nova unidade'" @close="modalOpen = false">
       <form class="space-y-4" @submit.prevent="handleSubmit">
-        <BaseInput v-model="form.name" label="Nome" required />
-        <BaseInput v-model="form.abbreviation" label="Abreviação" required />
+        <BaseInput v-model="form.name" label="Nome" :error="fieldErrors.name" />
+        <BaseInput v-model="form.abbreviation" label="Abreviação" :error="fieldErrors.abbreviation" />
         <div class="flex justify-end gap-2 pt-2">
           <BaseButton variant="secondary" type="button" @click="modalOpen = false">Cancelar</BaseButton>
           <BaseButton type="submit" :disabled="saving">{{ saving ? 'Salvando...' : 'Salvar' }}</BaseButton>

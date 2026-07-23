@@ -8,6 +8,7 @@ export function errorHandler(error: FastifyError | Error, request: FastifyReques
       error: {
         code: error.code,
         message: error.message,
+        ...(error.issues ? { issues: error.issues } : {}),
       },
     })
   }

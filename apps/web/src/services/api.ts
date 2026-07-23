@@ -1,4 +1,5 @@
 import axios from 'axios'
+import type { ApiErrorPayload } from '@/types'
 
 export const TOKEN_STORAGE_KEY = 'hortierp_token'
 
@@ -36,4 +37,18 @@ export function getApiErrorMessage(error: unknown, fallback = 'Ocorreu um erro i
   }
 
   return fallback
+}
+
+export function getApiFieldErrors(error: unknown): Record<string, string> {
+  if (!axios.isAxiosError(error)) return {}
+
+  const issues = (error.response?.data as ApiErrorPayload | undefined)?.error?.issues
+  if (!issues) return {}
+
+  const fieldErrors: Record<string, string> = {}
+  for (const [field, messages] of Object.entries(issues)) {
+    if (messages && messages.length > 0) fieldErrors[field] = messages[0]
+  }
+
+  return fieldErrors
 }
