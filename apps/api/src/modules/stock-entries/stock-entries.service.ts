@@ -1,0 +1,77 @@
+import { and, eq } from 'drizzle-orm'
+import { db } from '../../db/client.js'
+import { products, stockEntries, stockMovements, stockEntryItems } from '../../db/schema/index.js'
+import { AppError } from '../../shared/errors/AppError.js'
+import type { CreateStockEntryInput } from './stock-entries.schema.js'
+
+export async function listStockEntries(companyId: string) {
+  return db.query.stockEntries.findMany({
+    where: eq(stockEntries.companyId, companyId),
+    with: { items: { with: { product: true } } },
+    orderBy: (entries, { desc: desc_ }) => [desc_(entries.entryDate)],
+  })
+}
+
+export async function getStockEntry(companyId: string, id: string) {
+  const entry = await db.query.stockEntries.findFirst({
+    where: and(eq(stockEntries.id, id), eq(stockEntries.companyId, companyId)),
+    with: { items: { with: { product: true } } },
+  })
+
+  if (!entry) throw AppError.notFound('Entrada de mercadoria não encontrada')
+
+  return entry
+}
+
+export async function createStockEntry(companyId: string, userId: string, data: CreateStockEntryInput) {
+  return db.transaction(async (tx) => {
+    const [entry] = await tx
+      .insert(stockEntries)
+      .values({
+        companyId,
+        supplierName: data.supplierName,
+        entryDate: data.entryDate ?? new Date(),
+        notes: data.notes,
+        createdBy: userId,
+      })
+      .returning()
+
+    for (const item of data.items) {
+      const [product] = await tx
+        .select()
+        .from(products)
+        .where(and(eq(products.id, item.productId), eq(products.companyId, companyId)))
+
+      if (!product) {
+        throw AppError.notFound(`Produto não encontrado: ${item.productId}`)
+      }
+
+      await tx.insert(stockEntryItems).values({
+        stockEntryId: entry.id,
+        productId: item.productId,
+        quantity: item.quantity.toString(),
+        unitCost: item.unitCost?.toString(),
+      })
+
+      const newStock = Number(product.currentStock) + item.quantity
+
+      await tx
+        .update(products)
+        .set({ currentStock: newStock.toString(), updatedAt: new Date(), updatedBy: userId })
+        .where(eq(products.id, item.productId))
+
+      await tx.insert(stockMovements).values({
+        companyId,
+        productId: item.productId,
+        type: 'entrada',
+        quantity: item.quantity.toString(),
+        balanceAfter: newStock.toString(),
+        referenceType: 'stock_entry',
+        referenceId: entry.id,
+        createdBy: userId,
+      })
+    }
+
+    return entry
+  })
+}
