@@ -29,3 +29,4 @@ docker/postgres/data/
 # Coverage / temp
 coverage/
 tmp/
+*.tsbuildinfo
