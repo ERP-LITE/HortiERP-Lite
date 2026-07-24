@@ -44,7 +44,7 @@ function removeItem(index: number) {
 async function loadProducts() {
   loading.value = true
   try {
-    products.value = await listProducts()
+    products.value = (await listProducts({ page: 1, pageSize: 100 })).data
   } catch (error) {
     errorMessage.value = getApiErrorMessage(error)
   } finally {

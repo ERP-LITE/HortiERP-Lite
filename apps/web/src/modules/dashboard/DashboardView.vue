@@ -4,6 +4,9 @@ import { AlertTriangle, Coins, Package, TrendingDown } from '@lucide/vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import StatCard from '@/components/ui/StatCard.vue'
 import BaseBadge from '@/components/ui/BaseBadge.vue'
+import DonutChart from '@/components/charts/DonutChart.vue'
+import MovementsTrendChart from '@/components/charts/MovementsTrendChart.vue'
+import LossesByReasonChart from '@/components/charts/LossesByReasonChart.vue'
 import { getApiErrorMessage } from '@/services/api'
 import { fetchDashboardSummary } from '@/services/dashboardService'
 import type { DashboardSummary, MovementType } from '@/types'
@@ -71,7 +74,40 @@ onMounted(loadSummary)
         />
       </div>
 
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+        <div
+          class="lg:col-span-2 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden"
+        >
+          <div class="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
+            <h2 class="text-sm font-semibold text-gray-700 dark:text-gray-300">Movimentações — últimos 14 dias</h2>
+          </div>
+          <div class="p-4">
+            <MovementsTrendChart :data="summary.movementsTimeline" />
+          </div>
+        </div>
+
+        <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+          <div class="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
+            <h2 class="text-sm font-semibold text-gray-700 dark:text-gray-300">Estoque por categoria</h2>
+          </div>
+          <div class="p-4">
+            <DonutChart
+              :data="summary.stockByCategory.map((c) => ({ label: c.categoryName, value: c.totalStock }))"
+            />
+          </div>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+          <div class="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
+            <h2 class="text-sm font-semibold text-gray-700 dark:text-gray-300">Perdas por motivo (30 dias)</h2>
+          </div>
+          <div class="p-4">
+            <LossesByReasonChart :data="summary.lossesByReason" />
+          </div>
+        </div>
+
         <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
           <div class="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
             <h2 class="text-sm font-semibold text-gray-700 dark:text-gray-300">Produtos com estoque baixo</h2>

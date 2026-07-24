@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { Pencil, Plus, Trash2 } from '@lucide/vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
@@ -8,18 +8,43 @@ import BaseSelect from '@/components/ui/BaseSelect.vue'
 import BaseModal from '@/components/ui/BaseModal.vue'
 import BaseBadge from '@/components/ui/BaseBadge.vue'
 import BaseToggle from '@/components/ui/BaseToggle.vue'
+import Pagination from '@/components/ui/Pagination.vue'
+import FilterButton from '@/components/ui/FilterButton.vue'
 import { getApiErrorMessage, resolveFormError } from '@/services/api'
 import { confirmDelete, toastError, toastSuccess } from '@/lib/alerts'
 import { listCategories } from '@/services/categoriesService'
 import { listUnits } from '@/services/unitsService'
 import { createProduct, deleteProduct, listProducts, updateProduct } from '@/services/productsService'
+import { useAuthStore } from '@/stores/auth'
+import { usePagination } from '@/composables/usePagination'
 import type { Category, Product, Unit } from '@/types'
+
+const auth = useAuthStore()
+const canManage = computed(() => auth.user?.role === 'admin' || auth.user?.role === 'gerente')
+
+const { page, pageSize, total, totalPages, applyMeta } = usePagination()
 
 const products = ref<Product[]>([])
 const categories = ref<Category[]>([])
 const units = ref<Unit[]>([])
 const loading = ref(true)
 const errorMessage = ref('')
+
+const emptyFilters = { search: '', categoryId: 'todas', active: 'todos' }
+const filters = ref({ ...emptyFilters })
+const draftFilters = ref({ ...emptyFilters })
+const filterModalOpen = ref(false)
+const activeFilterCount = computed(
+  () =>
+    Number(filters.value.search !== '') +
+    Number(filters.value.categoryId !== 'todas') +
+    Number(filters.value.active !== 'todos'),
+)
+const statusFilterOptions = [
+  { value: 'todos', label: 'Todos' },
+  { value: 'true', label: 'Ativo' },
+  { value: 'false', label: 'Inativo' },
+]
 
 const modalOpen = ref(false)
 const editingId = ref<string | null>(null)
@@ -41,6 +66,7 @@ const form = ref({ ...emptyForm })
 
 const categoryOptions = computed(() => categories.value.map((c) => ({ value: c.id, label: c.name })))
 const unitOptions = computed(() => units.value.map((u) => ({ value: u.id, label: `${u.name} (${u.abbreviation})` })))
+const categoryFilterOptions = computed(() => [{ value: 'todas', label: 'Todas as categorias' }, ...categoryOptions.value])
 
 function categoryName(id: string) {
   return categories.value.find((c) => c.id === id)?.name ?? '—'
@@ -50,22 +76,56 @@ function unitAbbreviation(id: string) {
   return units.value.find((u) => u.id === id)?.abbreviation ?? '—'
 }
 
-async function loadAll() {
+async function loadProducts() {
   loading.value = true
   try {
-    const [productsData, categoriesData, unitsData] = await Promise.all([
-      listProducts(),
-      listCategories(),
-      listUnits(),
-    ])
-    products.value = productsData
-    categories.value = categoriesData
-    units.value = unitsData
+    const result = await listProducts({
+      page: page.value,
+      pageSize: pageSize.value,
+      search: filters.value.search || undefined,
+      categoryId: filters.value.categoryId !== 'todas' ? filters.value.categoryId : undefined,
+      active: filters.value.active === 'todos' ? undefined : filters.value.active === 'true',
+    })
+    products.value = result.data
+    applyMeta(result)
   } catch (error) {
     errorMessage.value = getApiErrorMessage(error)
   } finally {
     loading.value = false
   }
+}
+
+async function loadFormOptions() {
+  try {
+    const [categoriesResult, unitsResult] = await Promise.all([
+      listCategories({ page: 1, pageSize: 100 }),
+      listUnits({ page: 1, pageSize: 100 }),
+    ])
+    categories.value = categoriesResult.data
+    units.value = unitsResult.data
+  } catch (error) {
+    errorMessage.value = getApiErrorMessage(error)
+  }
+}
+
+async function loadAll() {
+  await Promise.all([loadProducts(), loadFormOptions()])
+}
+
+function openFilterModal() {
+  draftFilters.value = { ...filters.value }
+  filterModalOpen.value = true
+}
+
+function applyFilters() {
+  filters.value = { ...draftFilters.value }
+  filterModalOpen.value = false
+  page.value = 1
+  loadProducts()
+}
+
+function clearFilters() {
+  draftFilters.value = { ...emptyFilters }
 }
 
 function openCreateModal() {
@@ -151,6 +211,7 @@ async function handleDelete(product: Product) {
   }
 }
 
+watch([page, pageSize], loadProducts)
 onMounted(loadAll)
 </script>
 
@@ -158,7 +219,8 @@ onMounted(loadAll)
   <div>
     <PageHeader title="Produtos" subtitle="Cadastro de produtos do estoque">
       <template #actions>
-        <BaseButton @click="openCreateModal"><Plus :size="16" /> Novo produto</BaseButton>
+        <FilterButton :active="activeFilterCount" @click="openFilterModal" />
+        <BaseButton v-if="canManage" @click="openCreateModal"><Plus :size="16" /> Novo produto</BaseButton>
       </template>
     </PageHeader>
 
@@ -194,9 +256,10 @@ onMounted(loadAll)
             v-for="product in products"
             v-else
             :key="product.id"
-            class="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/40"
-            title="Duplo clique para editar"
-            @dblclick="openEditModal(product)"
+            class="hover:bg-gray-50 dark:hover:bg-gray-700/40"
+            :class="canManage ? 'cursor-pointer' : ''"
+            :title="canManage ? 'Duplo clique para editar' : ''"
+            @dblclick="canManage && openEditModal(product)"
           >
             <td class="px-4 py-3 text-sm font-medium text-gray-900 dark:text-gray-100 whitespace-nowrap">
               {{ product.name }}
@@ -215,7 +278,7 @@ onMounted(loadAll)
                 {{ product.active ? 'Ativo' : 'Inativo' }}
               </BaseBadge>
             </td>
-            <td class="px-4 py-3 text-right space-x-1 whitespace-nowrap" @dblclick.stop>
+            <td v-if="canManage" class="px-4 py-3 text-right space-x-1 whitespace-nowrap" @dblclick.stop>
               <button
                 class="inline-flex items-center justify-center h-8 w-8 rounded-lg text-primary-600 hover:bg-primary-50 dark:text-primary-400 dark:hover:bg-primary-900/30"
                 title="Editar"
@@ -231,9 +294,18 @@ onMounted(loadAll)
                 <Trash2 :size="16" />
               </button>
             </td>
+            <td v-else class="px-4 py-3" />
           </tr>
         </tbody>
       </table>
+      <Pagination
+        :page="page"
+        :page-size="pageSize"
+        :total="total"
+        :total-pages="totalPages"
+        @update:page="page = $event"
+        @update:page-size="pageSize = $event"
+      />
     </div>
 
     <BaseModal :open="modalOpen" :title="editingId ? 'Editar produto' : 'Novo produto'" @close="modalOpen = false">
@@ -271,6 +343,24 @@ onMounted(loadAll)
         <div class="flex justify-end gap-2 pt-2">
           <BaseButton variant="secondary" type="button" @click="modalOpen = false">Cancelar</BaseButton>
           <BaseButton type="submit" :disabled="saving">{{ saving ? 'Salvando...' : 'Salvar' }}</BaseButton>
+        </div>
+      </form>
+    </BaseModal>
+
+    <BaseModal :open="filterModalOpen" title="Filtrar produtos" @close="filterModalOpen = false">
+      <form class="space-y-4" @submit.prevent="applyFilters">
+        <BaseInput v-model="draftFilters.search" label="Nome ou SKU" placeholder="Buscar..." />
+        <BaseSelect v-model="draftFilters.categoryId" label="Categoria" :options="categoryFilterOptions" />
+        <BaseSelect v-model="draftFilters.active" label="Status" :options="statusFilterOptions" />
+
+        <div class="flex justify-between items-center pt-2">
+          <button type="button" class="text-sm text-gray-500 hover:underline dark:text-gray-400" @click="clearFilters">
+            Limpar
+          </button>
+          <div class="flex gap-2">
+            <BaseButton variant="secondary" type="button" @click="filterModalOpen = false">Cancelar</BaseButton>
+            <BaseButton type="submit">Aplicar</BaseButton>
+          </div>
         </div>
       </form>
     </BaseModal>

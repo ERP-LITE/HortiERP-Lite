@@ -1,10 +1,12 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { Pencil, Plus, Trash2 } from '@lucide/vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
 import BaseModal from '@/components/ui/BaseModal.vue'
+import Pagination from '@/components/ui/Pagination.vue'
+import FilterButton from '@/components/ui/FilterButton.vue'
 import { getApiErrorMessage, resolveFormError } from '@/services/api'
 import { confirmDelete, toastError, toastSuccess } from '@/lib/alerts'
 import {
@@ -14,11 +16,23 @@ import {
   updateCategory,
   type CategoryInput,
 } from '@/services/categoriesService'
+import { useAuthStore } from '@/stores/auth'
+import { usePagination } from '@/composables/usePagination'
 import type { Category } from '@/types'
+
+const auth = useAuthStore()
+const canManage = computed(() => auth.user?.role === 'admin' || auth.user?.role === 'gerente')
+
+const { page, pageSize, total, totalPages, applyMeta } = usePagination()
 
 const categories = ref<Category[]>([])
 const loading = ref(true)
 const errorMessage = ref('')
+
+const search = ref('')
+const draftSearch = ref('')
+const filterModalOpen = ref(false)
+const activeFilterCount = computed(() => Number(search.value !== ''))
 
 const modalOpen = ref(false)
 const editingId = ref<string | null>(null)
@@ -29,12 +43,30 @@ const fieldErrors = ref<Record<string, string>>({})
 async function loadCategories() {
   loading.value = true
   try {
-    categories.value = await listCategories()
+    const result = await listCategories({ page: page.value, pageSize: pageSize.value, search: search.value || undefined })
+    categories.value = result.data
+    applyMeta(result)
   } catch (error) {
     errorMessage.value = getApiErrorMessage(error)
   } finally {
     loading.value = false
   }
+}
+
+function openFilterModal() {
+  draftSearch.value = search.value
+  filterModalOpen.value = true
+}
+
+function applyFilters() {
+  search.value = draftSearch.value
+  filterModalOpen.value = false
+  page.value = 1
+  loadCategories()
+}
+
+function clearFilters() {
+  draftSearch.value = ''
 }
 
 function openCreateModal() {
@@ -96,6 +128,7 @@ async function handleDelete(category: Category) {
   }
 }
 
+watch([page, pageSize], loadCategories)
 onMounted(loadCategories)
 </script>
 
@@ -103,7 +136,8 @@ onMounted(loadCategories)
   <div>
     <PageHeader title="Categorias" subtitle="Organize seus produtos por categoria">
       <template #actions>
-        <BaseButton @click="openCreateModal"><Plus :size="16" /> Nova categoria</BaseButton>
+        <FilterButton :active="activeFilterCount" @click="openFilterModal" />
+        <BaseButton v-if="canManage" @click="openCreateModal"><Plus :size="16" /> Nova categoria</BaseButton>
       </template>
     </PageHeader>
 
@@ -135,15 +169,16 @@ onMounted(loadCategories)
             v-for="category in categories"
             v-else
             :key="category.id"
-            class="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/40"
-            title="Duplo clique para editar"
-            @dblclick="openEditModal(category)"
+            class="hover:bg-gray-50 dark:hover:bg-gray-700/40"
+            :class="canManage ? 'cursor-pointer' : ''"
+            :title="canManage ? 'Duplo clique para editar' : ''"
+            @dblclick="canManage && openEditModal(category)"
           >
             <td class="px-4 py-3 text-sm font-medium text-gray-900 dark:text-gray-100">{{ category.name }}</td>
             <td class="px-4 py-3 text-sm text-gray-500 dark:text-gray-400 hidden sm:table-cell">
               {{ category.description || '—' }}
             </td>
-            <td class="px-4 py-3 text-right space-x-1 whitespace-nowrap" @dblclick.stop>
+            <td v-if="canManage" class="px-4 py-3 text-right space-x-1 whitespace-nowrap" @dblclick.stop>
               <button
                 class="inline-flex items-center justify-center h-8 w-8 rounded-lg text-primary-600 hover:bg-primary-50 dark:text-primary-400 dark:hover:bg-primary-900/30"
                 title="Editar"
@@ -159,9 +194,18 @@ onMounted(loadCategories)
                 <Trash2 :size="16" />
               </button>
             </td>
+            <td v-else class="px-4 py-3" />
           </tr>
         </tbody>
       </table>
+      <Pagination
+        :page="page"
+        :page-size="pageSize"
+        :total="total"
+        :total-pages="totalPages"
+        @update:page="page = $event"
+        @update:page-size="pageSize = $event"
+      />
     </div>
 
     <BaseModal :open="modalOpen" :title="editingId ? 'Editar categoria' : 'Nova categoria'" @close="modalOpen = false">
@@ -171,6 +215,22 @@ onMounted(loadCategories)
         <div class="flex justify-end gap-2 pt-2">
           <BaseButton variant="secondary" type="button" @click="modalOpen = false">Cancelar</BaseButton>
           <BaseButton type="submit" :disabled="saving">{{ saving ? 'Salvando...' : 'Salvar' }}</BaseButton>
+        </div>
+      </form>
+    </BaseModal>
+
+    <BaseModal :open="filterModalOpen" title="Filtrar categorias" @close="filterModalOpen = false">
+      <form class="space-y-4" @submit.prevent="applyFilters">
+        <BaseInput v-model="draftSearch" label="Nome" placeholder="Buscar..." />
+
+        <div class="flex justify-between items-center pt-2">
+          <button type="button" class="text-sm text-gray-500 hover:underline dark:text-gray-400" @click="clearFilters">
+            Limpar
+          </button>
+          <div class="flex gap-2">
+            <BaseButton variant="secondary" type="button" @click="filterModalOpen = false">Cancelar</BaseButton>
+            <BaseButton type="submit">Aplicar</BaseButton>
+          </div>
         </div>
       </form>
     </BaseModal>

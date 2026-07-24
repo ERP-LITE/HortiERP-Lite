@@ -1,15 +1,30 @@
-import { and, desc, eq } from 'drizzle-orm'
+import { and, count, desc, eq, gte, lte } from 'drizzle-orm'
 import { db } from '../../db/client.js'
 import { losses, products, stockMovements } from '../../db/schema/index.js'
 import { AppError } from '../../shared/errors/AppError.js'
-import type { CreateLossInput } from './losses.schema.js'
+import { buildPaginatedResult } from '../../shared/db/paginate.js'
+import type { CreateLossInput, ListLossesQuery } from './losses.schema.js'
 
-export async function listLosses(companyId: string) {
-  return db.query.losses.findMany({
-    where: eq(losses.companyId, companyId),
-    with: { product: true },
-    orderBy: desc(losses.lossDate),
-  })
+export async function listLosses(companyId: string, query: ListLossesQuery) {
+  const conditions = [eq(losses.companyId, companyId)]
+  if (query.productId) conditions.push(eq(losses.productId, query.productId))
+  if (query.reason) conditions.push(eq(losses.reason, query.reason))
+  if (query.from) conditions.push(gte(losses.lossDate, query.from))
+  if (query.to) conditions.push(lte(losses.lossDate, query.to))
+  const where = and(...conditions)
+
+  const [data, [{ total }]] = await Promise.all([
+    db.query.losses.findMany({
+      where,
+      with: { product: true },
+      orderBy: desc(losses.lossDate),
+      limit: query.pageSize,
+      offset: (query.page - 1) * query.pageSize,
+    }),
+    db.select({ total: count() }).from(losses).where(where),
+  ])
+
+  return buildPaginatedResult(data, total, query.page, query.pageSize)
 }
 
 export async function getLoss(companyId: string, id: string) {

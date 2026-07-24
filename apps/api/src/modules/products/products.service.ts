@@ -1,9 +1,10 @@
-import { and, asc, eq, isNull } from 'drizzle-orm'
+import { and, asc, count, eq, ilike, isNull } from 'drizzle-orm'
 import { db } from '../../db/client.js'
 import { categories, products, units } from '../../db/schema/index.js'
 import { AppError } from '../../shared/errors/AppError.js'
 import { assertUniqueField } from '../../shared/db/assertUniqueField.js'
-import type { CreateProductInput, UpdateProductInput } from './products.schema.js'
+import { buildPaginatedResult } from '../../shared/db/paginate.js'
+import type { CreateProductInput, ListProductsQuery, UpdateProductInput } from './products.schema.js'
 
 function assertUniqueName(companyId: string, name: string, excludeId?: string) {
   return assertUniqueField({
@@ -61,12 +62,25 @@ async function assertCategoryAndUnitBelongToCompany(
   }
 }
 
-export async function listProducts(companyId: string) {
-  return db
-    .select()
-    .from(products)
-    .where(and(eq(products.companyId, companyId), isNull(products.deletedAt)))
-    .orderBy(asc(products.name))
+export async function listProducts(companyId: string, query: ListProductsQuery) {
+  const conditions = [eq(products.companyId, companyId), isNull(products.deletedAt)]
+  if (query.search) conditions.push(ilike(products.name, `%${query.search}%`))
+  if (query.categoryId) conditions.push(eq(products.categoryId, query.categoryId))
+  if (query.active !== undefined) conditions.push(eq(products.active, query.active))
+  const where = and(...conditions)
+
+  const [data, [{ total }]] = await Promise.all([
+    db
+      .select()
+      .from(products)
+      .where(where)
+      .orderBy(asc(products.name))
+      .limit(query.pageSize)
+      .offset((query.page - 1) * query.pageSize),
+    db.select({ total: count() }).from(products).where(where),
+  ])
+
+  return buildPaginatedResult(data, total, query.page, query.pageSize)
 }
 
 export async function getProduct(companyId: string, id: string) {

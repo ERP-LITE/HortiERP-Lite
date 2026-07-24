@@ -1,5 +1,5 @@
 import { api } from './api'
-import type { User, UserRole } from '@/types'
+import type { PaginatedResult, User, UserRole } from '@/types'
 
 export interface UserInput {
   name: string
@@ -9,8 +9,16 @@ export interface UserInput {
   active: boolean
 }
 
-export async function listUsers() {
-  const { data } = await api.get<User[]>('/users')
+export interface ListUsersParams {
+  page: number
+  pageSize: number
+  search?: string
+  role?: UserRole
+  active?: boolean
+}
+
+export async function listUsers(params: ListUsersParams) {
+  const { data } = await api.get<PaginatedResult<User>>('/users', { params })
   return data
 }
 

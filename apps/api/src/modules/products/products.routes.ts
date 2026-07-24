@@ -1,13 +1,14 @@
 import type { FastifyInstance } from 'fastify'
 import { authenticate, requireRole } from '../../shared/middlewares/auth.js'
-import { createProductSchema, updateProductSchema } from './products.schema.js'
+import { createProductSchema, listProductsQuerySchema, updateProductSchema } from './products.schema.js'
 import { createProduct, deleteProduct, getProduct, listProducts, updateProduct } from './products.service.js'
 
 export async function productsRoutes(app: FastifyInstance) {
   app.addHook('preHandler', authenticate)
 
   app.get('/products', async (request) => {
-    return listProducts(request.user.companyId)
+    const query = listProductsQuerySchema.parse(request.query)
+    return listProducts(request.user.companyId, query)
   })
 
   app.get<{ Params: { id: string } }>('/products/:id', async (request) => {

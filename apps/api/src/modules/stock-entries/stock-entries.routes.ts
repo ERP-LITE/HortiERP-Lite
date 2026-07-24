@@ -1,13 +1,14 @@
 import type { FastifyInstance } from 'fastify'
 import { authenticate } from '../../shared/middlewares/auth.js'
-import { createStockEntrySchema } from './stock-entries.schema.js'
+import { createStockEntrySchema, listStockEntriesQuerySchema } from './stock-entries.schema.js'
 import { createStockEntry, getStockEntry, listStockEntries } from './stock-entries.service.js'
 
 export async function stockEntriesRoutes(app: FastifyInstance) {
   app.addHook('preHandler', authenticate)
 
   app.get('/stock-entries', async (request) => {
-    return listStockEntries(request.user.companyId)
+    const query = listStockEntriesQuerySchema.parse(request.query)
+    return listStockEntries(request.user.companyId, query)
   })
 
   app.get<{ Params: { id: string } }>('/stock-entries/:id', async (request) => {

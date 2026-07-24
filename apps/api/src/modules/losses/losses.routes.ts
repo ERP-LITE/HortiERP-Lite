@@ -1,13 +1,14 @@
 import type { FastifyInstance } from 'fastify'
 import { authenticate } from '../../shared/middlewares/auth.js'
-import { createLossSchema } from './losses.schema.js'
+import { createLossSchema, listLossesQuerySchema } from './losses.schema.js'
 import { createLoss, getLoss, listLosses } from './losses.service.js'
 
 export async function lossesRoutes(app: FastifyInstance) {
   app.addHook('preHandler', authenticate)
 
   app.get('/losses', async (request) => {
-    return listLosses(request.user.companyId)
+    const query = listLossesQuerySchema.parse(request.query)
+    return listLosses(request.user.companyId, query)
   })
 
   app.get<{ Params: { id: string } }>('/losses/:id', async (request) => {

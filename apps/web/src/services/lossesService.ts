@@ -1,5 +1,5 @@
 import { api } from './api'
-import type { Loss, LossReason } from '@/types'
+import type { Loss, LossReason, PaginatedResult } from '@/types'
 
 export interface LossInput {
   productId: string
@@ -9,8 +9,17 @@ export interface LossInput {
   lossDate?: string
 }
 
-export async function listLosses() {
-  const { data } = await api.get<Loss[]>('/losses')
+export interface ListLossesParams {
+  page: number
+  pageSize: number
+  productId?: string
+  reason?: LossReason
+  from?: string
+  to?: string
+}
+
+export async function listLosses(params: ListLossesParams) {
+  const { data } = await api.get<PaginatedResult<Loss>>('/losses', { params })
   return data
 }
 

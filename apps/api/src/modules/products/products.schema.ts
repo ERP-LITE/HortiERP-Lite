@@ -1,4 +1,13 @@
 import { z } from 'zod'
+import { booleanQueryParam, paginationQuerySchema } from '../../shared/schemas/pagination.schema.js'
+
+export const listProductsQuerySchema = paginationQuerySchema.extend({
+  search: z.string().trim().min(1).optional(),
+  categoryId: z.string().uuid().optional(),
+  active: booleanQueryParam,
+})
+
+export type ListProductsQuery = z.infer<typeof listProductsQuerySchema>
 
 export const createProductSchema = z.object({
   categoryId: z.string().uuid('Categoria inválida'),

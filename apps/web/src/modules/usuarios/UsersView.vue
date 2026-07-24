@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { Pencil, Plus, Trash2, Wand2 } from '@lucide/vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
@@ -8,10 +8,13 @@ import BaseSelect from '@/components/ui/BaseSelect.vue'
 import BaseModal from '@/components/ui/BaseModal.vue'
 import BaseBadge from '@/components/ui/BaseBadge.vue'
 import BaseToggle from '@/components/ui/BaseToggle.vue'
+import Pagination from '@/components/ui/Pagination.vue'
+import FilterButton from '@/components/ui/FilterButton.vue'
 import { getApiErrorMessage, resolveFormError } from '@/services/api'
 import { confirmDelete, toastError, toastSuccess } from '@/lib/alerts'
 import { generateRandomPassword } from '@/lib/password'
 import { createUser, deleteUser, listUsers, updateUser } from '@/services/usersService'
+import { usePagination } from '@/composables/usePagination'
 import type { User, UserRole } from '@/types'
 
 const roleOptions: { value: UserRole; label: string }[] = [
@@ -19,10 +22,26 @@ const roleOptions: { value: UserRole; label: string }[] = [
   { value: 'gerente', label: 'Gerente' },
   { value: 'operador', label: 'Operador' },
 ]
+const roleFilterOptions = [{ value: 'todos', label: 'Todos os perfis' }, ...roleOptions]
+const statusFilterOptions = [
+  { value: 'todos', label: 'Todos' },
+  { value: 'true', label: 'Ativo' },
+  { value: 'false', label: 'Inativo' },
+]
+
+const { page, pageSize, total, totalPages, applyMeta } = usePagination()
 
 const users = ref<User[]>([])
 const loading = ref(true)
 const errorMessage = ref('')
+
+const emptyFilters = { role: 'todos', active: 'todos' }
+const filters = ref({ ...emptyFilters })
+const draftFilters = ref({ ...emptyFilters })
+const filterModalOpen = ref(false)
+const activeFilterCount = computed(
+  () => Number(filters.value.role !== 'todos') + Number(filters.value.active !== 'todos'),
+)
 
 const modalOpen = ref(false)
 const editingId = ref<string | null>(null)
@@ -35,12 +54,35 @@ const form = ref({ ...emptyForm })
 async function loadUsers() {
   loading.value = true
   try {
-    users.value = await listUsers()
+    const result = await listUsers({
+      page: page.value,
+      pageSize: pageSize.value,
+      role: filters.value.role !== 'todos' ? (filters.value.role as UserRole) : undefined,
+      active: filters.value.active === 'todos' ? undefined : filters.value.active === 'true',
+    })
+    users.value = result.data
+    applyMeta(result)
   } catch (error) {
     errorMessage.value = getApiErrorMessage(error)
   } finally {
     loading.value = false
   }
+}
+
+function openFilterModal() {
+  draftFilters.value = { ...filters.value }
+  filterModalOpen.value = true
+}
+
+function applyFilters() {
+  filters.value = { ...draftFilters.value }
+  filterModalOpen.value = false
+  page.value = 1
+  loadUsers()
+}
+
+function clearFilters() {
+  draftFilters.value = { ...emptyFilters }
 }
 
 function openCreateModal() {
@@ -117,6 +159,7 @@ async function handleDelete(user: User) {
   }
 }
 
+watch([page, pageSize], loadUsers)
 onMounted(loadUsers)
 </script>
 
@@ -124,6 +167,7 @@ onMounted(loadUsers)
   <div>
     <PageHeader title="Usuários" subtitle="Gerencie os acessos ao sistema">
       <template #actions>
+        <FilterButton :active="activeFilterCount" @click="openFilterModal" />
         <BaseButton @click="openCreateModal"><Plus :size="16" /> Novo usuário</BaseButton>
       </template>
     </PageHeader>
@@ -195,6 +239,14 @@ onMounted(loadUsers)
           </tr>
         </tbody>
       </table>
+      <Pagination
+        :page="page"
+        :page-size="pageSize"
+        :total="total"
+        :total-pages="totalPages"
+        @update:page="page = $event"
+        @update:page-size="pageSize = $event"
+      />
     </div>
 
     <BaseModal :open="modalOpen" :title="editingId ? 'Editar usuário' : 'Novo usuário'" @close="modalOpen = false">
@@ -223,6 +275,23 @@ onMounted(loadUsers)
         <div class="flex justify-end gap-2 pt-2">
           <BaseButton variant="secondary" type="button" @click="modalOpen = false">Cancelar</BaseButton>
           <BaseButton type="submit" :disabled="saving">{{ saving ? 'Salvando...' : 'Salvar' }}</BaseButton>
+        </div>
+      </form>
+    </BaseModal>
+
+    <BaseModal :open="filterModalOpen" title="Filtrar usuários" @close="filterModalOpen = false">
+      <form class="space-y-4" @submit.prevent="applyFilters">
+        <BaseSelect v-model="draftFilters.role" label="Perfil" :options="roleFilterOptions" />
+        <BaseSelect v-model="draftFilters.active" label="Status" :options="statusFilterOptions" />
+
+        <div class="flex justify-between items-center pt-2">
+          <button type="button" class="text-sm text-gray-500 hover:underline dark:text-gray-400" @click="clearFilters">
+            Limpar
+          </button>
+          <div class="flex gap-2">
+            <BaseButton variant="secondary" type="button" @click="filterModalOpen = false">Cancelar</BaseButton>
+            <BaseButton type="submit">Aplicar</BaseButton>
+          </div>
         </div>
       </form>
     </BaseModal>
