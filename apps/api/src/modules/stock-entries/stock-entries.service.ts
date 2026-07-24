@@ -1,15 +1,29 @@
-import { and, eq } from 'drizzle-orm'
+import { and, count, eq, gte, ilike, lte } from 'drizzle-orm'
 import { db } from '../../db/client.js'
 import { products, stockEntries, stockMovements, stockEntryItems } from '../../db/schema/index.js'
 import { AppError } from '../../shared/errors/AppError.js'
-import type { CreateStockEntryInput } from './stock-entries.schema.js'
+import { buildPaginatedResult } from '../../shared/db/paginate.js'
+import type { CreateStockEntryInput, ListStockEntriesQuery } from './stock-entries.schema.js'
 
-export async function listStockEntries(companyId: string) {
-  return db.query.stockEntries.findMany({
-    where: eq(stockEntries.companyId, companyId),
-    with: { items: { with: { product: true } } },
-    orderBy: (entries, { desc: desc_ }) => [desc_(entries.entryDate)],
-  })
+export async function listStockEntries(companyId: string, query: ListStockEntriesQuery) {
+  const conditions = [eq(stockEntries.companyId, companyId)]
+  if (query.search) conditions.push(ilike(stockEntries.supplierName, `%${query.search}%`))
+  if (query.from) conditions.push(gte(stockEntries.entryDate, query.from))
+  if (query.to) conditions.push(lte(stockEntries.entryDate, query.to))
+  const where = and(...conditions)
+
+  const [data, [{ total }]] = await Promise.all([
+    db.query.stockEntries.findMany({
+      where,
+      with: { items: { with: { product: true } } },
+      orderBy: (entries, { desc: desc_ }) => [desc_(entries.entryDate)],
+      limit: query.pageSize,
+      offset: (query.page - 1) * query.pageSize,
+    }),
+    db.select({ total: count() }).from(stockEntries).where(where),
+  ])
+
+  return buildPaginatedResult(data, total, query.page, query.pageSize)
 }
 
 export async function getStockEntry(companyId: string, id: string) {

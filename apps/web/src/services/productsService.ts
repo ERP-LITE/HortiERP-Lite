@@ -1,5 +1,5 @@
 import { api } from './api'
-import type { Product } from '@/types'
+import type { PaginatedResult, Product } from '@/types'
 
 export interface ProductInput {
   categoryId: string
@@ -13,8 +13,16 @@ export interface ProductInput {
   active: boolean
 }
 
-export async function listProducts() {
-  const { data } = await api.get<Product[]>('/products')
+export interface ListProductsParams {
+  page: number
+  pageSize: number
+  search?: string
+  categoryId?: string
+  active?: boolean
+}
+
+export async function listProducts(params: ListProductsParams) {
+  const { data } = await api.get<PaginatedResult<Product>>('/products', { params })
   return data
 }
 

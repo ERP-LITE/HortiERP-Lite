@@ -1,9 +1,10 @@
-import { and, asc, eq, isNull } from 'drizzle-orm'
+import { and, asc, count, eq, ilike, isNull, or } from 'drizzle-orm'
 import { db } from '../../db/client.js'
 import { units } from '../../db/schema/index.js'
 import { AppError } from '../../shared/errors/AppError.js'
 import { assertUniqueField } from '../../shared/db/assertUniqueField.js'
-import type { CreateUnitInput, UpdateUnitInput } from './units.schema.js'
+import { buildPaginatedResult } from '../../shared/db/paginate.js'
+import type { CreateUnitInput, ListUnitsQuery, UpdateUnitInput } from './units.schema.js'
 
 function assertUniqueName(companyId: string, name: string, excludeId?: string) {
   return assertUniqueField({
@@ -35,12 +36,25 @@ function assertUniqueAbbreviation(companyId: string, abbreviation: string, exclu
   })
 }
 
-export async function listUnits(companyId: string) {
-  return db
-    .select()
-    .from(units)
-    .where(and(eq(units.companyId, companyId), isNull(units.deletedAt)))
-    .orderBy(asc(units.name))
+export async function listUnits(companyId: string, query: ListUnitsQuery) {
+  const conditions = [eq(units.companyId, companyId), isNull(units.deletedAt)]
+  if (query.search) {
+    conditions.push(or(ilike(units.name, `%${query.search}%`), ilike(units.abbreviation, `%${query.search}%`))!)
+  }
+  const where = and(...conditions)
+
+  const [data, [{ total }]] = await Promise.all([
+    db
+      .select()
+      .from(units)
+      .where(where)
+      .orderBy(asc(units.name))
+      .limit(query.pageSize)
+      .offset((query.page - 1) * query.pageSize),
+    db.select({ total: count() }).from(units).where(where),
+  ])
+
+  return buildPaginatedResult(data, total, query.page, query.pageSize)
 }
 
 export async function getUnit(companyId: string, id: string) {

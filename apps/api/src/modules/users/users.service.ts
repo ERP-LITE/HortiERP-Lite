@@ -1,10 +1,11 @@
 import bcrypt from 'bcryptjs'
-import { and, asc, eq, isNull } from 'drizzle-orm'
+import { and, asc, count, eq, ilike, isNull } from 'drizzle-orm'
 import { db } from '../../db/client.js'
 import { users } from '../../db/schema/index.js'
 import { AppError } from '../../shared/errors/AppError.js'
 import { assertUniqueField } from '../../shared/db/assertUniqueField.js'
-import type { CreateUserInput, UpdateUserInput } from './users.schema.js'
+import { buildPaginatedResult } from '../../shared/db/paginate.js'
+import type { CreateUserInput, ListUsersQuery, UpdateUserInput } from './users.schema.js'
 
 // email is globally unique at the DB level (not scoped by company), so the
 // duplicate check below intentionally ignores deletedAt and companyId too.
@@ -34,12 +35,25 @@ const publicColumns = {
   updatedAt: users.updatedAt,
 }
 
-export async function listUsers(companyId: string) {
-  return db
-    .select(publicColumns)
-    .from(users)
-    .where(and(eq(users.companyId, companyId), isNull(users.deletedAt)))
-    .orderBy(asc(users.name))
+export async function listUsers(companyId: string, query: ListUsersQuery) {
+  const conditions = [eq(users.companyId, companyId), isNull(users.deletedAt)]
+  if (query.search) conditions.push(ilike(users.name, `%${query.search}%`))
+  if (query.role) conditions.push(eq(users.role, query.role))
+  if (query.active !== undefined) conditions.push(eq(users.active, query.active))
+  const where = and(...conditions)
+
+  const [data, [{ total }]] = await Promise.all([
+    db
+      .select(publicColumns)
+      .from(users)
+      .where(where)
+      .orderBy(asc(users.name))
+      .limit(query.pageSize)
+      .offset((query.page - 1) * query.pageSize),
+    db.select({ total: count() }).from(users).where(where),
+  ])
+
+  return buildPaginatedResult(data, total, query.page, query.pageSize)
 }
 
 export async function getUser(companyId: string, id: string) {

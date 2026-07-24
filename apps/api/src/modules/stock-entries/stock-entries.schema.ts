@@ -1,4 +1,13 @@
 import { z } from 'zod'
+import { paginationQuerySchema } from '../../shared/schemas/pagination.schema.js'
+
+export const listStockEntriesQuerySchema = paginationQuerySchema.extend({
+  search: z.string().trim().min(1).optional(),
+  from: z.coerce.date().optional(),
+  to: z.coerce.date().optional(),
+})
+
+export type ListStockEntriesQuery = z.infer<typeof listStockEntriesQuerySchema>
 
 export const stockEntryItemSchema = z.object({
   productId: z.string().uuid('Produto inválido'),

@@ -1,4 +1,11 @@
 import { z } from 'zod'
+import { paginationQuerySchema } from '../../shared/schemas/pagination.schema.js'
+
+export const listCategoriesQuerySchema = paginationQuerySchema.extend({
+  search: z.string().trim().min(1).optional(),
+})
+
+export type ListCategoriesQuery = z.infer<typeof listCategoriesQuerySchema>
 
 export const createCategorySchema = z.object({
   name: z.string().min(1, 'Nome é obrigatório'),

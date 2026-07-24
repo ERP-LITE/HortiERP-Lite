@@ -1,8 +1,11 @@
 <script setup lang="ts">
-import { onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
-import BaseInput from '@/components/ui/BaseInput.vue'
 import BaseBadge from '@/components/ui/BaseBadge.vue'
+import BaseButton from '@/components/ui/BaseButton.vue'
+import BaseModal from '@/components/ui/BaseModal.vue'
+import FilterButton from '@/components/ui/FilterButton.vue'
+import DateInput from '@/components/ui/DateInput.vue'
 import { getApiErrorMessage } from '@/services/api'
 import {
   fetchLossesReport,
@@ -27,6 +30,29 @@ const errorMessage = ref('')
 
 const from = ref('')
 const to = ref('')
+const filterModalOpen = ref(false)
+const draftFrom = ref('')
+const draftTo = ref('')
+const hasDateFilterTab = computed(() => activeTab.value !== 'estoque')
+const activeFilterCount = computed(() => Number(Boolean(from.value)) + Number(Boolean(to.value)))
+
+function openFilterModal() {
+  draftFrom.value = from.value
+  draftTo.value = to.value
+  filterModalOpen.value = true
+}
+
+function applyFilters() {
+  from.value = draftFrom.value
+  to.value = draftTo.value
+  filterModalOpen.value = false
+  loadActiveTab()
+}
+
+function clearFilters() {
+  draftFrom.value = ''
+  draftTo.value = ''
+}
 
 const stockByCategory = ref<StockByCategoryRow[]>([])
 const lossesReport = ref<LossesReport | null>(null)
@@ -76,7 +102,11 @@ onMounted(loadActiveTab)
 
 <template>
   <div>
-    <PageHeader title="Relatórios" subtitle="Consolidados de estoque, perdas e entradas" />
+    <PageHeader title="Relatórios" subtitle="Consolidados de estoque, perdas e entradas">
+      <template v-if="hasDateFilterTab" #actions>
+        <FilterButton :active="activeFilterCount" @click="openFilterModal" />
+      </template>
+    </PageHeader>
 
     <div class="border-b border-gray-200 dark:border-gray-700 mb-6">
       <nav class="flex gap-6">
@@ -96,18 +126,9 @@ onMounted(loadActiveTab)
       </nav>
     </div>
 
-    <div v-if="activeTab !== 'estoque'" class="flex flex-wrap gap-4 mb-4">
-      <BaseInput v-model="from" type="date" label="De" />
-      <BaseInput v-model="to" type="date" label="Até" />
-      <div class="flex items-end">
-        <button
-          class="text-sm text-primary-600 hover:underline dark:text-primary-400"
-          @click="loadActiveTab"
-        >
-          Filtrar
-        </button>
-      </div>
-    </div>
+    <p v-if="activeFilterCount > 0 && hasDateFilterTab" class="text-sm text-gray-500 dark:text-gray-400 mb-4">
+      Período: {{ from ? formatDate(from) : 'início' }} até {{ to ? formatDate(to) : 'hoje' }}
+    </p>
 
     <p v-if="errorMessage" class="text-sm text-red-600 dark:text-red-400 mb-4">{{ errorMessage }}</p>
     <p v-else-if="loading" class="text-sm text-gray-500 dark:text-gray-400">Carregando...</p>
@@ -238,5 +259,28 @@ onMounted(loadActiveTab)
         </table>
       </div>
     </template>
+
+    <BaseModal :open="filterModalOpen" title="Filtrar por período" @close="filterModalOpen = false">
+      <form class="space-y-4" @submit.prevent="applyFilters">
+        <div class="grid grid-cols-2 gap-4">
+          <DateInput v-model="draftFrom" label="De" />
+          <DateInput v-model="draftTo" label="Até" />
+        </div>
+
+        <div class="flex justify-between items-center pt-2">
+          <button
+            type="button"
+            class="text-sm text-gray-500 hover:underline dark:text-gray-400"
+            @click="clearFilters"
+          >
+            Limpar
+          </button>
+          <div class="flex gap-2">
+            <BaseButton variant="secondary" type="button" @click="filterModalOpen = false">Cancelar</BaseButton>
+            <BaseButton type="submit">Aplicar</BaseButton>
+          </div>
+        </div>
+      </form>
+    </BaseModal>
   </div>
 </template>

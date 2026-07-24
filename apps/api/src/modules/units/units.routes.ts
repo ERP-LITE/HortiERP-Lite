@@ -1,13 +1,14 @@
 import type { FastifyInstance } from 'fastify'
 import { authenticate, requireRole } from '../../shared/middlewares/auth.js'
-import { createUnitSchema, updateUnitSchema } from './units.schema.js'
+import { createUnitSchema, listUnitsQuerySchema, updateUnitSchema } from './units.schema.js'
 import { createUnit, deleteUnit, getUnit, listUnits, updateUnit } from './units.service.js'
 
 export async function unitsRoutes(app: FastifyInstance) {
   app.addHook('preHandler', authenticate)
 
   app.get('/units', async (request) => {
-    return listUnits(request.user.companyId)
+    const query = listUnitsQuerySchema.parse(request.query)
+    return listUnits(request.user.companyId, query)
   })
 
   app.get<{ Params: { id: string } }>('/units/:id', async (request) => {

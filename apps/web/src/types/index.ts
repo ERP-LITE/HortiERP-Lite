@@ -1,3 +1,11 @@
+export interface PaginatedResult<T> {
+  data: T[]
+  page: number
+  pageSize: number
+  total: number
+  totalPages: number
+}
+
 export type UserRole = 'admin' | 'gerente' | 'operador'
 
 export interface AuthUser {
@@ -110,6 +118,9 @@ export interface DashboardSummary {
     lossesQuantity: number
   }
   recentMovements: StockMovement[]
+  movementsTimeline: { date: string; entrada: number; perda: number }[]
+  stockByCategory: { categoryId: string; categoryName: string; totalStock: number }[]
+  lossesByReason: { reason: LossReason; quantity: number }[]
 }
 
 export interface ApiErrorPayload {

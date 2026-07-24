@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify'
 import { authenticate, requireRole } from '../../shared/middlewares/auth.js'
-import { createCategorySchema, updateCategorySchema } from './categories.schema.js'
+import { createCategorySchema, listCategoriesQuerySchema, updateCategorySchema } from './categories.schema.js'
 import {
   createCategory,
   deleteCategory,
@@ -13,7 +13,8 @@ export async function categoriesRoutes(app: FastifyInstance) {
   app.addHook('preHandler', authenticate)
 
   app.get('/categories', async (request) => {
-    return listCategories(request.user.companyId)
+    const query = listCategoriesQuerySchema.parse(request.query)
+    return listCategories(request.user.companyId, query)
   })
 
   app.get<{ Params: { id: string } }>('/categories/:id', async (request) => {

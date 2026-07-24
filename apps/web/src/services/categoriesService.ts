@@ -1,13 +1,19 @@
 import { api } from './api'
-import type { Category } from '@/types'
+import type { Category, PaginatedResult } from '@/types'
 
 export interface CategoryInput {
   name: string
   description?: string
 }
 
-export async function listCategories() {
-  const { data } = await api.get<Category[]>('/categories')
+export interface ListCategoriesParams {
+  page: number
+  pageSize: number
+  search?: string
+}
+
+export async function listCategories(params: ListCategoriesParams) {
+  const { data } = await api.get<PaginatedResult<Category>>('/categories', { params })
   return data
 }
 

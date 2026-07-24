@@ -1,4 +1,13 @@
 import { z } from 'zod'
+import { booleanQueryParam, paginationQuerySchema } from '../../shared/schemas/pagination.schema.js'
+
+export const listUsersQuerySchema = paginationQuerySchema.extend({
+  search: z.string().trim().min(1).optional(),
+  role: z.enum(['admin', 'gerente', 'operador']).optional(),
+  active: booleanQueryParam,
+})
+
+export type ListUsersQuery = z.infer<typeof listUsersQuerySchema>
 
 export const createUserSchema = z.object({
   name: z.string().min(1, 'Nome é obrigatório'),

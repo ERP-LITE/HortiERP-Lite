@@ -1,12 +1,23 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import BaseBadge from '@/components/ui/BaseBadge.vue'
+import BaseButton from '@/components/ui/BaseButton.vue'
+import BaseSelect from '@/components/ui/BaseSelect.vue'
+import DateInput from '@/components/ui/DateInput.vue'
+import BaseModal from '@/components/ui/BaseModal.vue'
+import Pagination from '@/components/ui/Pagination.vue'
+import FilterButton from '@/components/ui/FilterButton.vue'
 import { getApiErrorMessage } from '@/services/api'
 import { listStockMovements } from '@/services/stockService'
-import type { MovementType, StockMovement } from '@/types'
+import { listProducts } from '@/services/productsService'
+import { usePagination } from '@/composables/usePagination'
+import type { MovementType, Product, StockMovement } from '@/types'
+
+const { page, pageSize, total, totalPages, applyMeta } = usePagination()
 
 const movements = ref<StockMovement[]>([])
+const products = ref<Product[]>([])
 const loading = ref(true)
 const errorMessage = ref('')
 
@@ -22,6 +33,29 @@ const typeVariant: Record<MovementType, 'success' | 'danger' | 'neutral'> = {
   ajuste: 'neutral',
 }
 
+const typeFilterOptions = [
+  { value: 'todos', label: 'Todos os tipos' },
+  { value: 'entrada', label: 'Entrada' },
+  { value: 'perda', label: 'Perda' },
+  { value: 'ajuste', label: 'Ajuste' },
+]
+
+const emptyFilters = { productId: 'todos', type: 'todos', from: '', to: '' }
+const filters = ref({ ...emptyFilters })
+const draftFilters = ref({ ...emptyFilters })
+const filterModalOpen = ref(false)
+const activeFilterCount = computed(
+  () =>
+    Number(filters.value.productId !== 'todos') +
+    Number(filters.value.type !== 'todos') +
+    Number(filters.value.from !== '') +
+    Number(filters.value.to !== ''),
+)
+const productFilterOptions = computed(() => [
+  { value: 'todos', label: 'Todos os produtos' },
+  ...products.value.map((p) => ({ value: p.id, label: p.name })),
+])
+
 function formatDateTime(value: string) {
   return new Date(value).toLocaleString('pt-BR')
 }
@@ -29,7 +63,16 @@ function formatDateTime(value: string) {
 async function loadMovements() {
   loading.value = true
   try {
-    movements.value = await listStockMovements()
+    const result = await listStockMovements({
+      page: page.value,
+      pageSize: pageSize.value,
+      productId: filters.value.productId !== 'todos' ? filters.value.productId : undefined,
+      type: filters.value.type !== 'todos' ? (filters.value.type as MovementType) : undefined,
+      from: filters.value.from || undefined,
+      to: filters.value.to || undefined,
+    })
+    movements.value = result.data
+    applyMeta(result)
   } catch (error) {
     errorMessage.value = getApiErrorMessage(error)
   } finally {
@@ -37,12 +80,44 @@ async function loadMovements() {
   }
 }
 
-onMounted(loadMovements)
+async function loadProductOptions() {
+  try {
+    products.value = (await listProducts({ page: 1, pageSize: 100 })).data
+  } catch (error) {
+    errorMessage.value = getApiErrorMessage(error)
+  }
+}
+
+function openFilterModal() {
+  draftFilters.value = { ...filters.value }
+  filterModalOpen.value = true
+}
+
+function applyFilters() {
+  filters.value = { ...draftFilters.value }
+  filterModalOpen.value = false
+  page.value = 1
+  loadMovements()
+}
+
+function clearFilters() {
+  draftFilters.value = { ...emptyFilters }
+}
+
+watch([page, pageSize], loadMovements)
+onMounted(() => {
+  loadMovements()
+  loadProductOptions()
+})
 </script>
 
 <template>
   <div>
-    <PageHeader title="Histórico de movimentações" subtitle="Todas as entradas, perdas e ajustes de estoque" />
+    <PageHeader title="Histórico de movimentações" subtitle="Todas as entradas, perdas e ajustes de estoque">
+      <template #actions>
+        <FilterButton :active="activeFilterCount" @click="openFilterModal" />
+      </template>
+    </PageHeader>
 
     <p v-if="errorMessage" class="text-sm text-red-600 dark:text-red-400 mb-4">{{ errorMessage }}</p>
 
@@ -91,6 +166,35 @@ onMounted(loadMovements)
           </tr>
         </tbody>
       </table>
+      <Pagination
+        :page="page"
+        :page-size="pageSize"
+        :total="total"
+        :total-pages="totalPages"
+        @update:page="page = $event"
+        @update:page-size="pageSize = $event"
+      />
     </div>
+
+    <BaseModal :open="filterModalOpen" title="Filtrar movimentações" @close="filterModalOpen = false">
+      <form class="space-y-4" @submit.prevent="applyFilters">
+        <BaseSelect v-model="draftFilters.productId" label="Produto" :options="productFilterOptions" />
+        <BaseSelect v-model="draftFilters.type" label="Tipo" :options="typeFilterOptions" />
+        <div class="grid grid-cols-2 gap-4">
+          <DateInput v-model="draftFilters.from" label="De" />
+          <DateInput v-model="draftFilters.to" label="Até" />
+        </div>
+
+        <div class="flex justify-between items-center pt-2">
+          <button type="button" class="text-sm text-gray-500 hover:underline dark:text-gray-400" @click="clearFilters">
+            Limpar
+          </button>
+          <div class="flex gap-2">
+            <BaseButton variant="secondary" type="button" @click="filterModalOpen = false">Cancelar</BaseButton>
+            <BaseButton type="submit">Aplicar</BaseButton>
+          </div>
+        </div>
+      </form>
+    </BaseModal>
   </div>
 </template>

@@ -44,7 +44,10 @@ ERP-LITE/
 4. Acesse:
    - Frontend: http://localhost:5173
    - API: http://localhost:3333
-   - Login de teste (criado pelo seed): `admin@hortierp.com` / `admin123`
+   - Logins de teste (criados pelo seed):
+     - Admin: `admin@hortierp.com` / `admin123`
+     - Gerente: `gerente@hortierp.com` / `gerente123`
+     - Operador: `operador@hortierp.com` / `operador123`
 
 ### Sem Docker
 

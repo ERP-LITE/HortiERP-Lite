@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify'
 import { authenticate, requireRole } from '../../shared/middlewares/auth.js'
-import { createUserSchema, updateUserSchema } from './users.schema.js'
+import { createUserSchema, listUsersQuerySchema, updateUserSchema } from './users.schema.js'
 import { createUser, deleteUser, getUser, listUsers, updateUser } from './users.service.js'
 
 export async function usersRoutes(app: FastifyInstance) {
@@ -8,7 +8,8 @@ export async function usersRoutes(app: FastifyInstance) {
   app.addHook('preHandler', requireRole('admin'))
 
   app.get('/users', async (request) => {
-    return listUsers(request.user.companyId)
+    const query = listUsersQuerySchema.parse(request.query)
+    return listUsers(request.user.companyId, query)
   })
 
   app.get<{ Params: { id: string } }>('/users/:id', async (request) => {

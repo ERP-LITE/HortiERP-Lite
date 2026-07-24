@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { Plus } from '@lucide/vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
@@ -7,10 +7,14 @@ import BaseInput from '@/components/ui/BaseInput.vue'
 import BaseSelect from '@/components/ui/BaseSelect.vue'
 import BaseModal from '@/components/ui/BaseModal.vue'
 import BaseBadge from '@/components/ui/BaseBadge.vue'
+import Pagination from '@/components/ui/Pagination.vue'
+import FilterButton from '@/components/ui/FilterButton.vue'
+import DateInput from '@/components/ui/DateInput.vue'
 import { getApiErrorMessage, resolveFormError } from '@/services/api'
 import { toastSuccess } from '@/lib/alerts'
 import { listProducts } from '@/services/productsService'
 import { createLoss, listLosses } from '@/services/lossesService'
+import { usePagination } from '@/composables/usePagination'
 import type { Loss, LossReason, Product } from '@/types'
 
 const reasonOptions: { value: LossReason; label: string }[] = [
@@ -20,13 +24,28 @@ const reasonOptions: { value: LossReason; label: string }[] = [
   { value: 'erro_operacional', label: 'Erro operacional' },
   { value: 'outro', label: 'Outro' },
 ]
+const reasonFilterOptions = [{ value: 'todos', label: 'Todos os motivos' }, ...reasonOptions]
 
 const reasonLabels = Object.fromEntries(reasonOptions.map((r) => [r.value, r.label])) as Record<LossReason, string>
+
+const { page, pageSize, total, totalPages, applyMeta } = usePagination()
 
 const losses = ref<Loss[]>([])
 const products = ref<Product[]>([])
 const loading = ref(true)
 const errorMessage = ref('')
+
+const emptyFilters = { productId: 'todos', reason: 'todos', from: '', to: '' }
+const filters = ref({ ...emptyFilters })
+const draftFilters = ref({ ...emptyFilters })
+const filterModalOpen = ref(false)
+const activeFilterCount = computed(
+  () =>
+    Number(filters.value.productId !== 'todos') +
+    Number(filters.value.reason !== 'todos') +
+    Number(filters.value.from !== '') +
+    Number(filters.value.to !== ''),
+)
 
 const modalOpen = ref(false)
 const saving = ref(false)
@@ -34,22 +53,59 @@ const form = ref({ productId: '', quantity: '', reason: '' as LossReason | '', n
 const fieldErrors = ref<Record<string, string>>({})
 
 const productOptions = computed(() => products.value.map((p) => ({ value: p.id, label: p.name })))
+const productFilterOptions = computed(() => [{ value: 'todos', label: 'Todos os produtos' }, ...productOptions.value])
 
 function formatDate(value: string) {
   return new Date(value).toLocaleDateString('pt-BR')
 }
 
-async function loadAll() {
+async function loadLosses() {
   loading.value = true
   try {
-    const [lossesData, productsData] = await Promise.all([listLosses(), listProducts()])
-    losses.value = lossesData
-    products.value = productsData
+    const result = await listLosses({
+      page: page.value,
+      pageSize: pageSize.value,
+      productId: filters.value.productId !== 'todos' ? filters.value.productId : undefined,
+      reason: filters.value.reason !== 'todos' ? (filters.value.reason as LossReason) : undefined,
+      from: filters.value.from || undefined,
+      to: filters.value.to || undefined,
+    })
+    losses.value = result.data
+    applyMeta(result)
   } catch (error) {
     errorMessage.value = getApiErrorMessage(error)
   } finally {
     loading.value = false
   }
+}
+
+async function loadProductOptions() {
+  try {
+    const result = await listProducts({ page: 1, pageSize: 100 })
+    products.value = result.data
+  } catch (error) {
+    errorMessage.value = getApiErrorMessage(error)
+  }
+}
+
+async function loadAll() {
+  await Promise.all([loadLosses(), loadProductOptions()])
+}
+
+function openFilterModal() {
+  draftFilters.value = { ...filters.value }
+  filterModalOpen.value = true
+}
+
+function applyFilters() {
+  filters.value = { ...draftFilters.value }
+  filterModalOpen.value = false
+  page.value = 1
+  loadLosses()
+}
+
+function clearFilters() {
+  draftFilters.value = { ...emptyFilters }
 }
 
 function openCreateModal() {
@@ -92,6 +148,7 @@ async function handleSubmit() {
   }
 }
 
+watch([page, pageSize], loadLosses)
 onMounted(loadAll)
 </script>
 
@@ -99,6 +156,7 @@ onMounted(loadAll)
   <div>
     <PageHeader title="Perdas" subtitle="Registro de perdas com baixa automática no estoque">
       <template #actions>
+        <FilterButton :active="activeFilterCount" @click="openFilterModal" />
         <BaseButton @click="openCreateModal"><Plus :size="16" /> Registrar perda</BaseButton>
       </template>
     </PageHeader>
@@ -154,6 +212,14 @@ onMounted(loadAll)
           </tr>
         </tbody>
       </table>
+      <Pagination
+        :page="page"
+        :page-size="pageSize"
+        :total="total"
+        :total-pages="totalPages"
+        @update:page="page = $event"
+        @update:page-size="pageSize = $event"
+      />
     </div>
 
     <BaseModal :open="modalOpen" title="Registrar perda" @close="modalOpen = false">
@@ -174,6 +240,27 @@ onMounted(loadAll)
           <BaseButton variant="danger" type="submit" :disabled="saving">
             {{ saving ? 'Salvando...' : 'Registrar perda' }}
           </BaseButton>
+        </div>
+      </form>
+    </BaseModal>
+
+    <BaseModal :open="filterModalOpen" title="Filtrar perdas" @close="filterModalOpen = false">
+      <form class="space-y-4" @submit.prevent="applyFilters">
+        <BaseSelect v-model="draftFilters.productId" label="Produto" :options="productFilterOptions" />
+        <BaseSelect v-model="draftFilters.reason" label="Motivo" :options="reasonFilterOptions" />
+        <div class="grid grid-cols-2 gap-4">
+          <DateInput v-model="draftFilters.from" label="De" />
+          <DateInput v-model="draftFilters.to" label="Até" />
+        </div>
+
+        <div class="flex justify-between items-center pt-2">
+          <button type="button" class="text-sm text-gray-500 hover:underline dark:text-gray-400" @click="clearFilters">
+            Limpar
+          </button>
+          <div class="flex gap-2">
+            <BaseButton variant="secondary" type="button" @click="filterModalOpen = false">Cancelar</BaseButton>
+            <BaseButton type="submit">Aplicar</BaseButton>
+          </div>
         </div>
       </form>
     </BaseModal>

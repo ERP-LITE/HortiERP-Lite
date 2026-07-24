@@ -1,21 +1,51 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import { ArrowRight } from '@lucide/vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import BaseBadge from '@/components/ui/BaseBadge.vue'
+import BaseButton from '@/components/ui/BaseButton.vue'
+import BaseSelect from '@/components/ui/BaseSelect.vue'
+import BaseModal from '@/components/ui/BaseModal.vue'
+import BaseToggle from '@/components/ui/BaseToggle.vue'
+import Pagination from '@/components/ui/Pagination.vue'
+import FilterButton from '@/components/ui/FilterButton.vue'
 import { getApiErrorMessage } from '@/services/api'
 import { listCurrentStock } from '@/services/stockService'
-import type { ProductWithRelations } from '@/types'
+import { listCategories } from '@/services/categoriesService'
+import { usePagination } from '@/composables/usePagination'
+import type { Category, ProductWithRelations } from '@/types'
+
+const { page, pageSize, total, totalPages, applyMeta } = usePagination()
 
 const products = ref<ProductWithRelations[]>([])
+const categories = ref<Category[]>([])
 const loading = ref(true)
 const errorMessage = ref('')
+
+const emptyFilters = { categoryId: 'todas', lowStockOnly: false }
+const filters = ref({ ...emptyFilters })
+const draftFilters = ref({ ...emptyFilters })
+const filterModalOpen = ref(false)
+const activeFilterCount = computed(
+  () => Number(filters.value.categoryId !== 'todas') + Number(filters.value.lowStockOnly),
+)
+const categoryFilterOptions = computed(() => [
+  { value: 'todas', label: 'Todas as categorias' },
+  ...categories.value.map((c) => ({ value: c.id, label: c.name })),
+])
 
 async function loadStock() {
   loading.value = true
   try {
-    products.value = await listCurrentStock()
+    const result = await listCurrentStock({
+      page: page.value,
+      pageSize: pageSize.value,
+      categoryId: filters.value.categoryId !== 'todas' ? filters.value.categoryId : undefined,
+      lowStockOnly: filters.value.lowStockOnly || undefined,
+    })
+    products.value = result.data
+    applyMeta(result)
   } catch (error) {
     errorMessage.value = getApiErrorMessage(error)
   } finally {
@@ -23,13 +53,42 @@ async function loadStock() {
   }
 }
 
-onMounted(loadStock)
+async function loadCategoryOptions() {
+  try {
+    categories.value = (await listCategories({ page: 1, pageSize: 100 })).data
+  } catch (error) {
+    errorMessage.value = getApiErrorMessage(error)
+  }
+}
+
+function openFilterModal() {
+  draftFilters.value = { ...filters.value }
+  filterModalOpen.value = true
+}
+
+function applyFilters() {
+  filters.value = { ...draftFilters.value }
+  filterModalOpen.value = false
+  page.value = 1
+  loadStock()
+}
+
+function clearFilters() {
+  draftFilters.value = { ...emptyFilters }
+}
+
+watch([page, pageSize], loadStock)
+onMounted(() => {
+  loadStock()
+  loadCategoryOptions()
+})
 </script>
 
 <template>
   <div>
     <PageHeader title="Estoque atual" subtitle="Situação de estoque por produto">
       <template #actions>
+        <FilterButton :active="activeFilterCount" @click="openFilterModal" />
         <RouterLink
           :to="{ name: 'movimentacoes' }"
           class="inline-flex items-center gap-1 text-sm text-primary-600 hover:underline dark:text-primary-400"
@@ -90,6 +149,31 @@ onMounted(loadStock)
           </tr>
         </tbody>
       </table>
+      <Pagination
+        :page="page"
+        :page-size="pageSize"
+        :total="total"
+        :total-pages="totalPages"
+        @update:page="page = $event"
+        @update:page-size="pageSize = $event"
+      />
     </div>
+
+    <BaseModal :open="filterModalOpen" title="Filtrar estoque" @close="filterModalOpen = false">
+      <form class="space-y-4" @submit.prevent="applyFilters">
+        <BaseSelect v-model="draftFilters.categoryId" label="Categoria" :options="categoryFilterOptions" />
+        <BaseToggle v-model="draftFilters.lowStockOnly" label="Somente estoque baixo" />
+
+        <div class="flex justify-between items-center pt-2">
+          <button type="button" class="text-sm text-gray-500 hover:underline dark:text-gray-400" @click="clearFilters">
+            Limpar
+          </button>
+          <div class="flex gap-2">
+            <BaseButton variant="secondary" type="button" @click="filterModalOpen = false">Cancelar</BaseButton>
+            <BaseButton type="submit">Aplicar</BaseButton>
+          </div>
+        </div>
+      </form>
+    </BaseModal>
   </div>
 </template>

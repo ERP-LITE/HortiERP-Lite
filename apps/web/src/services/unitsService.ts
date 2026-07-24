@@ -1,13 +1,19 @@
 import { api } from './api'
-import type { Unit } from '@/types'
+import type { PaginatedResult, Unit } from '@/types'
 
 export interface UnitInput {
   name: string
   abbreviation: string
 }
 
-export async function listUnits() {
-  const { data } = await api.get<Unit[]>('/units')
+export interface ListUnitsParams {
+  page: number
+  pageSize: number
+  search?: string
+}
+
+export async function listUnits(params: ListUnitsParams) {
+  const { data } = await api.get<PaginatedResult<Unit>>('/units', { params })
   return data
 }
 

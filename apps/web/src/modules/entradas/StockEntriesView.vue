@@ -1,16 +1,33 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import { Plus } from '@lucide/vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
+import BaseInput from '@/components/ui/BaseInput.vue'
+import BaseModal from '@/components/ui/BaseModal.vue'
+import Pagination from '@/components/ui/Pagination.vue'
+import FilterButton from '@/components/ui/FilterButton.vue'
+import DateInput from '@/components/ui/DateInput.vue'
 import { getApiErrorMessage } from '@/services/api'
 import { listStockEntries } from '@/services/stockEntriesService'
+import { usePagination } from '@/composables/usePagination'
 import type { StockEntry } from '@/types'
+
+const { page, pageSize, total, totalPages, applyMeta } = usePagination()
 
 const entries = ref<StockEntry[]>([])
 const loading = ref(true)
 const errorMessage = ref('')
+
+const emptyFilters = { search: '', from: '', to: '' }
+const filters = ref({ ...emptyFilters })
+const draftFilters = ref({ ...emptyFilters })
+const filterModalOpen = ref(false)
+const activeFilterCount = computed(
+  () =>
+    Number(filters.value.search !== '') + Number(filters.value.from !== '') + Number(filters.value.to !== ''),
+)
 
 function itemsSummary(entry: StockEntry) {
   return entry.items.map((item) => `${item.product.name} (${Number(item.quantity)})`).join(', ')
@@ -23,7 +40,15 @@ function formatDate(value: string) {
 async function loadEntries() {
   loading.value = true
   try {
-    entries.value = await listStockEntries()
+    const result = await listStockEntries({
+      page: page.value,
+      pageSize: pageSize.value,
+      search: filters.value.search || undefined,
+      from: filters.value.from || undefined,
+      to: filters.value.to || undefined,
+    })
+    entries.value = result.data
+    applyMeta(result)
   } catch (error) {
     errorMessage.value = getApiErrorMessage(error)
   } finally {
@@ -31,6 +56,23 @@ async function loadEntries() {
   }
 }
 
+function openFilterModal() {
+  draftFilters.value = { ...filters.value }
+  filterModalOpen.value = true
+}
+
+function applyFilters() {
+  filters.value = { ...draftFilters.value }
+  filterModalOpen.value = false
+  page.value = 1
+  loadEntries()
+}
+
+function clearFilters() {
+  draftFilters.value = { ...emptyFilters }
+}
+
+watch([page, pageSize], loadEntries)
 onMounted(loadEntries)
 </script>
 
@@ -38,6 +80,7 @@ onMounted(loadEntries)
   <div>
     <PageHeader title="Entradas de mercadoria" subtitle="Histórico de recebimentos de estoque">
       <template #actions>
+        <FilterButton :active="activeFilterCount" @click="openFilterModal" />
         <RouterLink :to="{ name: 'entradas-nova' }">
           <BaseButton><Plus :size="16" /> Nova entrada</BaseButton>
         </RouterLink>
@@ -77,6 +120,34 @@ onMounted(loadEntries)
           </tr>
         </tbody>
       </table>
+      <Pagination
+        :page="page"
+        :page-size="pageSize"
+        :total="total"
+        :total-pages="totalPages"
+        @update:page="page = $event"
+        @update:page-size="pageSize = $event"
+      />
     </div>
+
+    <BaseModal :open="filterModalOpen" title="Filtrar entradas" @close="filterModalOpen = false">
+      <form class="space-y-4" @submit.prevent="applyFilters">
+        <BaseInput v-model="draftFilters.search" label="Fornecedor" placeholder="Buscar..." />
+        <div class="grid grid-cols-2 gap-4">
+          <DateInput v-model="draftFilters.from" label="De" />
+          <DateInput v-model="draftFilters.to" label="Até" />
+        </div>
+
+        <div class="flex justify-between items-center pt-2">
+          <button type="button" class="text-sm text-gray-500 hover:underline dark:text-gray-400" @click="clearFilters">
+            Limpar
+          </button>
+          <div class="flex gap-2">
+            <BaseButton variant="secondary" type="button" @click="filterModalOpen = false">Cancelar</BaseButton>
+            <BaseButton type="submit">Aplicar</BaseButton>
+          </div>
+        </div>
+      </form>
+    </BaseModal>
   </div>
 </template>

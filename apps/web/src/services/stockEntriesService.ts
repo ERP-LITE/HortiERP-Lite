@@ -1,5 +1,5 @@
 import { api } from './api'
-import type { StockEntry } from '@/types'
+import type { PaginatedResult, StockEntry } from '@/types'
 
 export interface StockEntryItemInput {
   productId: string
@@ -14,8 +14,16 @@ export interface StockEntryInput {
   items: StockEntryItemInput[]
 }
 
-export async function listStockEntries() {
-  const { data } = await api.get<StockEntry[]>('/stock-entries')
+export interface ListStockEntriesParams {
+  page: number
+  pageSize: number
+  search?: string
+  from?: string
+  to?: string
+}
+
+export async function listStockEntries(params: ListStockEntriesParams) {
+  const { data } = await api.get<PaginatedResult<StockEntry>>('/stock-entries', { params })
   return data
 }
 
