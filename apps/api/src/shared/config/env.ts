@@ -8,6 +8,9 @@ const envSchema = z.object({
   JWT_SECRET: z.string().min(1, 'JWT_SECRET é obrigatório'),
   JWT_EXPIRES_IN: z.string().default('8h'),
   CORS_ORIGIN: z.string().default('http://localhost:5173'),
+  // Default is Cloudflare's "always passes" test secret key, so local dev works
+  // out of the box. Replace with the real secret key in production.
+  TURNSTILE_SECRET_KEY: z.string().default('1x0000000000000000000000000000000AA'),
 })
 
 const parsed = envSchema.safeParse(process.env)

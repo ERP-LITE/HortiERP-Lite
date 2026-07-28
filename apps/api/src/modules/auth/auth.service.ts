@@ -53,5 +53,5 @@ export async function changeOwnPassword(
   await db
     .update(users)
     .set({ passwordHash, updatedAt: new Date() })
-    .where(eq(users.id, userId))
+    .where(and(eq(users.id, userId), eq(users.companyId, companyId)))
 }

@@ -1,12 +1,15 @@
 import type { FastifyInstance } from 'fastify'
 import { env } from '../../shared/config/env.js'
 import { authenticate } from '../../shared/middlewares/auth.js'
+import { verifyTurnstileToken } from '../../shared/security/verifyTurnstile.js'
 import { changePasswordSchema, loginSchema } from './auth.schema.js'
 import { authenticateUser, changeOwnPassword, getUserProfile } from './auth.service.js'
 
 export async function authRoutes(app: FastifyInstance) {
   app.post('/auth/login', async (request, reply) => {
-    const { email, password } = loginSchema.parse(request.body)
+    const { email, password, turnstileToken } = loginSchema.parse(request.body)
+
+    await verifyTurnstileToken(turnstileToken, request.ip)
 
     const user = await authenticateUser(email, password)
 

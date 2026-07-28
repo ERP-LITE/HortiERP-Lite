@@ -72,7 +72,7 @@ export async function createStockEntry(companyId: string, userId: string, data: 
       await tx
         .update(products)
         .set({ currentStock: newStock.toString(), updatedAt: new Date(), updatedBy: userId })
-        .where(eq(products.id, item.productId))
+        .where(and(eq(products.id, item.productId), eq(products.companyId, companyId)))
 
       await tx.insert(stockMovements).values({
         companyId,
