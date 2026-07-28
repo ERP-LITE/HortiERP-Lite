@@ -2,8 +2,17 @@ import type { FastifyInstance } from 'fastify'
 import { env } from '../../shared/config/env.js'
 import { authenticate } from '../../shared/middlewares/auth.js'
 import { verifyTurnstileToken } from '../../shared/security/verifyTurnstile.js'
+import { parseDurationToSeconds } from '../../shared/utils/duration.js'
 import { changePasswordSchema, loginSchema } from './auth.schema.js'
 import { authenticateUser, changeOwnPassword, getUserProfile } from './auth.service.js'
+
+const AUTH_COOKIE_NAME = 'token'
+const AUTH_COOKIE_OPTIONS = {
+  path: '/',
+  httpOnly: true,
+  secure: env.NODE_ENV === 'production',
+  sameSite: 'lax' as const,
+}
 
 export async function authRoutes(app: FastifyInstance) {
   app.post('/auth/login', async (request, reply) => {
@@ -18,8 +27,12 @@ export async function authRoutes(app: FastifyInstance) {
       { expiresIn: env.JWT_EXPIRES_IN },
     )
 
+    reply.setCookie(AUTH_COOKIE_NAME, token, {
+      ...AUTH_COOKIE_OPTIONS,
+      maxAge: parseDurationToSeconds(env.JWT_EXPIRES_IN),
+    })
+
     return {
-      token,
       user: {
         id: user.id,
         name: user.name,
@@ -28,6 +41,11 @@ export async function authRoutes(app: FastifyInstance) {
         companyId: user.companyId,
       },
     }
+  })
+
+  app.post('/auth/logout', { preHandler: [authenticate] }, async (_request, reply) => {
+    reply.clearCookie(AUTH_COOKIE_NAME, { path: '/' })
+    return { success: true }
   })
 
   app.get('/auth/me', { preHandler: [authenticate] }, async (request) => {

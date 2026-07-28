@@ -74,14 +74,20 @@ const router = createRouter({
   ],
 })
 
-router.beforeEach((to) => {
+router.beforeEach(async (to) => {
   const auth = useAuthStore()
 
-  if (!to.meta.public && !auth.token) {
+  if (!auth.initialized) {
+    await auth.restoreSession()
+  }
+
+  const isAuthenticated = !!auth.user
+
+  if (!to.meta.public && !isAuthenticated) {
     return { name: 'login', query: { redirect: to.fullPath } }
   }
 
-  if (to.name === 'login' && auth.token) {
+  if (to.name === 'login' && isAuthenticated) {
     return { name: 'dashboard' }
   }
 

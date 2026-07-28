@@ -15,11 +15,15 @@ import {
 } from '@lucide/vue'
 import ThemeToggle from '@/components/ui/ThemeToggle.vue'
 import AppUserMenu from '@/components/AppUserMenu.vue'
+import BaseModal from '@/components/ui/BaseModal.vue'
+import BaseButton from '@/components/ui/BaseButton.vue'
 import { useAuthStore } from '@/stores/auth'
+import { useIdleLogout } from '@/composables/useIdleLogout'
 
 const auth = useAuthStore()
 const route = useRoute()
 const sidebarOpen = ref(false)
+const { showWarning, secondsLeft, stayLoggedIn } = useIdleLogout()
 
 const navItems = computed(() => {
   const items = [
@@ -100,5 +104,15 @@ function isActive(name: string) {
         <RouterView />
       </main>
     </div>
+
+    <BaseModal :open="showWarning" title="Sessão prestes a expirar" @close="stayLoggedIn">
+      <p class="text-sm text-gray-600 dark:text-gray-300">
+        Você ficou inativo por um tempo. Por segurança, sua sessão vai encerrar em
+        <strong>{{ secondsLeft }}s</strong> se não houver interação.
+      </p>
+      <div class="mt-6 flex justify-end">
+        <BaseButton @click="stayLoggedIn">Continuar conectado</BaseButton>
+      </div>
+    </BaseModal>
   </div>
 </template>
