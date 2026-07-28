@@ -4,10 +4,11 @@ import { RouterLink } from 'vue-router'
 import { Plus } from '@lucide/vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
-import BaseInput from '@/components/ui/BaseInput.vue'
 import BaseModal from '@/components/ui/BaseModal.vue'
 import Pagination from '@/components/ui/Pagination.vue'
 import FilterButton from '@/components/ui/FilterButton.vue'
+import PrintButton from '@/components/ui/PrintButton.vue'
+import SearchInput from '@/components/ui/SearchInput.vue'
 import PeriodPicker from '@/components/ui/PeriodPicker.vue'
 import type { PeriodValue } from '@/lib/period'
 import { getApiErrorMessage } from '@/services/api'
@@ -21,15 +22,14 @@ const entries = ref<StockEntry[]>([])
 const loading = ref(true)
 const errorMessage = ref('')
 
+const search = ref('')
 function emptyFilters() {
-  return { search: '', period: { preset: 'todos', from: '', to: '' } as PeriodValue }
+  return { period: { preset: 'todos', from: '', to: '' } as PeriodValue }
 }
 const filters = ref(emptyFilters())
 const draftFilters = ref(emptyFilters())
 const filterModalOpen = ref(false)
-const activeFilterCount = computed(
-  () => Number(filters.value.search !== '') + Number(filters.value.period.preset !== 'todos'),
-)
+const activeFilterCount = computed(() => Number(filters.value.period.preset !== 'todos'))
 
 function itemsSummary(entry: StockEntry) {
   return entry.items.map((item) => `${item.product.name} (${Number(item.quantity)})`).join(', ')
@@ -45,7 +45,7 @@ async function loadEntries() {
     const result = await listStockEntries({
       page: page.value,
       pageSize: pageSize.value,
-      search: filters.value.search || undefined,
+      search: search.value || undefined,
       from: filters.value.period.from || undefined,
       to: filters.value.period.to || undefined,
     })
@@ -78,6 +78,10 @@ function clearFilters() {
   loadEntries()
 }
 
+watch(search, () => {
+  if (page.value !== 1) page.value = 1
+  else loadEntries()
+})
 watch([page, pageSize], loadEntries)
 onMounted(loadEntries)
 </script>
@@ -86,7 +90,9 @@ onMounted(loadEntries)
   <div>
     <PageHeader title="Entradas de mercadoria" subtitle="Histórico de recebimentos de estoque">
       <template #actions>
+        <SearchInput v-model="search" placeholder="Buscar por fornecedor..." />
         <FilterButton :active="activeFilterCount" @click="openFilterModal" />
+        <PrintButton />
         <RouterLink :to="{ name: 'entradas-nova' }">
           <BaseButton><Plus :size="16" /> Nova entrada</BaseButton>
         </RouterLink>
@@ -138,7 +144,6 @@ onMounted(loadEntries)
 
     <BaseModal :open="filterModalOpen" title="Filtrar entradas" @close="filterModalOpen = false">
       <form class="space-y-4" @submit.prevent="applyFilters">
-        <BaseInput v-model="draftFilters.search" label="Fornecedor" placeholder="Buscar..." />
         <PeriodPicker v-model="draftFilters.period" />
 
         <div class="flex justify-between items-center pt-2">

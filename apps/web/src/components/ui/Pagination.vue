@@ -26,7 +26,7 @@ function goTo(page: number) {
 
 <template>
   <div
-    class="flex flex-col sm:flex-row items-center justify-between gap-3 px-4 py-3 border-t border-gray-200 dark:border-gray-700 text-sm text-gray-500 dark:text-gray-400"
+    class="print:hidden flex flex-col sm:flex-row items-center justify-between gap-3 px-4 py-3 border-t border-gray-200 dark:border-gray-700 text-sm text-gray-500 dark:text-gray-400"
   >
     <div class="flex items-center gap-3">
       <span>{{ total === 0 ? 'Nenhum registro' : `${rangeStart}–${rangeEnd} de ${total}` }}</span>

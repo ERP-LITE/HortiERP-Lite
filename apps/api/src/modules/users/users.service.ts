@@ -1,5 +1,5 @@
 import bcrypt from 'bcryptjs'
-import { and, asc, count, eq, ilike, isNull } from 'drizzle-orm'
+import { and, asc, count, eq, ilike, isNull, or } from 'drizzle-orm'
 import { db } from '../../db/client.js'
 import { users } from '../../db/schema/index.js'
 import { AppError } from '../../shared/errors/AppError.js'
@@ -37,7 +37,7 @@ const publicColumns = {
 
 export async function listUsers(companyId: string, query: ListUsersQuery) {
   const conditions = [eq(users.companyId, companyId), isNull(users.deletedAt)]
-  if (query.search) conditions.push(ilike(users.name, `%${query.search}%`))
+  if (query.search) conditions.push(or(ilike(users.name, `%${query.search}%`), ilike(users.email, `%${query.search}%`))!)
   if (query.role) conditions.push(eq(users.role, query.role))
   if (query.active !== undefined) conditions.push(eq(users.active, query.active))
   const where = and(...conditions)

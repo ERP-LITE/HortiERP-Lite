@@ -10,6 +10,8 @@ import BaseModal from '@/components/ui/BaseModal.vue'
 import BaseToggle from '@/components/ui/BaseToggle.vue'
 import Pagination from '@/components/ui/Pagination.vue'
 import FilterButton from '@/components/ui/FilterButton.vue'
+import PrintButton from '@/components/ui/PrintButton.vue'
+import SearchInput from '@/components/ui/SearchInput.vue'
 import { getApiErrorMessage } from '@/services/api'
 import { listCurrentStock } from '@/services/stockService'
 import { listCategories } from '@/services/categoriesService'
@@ -23,6 +25,7 @@ const categories = ref<Category[]>([])
 const loading = ref(true)
 const errorMessage = ref('')
 
+const search = ref('')
 const emptyFilters = { categoryId: 'todas', lowStockOnly: false }
 const filters = ref({ ...emptyFilters })
 const draftFilters = ref({ ...emptyFilters })
@@ -41,6 +44,7 @@ async function loadStock() {
     const result = await listCurrentStock({
       page: page.value,
       pageSize: pageSize.value,
+      search: search.value || undefined,
       categoryId: filters.value.categoryId !== 'todas' ? filters.value.categoryId : undefined,
       lowStockOnly: filters.value.lowStockOnly || undefined,
     })
@@ -81,6 +85,10 @@ function clearFilters() {
   loadStock()
 }
 
+watch(search, () => {
+  if (page.value !== 1) page.value = 1
+  else loadStock()
+})
 watch([page, pageSize], loadStock)
 onMounted(() => {
   loadStock()
@@ -92,7 +100,9 @@ onMounted(() => {
   <div>
     <PageHeader title="Estoque atual" subtitle="Situação de estoque por produto">
       <template #actions>
+        <SearchInput v-model="search" placeholder="Buscar por produto..." />
         <FilterButton :active="activeFilterCount" @click="openFilterModal" />
+        <PrintButton />
         <RouterLink
           :to="{ name: 'movimentacoes' }"
           class="inline-flex items-center gap-1 text-sm text-primary-600 hover:underline dark:text-primary-400"

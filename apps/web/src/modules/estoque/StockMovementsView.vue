@@ -7,6 +7,8 @@ import BaseSelect from '@/components/ui/BaseSelect.vue'
 import BaseModal from '@/components/ui/BaseModal.vue'
 import Pagination from '@/components/ui/Pagination.vue'
 import FilterButton from '@/components/ui/FilterButton.vue'
+import PrintButton from '@/components/ui/PrintButton.vue'
+import SearchInput from '@/components/ui/SearchInput.vue'
 import PeriodPicker from '@/components/ui/PeriodPicker.vue'
 import type { PeriodValue } from '@/lib/period'
 import { getApiErrorMessage } from '@/services/api'
@@ -21,6 +23,7 @@ const movements = ref<StockMovement[]>([])
 const products = ref<Product[]>([])
 const loading = ref(true)
 const errorMessage = ref('')
+const search = ref('')
 
 const typeLabels: Record<MovementType, string> = {
   entrada: 'Entrada',
@@ -68,6 +71,7 @@ async function loadMovements() {
     const result = await listStockMovements({
       page: page.value,
       pageSize: pageSize.value,
+      search: search.value || undefined,
       productId: filters.value.productId !== 'todos' ? filters.value.productId : undefined,
       type: filters.value.type !== 'todos' ? (filters.value.type as MovementType) : undefined,
       from: filters.value.period.from || undefined,
@@ -110,6 +114,10 @@ function clearFilters() {
   loadMovements()
 }
 
+watch(search, () => {
+  if (page.value !== 1) page.value = 1
+  else loadMovements()
+})
 watch([page, pageSize], loadMovements)
 onMounted(() => {
   loadMovements()
@@ -121,7 +129,9 @@ onMounted(() => {
   <div>
     <PageHeader title="Histórico de movimentações" subtitle="Todas as entradas, perdas e ajustes de estoque">
       <template #actions>
+        <SearchInput v-model="search" placeholder="Buscar por produto..." />
         <FilterButton :active="activeFilterCount" @click="openFilterModal" />
+        <PrintButton />
       </template>
     </PageHeader>
 

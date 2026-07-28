@@ -12,6 +12,7 @@ export interface LossInput {
 export interface ListLossesParams {
   page: number
   pageSize: number
+  search?: string
   productId?: string
   reason?: LossReason
   from?: string

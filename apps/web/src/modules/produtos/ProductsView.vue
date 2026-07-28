@@ -10,6 +10,8 @@ import BaseBadge from '@/components/ui/BaseBadge.vue'
 import BaseToggle from '@/components/ui/BaseToggle.vue'
 import Pagination from '@/components/ui/Pagination.vue'
 import FilterButton from '@/components/ui/FilterButton.vue'
+import PrintButton from '@/components/ui/PrintButton.vue'
+import SearchInput from '@/components/ui/SearchInput.vue'
 import { getApiErrorMessage, resolveFormError } from '@/services/api'
 import { confirmDelete, toastError, toastSuccess } from '@/lib/alerts'
 import { listCategories } from '@/services/categoriesService'
@@ -30,15 +32,13 @@ const units = ref<Unit[]>([])
 const loading = ref(true)
 const errorMessage = ref('')
 
-const emptyFilters = { search: '', categoryId: 'todas', active: 'todos' }
+const search = ref('')
+const emptyFilters = { categoryId: 'todas', active: 'todos' }
 const filters = ref({ ...emptyFilters })
 const draftFilters = ref({ ...emptyFilters })
 const filterModalOpen = ref(false)
 const activeFilterCount = computed(
-  () =>
-    Number(filters.value.search !== '') +
-    Number(filters.value.categoryId !== 'todas') +
-    Number(filters.value.active !== 'todos'),
+  () => Number(filters.value.categoryId !== 'todas') + Number(filters.value.active !== 'todos'),
 )
 const statusFilterOptions = [
   { value: 'todos', label: 'Todos' },
@@ -82,7 +82,7 @@ async function loadProducts() {
     const result = await listProducts({
       page: page.value,
       pageSize: pageSize.value,
-      search: filters.value.search || undefined,
+      search: search.value || undefined,
       categoryId: filters.value.categoryId !== 'todas' ? filters.value.categoryId : undefined,
       active: filters.value.active === 'todos' ? undefined : filters.value.active === 'true',
     })
@@ -215,6 +215,10 @@ async function handleDelete(product: Product) {
   }
 }
 
+watch(search, () => {
+  if (page.value !== 1) page.value = 1
+  else loadProducts()
+})
 watch([page, pageSize], loadProducts)
 onMounted(loadAll)
 </script>
@@ -223,7 +227,9 @@ onMounted(loadAll)
   <div>
     <PageHeader title="Produtos" subtitle="Cadastro de produtos do estoque">
       <template #actions>
+        <SearchInput v-model="search" placeholder="Buscar por nome, SKU ou código de barras..." />
         <FilterButton :active="activeFilterCount" @click="openFilterModal" />
+        <PrintButton />
         <BaseButton v-if="canManage" @click="openCreateModal"><Plus :size="16" /> Novo produto</BaseButton>
       </template>
     </PageHeader>
@@ -244,7 +250,7 @@ onMounted(loadAll)
               Estoque
             </th>
             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Status</th>
-            <th class="px-4 py-3" />
+            <th class="print:hidden px-4 py-3" />
           </tr>
         </thead>
         <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
@@ -282,7 +288,7 @@ onMounted(loadAll)
                 {{ product.active ? 'Ativo' : 'Inativo' }}
               </BaseBadge>
             </td>
-            <td v-if="canManage" class="px-4 py-3 text-right space-x-1 whitespace-nowrap" @dblclick.stop>
+            <td v-if="canManage" class="print:hidden px-4 py-3 text-right space-x-1 whitespace-nowrap" @dblclick.stop>
               <button
                 class="inline-flex items-center justify-center h-8 w-8 rounded-lg text-primary-600 hover:bg-primary-50 dark:text-primary-400 dark:hover:bg-primary-900/30"
                 title="Editar"
@@ -298,7 +304,7 @@ onMounted(loadAll)
                 <Trash2 :size="16" />
               </button>
             </td>
-            <td v-else class="px-4 py-3" />
+            <td v-else class="print:hidden px-4 py-3" />
           </tr>
         </tbody>
       </table>
@@ -353,7 +359,6 @@ onMounted(loadAll)
 
     <BaseModal :open="filterModalOpen" title="Filtrar produtos" @close="filterModalOpen = false">
       <form class="space-y-4" @submit.prevent="applyFilters">
-        <BaseInput v-model="draftFilters.search" label="Nome ou SKU" placeholder="Buscar..." />
         <BaseSelect v-model="draftFilters.categoryId" label="Categoria" :options="categoryFilterOptions" />
         <BaseSelect v-model="draftFilters.active" label="Status" :options="statusFilterOptions" />
 

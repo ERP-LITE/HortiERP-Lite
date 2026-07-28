@@ -7,6 +7,7 @@ import BaseBadge from '@/components/ui/BaseBadge.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseModal from '@/components/ui/BaseModal.vue'
 import FilterButton from '@/components/ui/FilterButton.vue'
+import PrintButton from '@/components/ui/PrintButton.vue'
 import PeriodPicker from '@/components/ui/PeriodPicker.vue'
 import { rangeForPreset, type PeriodValue } from '@/lib/period'
 import DonutChart from '@/components/charts/DonutChart.vue'
@@ -91,6 +92,7 @@ onMounted(loadSummary)
     <PageHeader title="Dashboard" subtitle="Visão geral do estoque">
       <template #actions>
         <FilterButton :active="activeFilterCount" @click="openFilterModal" />
+        <PrintButton />
       </template>
     </PageHeader>
 
@@ -119,7 +121,7 @@ onMounted(loadSummary)
         />
       </div>
 
-      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+      <div class="print:hidden grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
         <div
           class="lg:col-span-2 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden"
         >
@@ -146,7 +148,7 @@ onMounted(loadSummary)
       </div>
 
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+        <div class="print:hidden bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
           <div class="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
             <h2 class="text-sm font-semibold text-gray-700 dark:text-gray-300">
               Perdas por motivo no período

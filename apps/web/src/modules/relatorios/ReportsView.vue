@@ -5,6 +5,8 @@ import BaseBadge from '@/components/ui/BaseBadge.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseModal from '@/components/ui/BaseModal.vue'
 import FilterButton from '@/components/ui/FilterButton.vue'
+import PrintButton from '@/components/ui/PrintButton.vue'
+import SearchInput from '@/components/ui/SearchInput.vue'
 import PeriodPicker from '@/components/ui/PeriodPicker.vue'
 import type { PeriodValue } from '@/lib/period'
 import { getApiErrorMessage } from '@/services/api'
@@ -67,6 +69,27 @@ const reasonLabels: Record<string, string> = {
   outro: 'Outro',
 }
 
+const search = ref('')
+
+function matches(text: string | null | undefined) {
+  if (!search.value) return true
+  return (text ?? '').toLowerCase().includes(search.value.toLowerCase())
+}
+
+const filteredStockByCategory = computed(() => stockByCategory.value.filter((row) => matches(row.categoryName)))
+
+const filteredLossItems = computed(() =>
+  (lossesReport.value?.items ?? []).filter(
+    (loss) => matches(loss.product?.name) || matches(reasonLabels[loss.reason] ?? loss.reason) || matches(loss.notes),
+  ),
+)
+
+const filteredStockEntries = computed(() =>
+  stockEntriesReport.value.filter(
+    (entry) => matches(entry.supplierName) || entry.items.some((item) => matches(item.product.name)),
+  ),
+)
+
 function formatDate(value: string) {
   return new Date(value).toLocaleDateString('pt-BR')
 }
@@ -109,12 +132,14 @@ onMounted(loadActiveTab)
 <template>
   <div>
     <PageHeader title="Relatórios" subtitle="Consolidados de estoque, perdas e entradas">
-      <template v-if="hasDateFilterTab" #actions>
-        <FilterButton :active="activeFilterCount" @click="openFilterModal" />
+      <template #actions>
+        <SearchInput v-model="search" placeholder="Buscar..." />
+        <FilterButton v-if="hasDateFilterTab" :active="activeFilterCount" @click="openFilterModal" />
+        <PrintButton />
       </template>
     </PageHeader>
 
-    <div class="border-b border-gray-200 dark:border-gray-700 mb-6">
+    <div class="print:hidden border-b border-gray-200 dark:border-gray-700 mb-6">
       <nav class="flex gap-6">
         <button
           v-for="tab in tabs"
@@ -159,10 +184,10 @@ onMounted(loadActiveTab)
             </tr>
           </thead>
           <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
-            <tr v-if="stockByCategory.length === 0">
+            <tr v-if="filteredStockByCategory.length === 0">
               <td colspan="3" class="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">Sem dados.</td>
             </tr>
-            <tr v-for="row in stockByCategory" v-else :key="row.categoryId">
+            <tr v-for="row in filteredStockByCategory" v-else :key="row.categoryId">
               <td class="px-4 py-3 text-sm font-medium text-gray-900 dark:text-gray-100">{{ row.categoryName }}</td>
               <td class="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">{{ row.productCount }}</td>
               <td class="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">{{ row.totalStock }}</td>
@@ -202,12 +227,12 @@ onMounted(loadActiveTab)
           </div>
           <table class="min-w-full divide-y divide-gray-100 dark:divide-gray-700">
             <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
-              <tr v-if="lossesReport.items.length === 0">
+              <tr v-if="filteredLossItems.length === 0">
                 <td class="px-4 py-4 text-sm text-gray-500 dark:text-gray-400 text-center">
                   Sem perdas no período.
                 </td>
               </tr>
-              <tr v-for="loss in lossesReport.items" v-else :key="loss.id">
+              <tr v-for="loss in filteredLossItems" v-else :key="loss.id">
                 <td class="px-4 py-3 text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">
                   {{ formatDate(loss.lossDate) }}
                 </td>
@@ -245,12 +270,12 @@ onMounted(loadActiveTab)
             </tr>
           </thead>
           <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
-            <tr v-if="stockEntriesReport.length === 0">
+            <tr v-if="filteredStockEntries.length === 0">
               <td colspan="3" class="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">
                 Sem entradas no período.
               </td>
             </tr>
-            <tr v-for="entry in stockEntriesReport" v-else :key="entry.id">
+            <tr v-for="entry in filteredStockEntries" v-else :key="entry.id">
               <td class="px-4 py-3 text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">
                 {{ formatDate(entry.entryDate) }}
               </td>

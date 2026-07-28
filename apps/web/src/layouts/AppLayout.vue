@@ -50,7 +50,7 @@ function isActive(name: string) {
 </script>
 
 <template>
-  <div class="min-h-screen bg-gray-50 dark:bg-gray-950 flex">
+  <div class="min-h-screen bg-gray-50 dark:bg-gray-950 flex print:block print:min-h-0">
     <div
       v-if="sidebarOpen"
       class="fixed inset-0 bg-black/40 z-20 lg:hidden"
@@ -58,7 +58,7 @@ function isActive(name: string) {
     />
 
     <aside
-      class="fixed lg:static inset-y-0 left-0 z-30 w-64 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 flex flex-col transition-transform lg:translate-x-0"
+      class="print:hidden fixed lg:static inset-y-0 left-0 z-30 w-64 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 flex flex-col transition-transform lg:translate-x-0"
       :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full'"
     >
       <div class="h-16 flex items-center px-6 border-b border-gray-200 dark:border-gray-800">
@@ -86,9 +86,9 @@ function isActive(name: string) {
       </nav>
     </aside>
 
-    <div class="flex-1 flex flex-col min-w-0">
+    <div class="flex-1 flex flex-col min-w-0 print:block">
       <header
-        class="h-16 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between px-4 lg:px-6"
+        class="print:hidden h-16 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between px-4 lg:px-6"
       >
         <button class="lg:hidden text-gray-600 dark:text-gray-300" @click="sidebarOpen = true">
           <Menu :size="22" />
@@ -100,7 +100,7 @@ function isActive(name: string) {
         </div>
       </header>
 
-      <main class="flex-1 p-4 lg:p-6 overflow-y-auto">
+      <main class="flex-1 p-4 lg:p-6 overflow-y-auto print:overflow-visible print:h-auto print:p-0">
         <RouterView />
       </main>
     </div>

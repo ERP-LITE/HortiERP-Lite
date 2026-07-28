@@ -4,6 +4,7 @@ import type { MovementType, PaginatedResult, ProductWithRelations, StockMovement
 export interface ListCurrentStockParams {
   page: number
   pageSize: number
+  search?: string
   categoryId?: string
   lowStockOnly?: boolean
 }
@@ -16,6 +17,7 @@ export async function listCurrentStock(params: ListCurrentStockParams) {
 export interface ListStockMovementsParams {
   page: number
   pageSize: number
+  search?: string
   productId?: string
   type?: MovementType
   from?: string

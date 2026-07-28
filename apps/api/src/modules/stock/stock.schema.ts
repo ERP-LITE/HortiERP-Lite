@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { booleanQueryParam, paginationQuerySchema } from '../../shared/schemas/pagination.schema.js'
 
 export const listStockQuerySchema = paginationQuerySchema.extend({
+  search: z.string().trim().min(1).optional(),
   categoryId: z.string().uuid().optional(),
   lowStockOnly: booleanQueryParam,
 })
@@ -9,6 +10,7 @@ export const listStockQuerySchema = paginationQuerySchema.extend({
 export type ListStockQuery = z.infer<typeof listStockQuerySchema>
 
 export const listStockMovementsQuerySchema = paginationQuerySchema.extend({
+  search: z.string().trim().min(1).optional(),
   productId: z.string().uuid().optional(),
   type: z.enum(['entrada', 'perda', 'ajuste']).optional(),
   from: z.coerce.date().optional(),
