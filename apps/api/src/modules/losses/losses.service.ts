@@ -77,7 +77,7 @@ export async function createLoss(companyId: string, userId: string, data: Create
     await tx
       .update(products)
       .set({ currentStock: newStock.toString(), updatedAt: new Date(), updatedBy: userId })
-      .where(eq(products.id, data.productId))
+      .where(and(eq(products.id, data.productId), eq(products.companyId, companyId)))
 
     await tx.insert(stockMovements).values({
       companyId,

@@ -6,8 +6,8 @@ export interface LoginResponse {
   user: AuthUser
 }
 
-export async function login(email: string, password: string) {
-  const { data } = await api.post<LoginResponse>('/auth/login', { email, password })
+export async function login(email: string, password: string, turnstileToken: string) {
+  const { data } = await api.post<LoginResponse>('/auth/login', { email, password, turnstileToken })
   return data
 }
 

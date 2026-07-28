@@ -17,8 +17,8 @@ export const useAuthStore = defineStore('auth', () => {
     localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(newUser))
   }
 
-  async function login(email: string, password: string) {
-    const response = await loginRequest(email, password)
+  async function login(email: string, password: string, turnstileToken: string) {
+    const response = await loginRequest(email, password, turnstileToken)
     persist(response.token, response.user)
   }
 

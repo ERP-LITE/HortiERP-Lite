@@ -3,6 +3,7 @@ import { z } from 'zod'
 export const loginSchema = z.object({
   email: z.string().email('E-mail inválido'),
   password: z.string().min(6, 'Senha deve ter ao menos 6 caracteres'),
+  turnstileToken: z.string().min(1, 'Verificação de segurança obrigatória'),
 })
 
 export type LoginInput = z.infer<typeof loginSchema>
