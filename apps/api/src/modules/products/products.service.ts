@@ -1,4 +1,4 @@
-import { and, asc, count, eq, ilike, isNull } from 'drizzle-orm'
+import { and, asc, count, eq, ilike, isNull, or } from 'drizzle-orm'
 import { db } from '../../db/client.js'
 import { categories, products, units } from '../../db/schema/index.js'
 import { AppError } from '../../shared/errors/AppError.js'
@@ -64,7 +64,15 @@ async function assertCategoryAndUnitBelongToCompany(
 
 export async function listProducts(companyId: string, query: ListProductsQuery) {
   const conditions = [eq(products.companyId, companyId), isNull(products.deletedAt)]
-  if (query.search) conditions.push(ilike(products.name, `%${query.search}%`))
+  if (query.search) {
+    conditions.push(
+      or(
+        ilike(products.name, `%${query.search}%`),
+        ilike(products.sku, `%${query.search}%`),
+        ilike(products.barcode, `%${query.search}%`),
+      )!,
+    )
+  }
   if (query.categoryId) conditions.push(eq(products.categoryId, query.categoryId))
   if (query.active !== undefined) conditions.push(eq(products.active, query.active))
   const where = and(...conditions)

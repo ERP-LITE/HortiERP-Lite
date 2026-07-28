@@ -8,7 +8,7 @@ defineProps<{ title: string; subtitle?: string }>()
       <h1 class="text-xl font-bold text-gray-900 dark:text-gray-100">{{ title }}</h1>
       <p v-if="subtitle" class="text-sm text-gray-500 dark:text-gray-400 mt-0.5">{{ subtitle }}</p>
     </div>
-    <div class="flex items-center gap-2">
+    <div class="print:hidden flex items-center gap-2">
       <slot name="actions" />
     </div>
   </div>

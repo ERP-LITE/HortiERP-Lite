@@ -1,4 +1,4 @@
-import { and, asc, count, eq, ilike, isNull } from 'drizzle-orm'
+import { and, asc, count, eq, ilike, isNull, or } from 'drizzle-orm'
 import { db } from '../../db/client.js'
 import { categories } from '../../db/schema/index.js'
 import { AppError } from '../../shared/errors/AppError.js'
@@ -23,7 +23,9 @@ function assertUniqueName(companyId: string, name: string, excludeId?: string) {
 
 export async function listCategories(companyId: string, query: ListCategoriesQuery) {
   const conditions = [eq(categories.companyId, companyId), isNull(categories.deletedAt)]
-  if (query.search) conditions.push(ilike(categories.name, `%${query.search}%`))
+  if (query.search) {
+    conditions.push(or(ilike(categories.name, `%${query.search}%`), ilike(categories.description, `%${query.search}%`))!)
+  }
   const where = and(...conditions)
 
   const [data, [{ total }]] = await Promise.all([

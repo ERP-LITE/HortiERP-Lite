@@ -7,6 +7,7 @@ import BaseInput from '@/components/ui/BaseInput.vue'
 import BaseModal from '@/components/ui/BaseModal.vue'
 import Pagination from '@/components/ui/Pagination.vue'
 import SearchInput from '@/components/ui/SearchInput.vue'
+import PrintButton from '@/components/ui/PrintButton.vue'
 import { getApiErrorMessage, resolveFormError } from '@/services/api'
 import { confirmDelete, toastError, toastSuccess } from '@/lib/alerts'
 import {
@@ -122,6 +123,7 @@ onMounted(loadCategories)
     <PageHeader title="Categorias" subtitle="Organize seus produtos por categoria">
       <template #actions>
         <SearchInput v-model="search" placeholder="Buscar por nome..." />
+        <PrintButton />
         <BaseButton v-if="canManage" @click="openCreateModal"><Plus :size="16" /> Nova categoria</BaseButton>
       </template>
     </PageHeader>
@@ -138,7 +140,7 @@ onMounted(loadCategories)
             >
               Descrição
             </th>
-            <th class="px-4 py-3" />
+            <th class="print:hidden px-4 py-3" />
           </tr>
         </thead>
         <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
@@ -163,7 +165,7 @@ onMounted(loadCategories)
             <td class="px-4 py-3 text-sm text-gray-500 dark:text-gray-400 hidden sm:table-cell">
               {{ category.description || '—' }}
             </td>
-            <td v-if="canManage" class="px-4 py-3 text-right space-x-1 whitespace-nowrap" @dblclick.stop>
+            <td v-if="canManage" class="print:hidden px-4 py-3 text-right space-x-1 whitespace-nowrap" @dblclick.stop>
               <button
                 class="inline-flex items-center justify-center h-8 w-8 rounded-lg text-primary-600 hover:bg-primary-50 dark:text-primary-400 dark:hover:bg-primary-900/30"
                 title="Editar"
@@ -179,7 +181,7 @@ onMounted(loadCategories)
                 <Trash2 :size="16" />
               </button>
             </td>
-            <td v-else class="px-4 py-3" />
+            <td v-else class="print:hidden px-4 py-3" />
           </tr>
         </tbody>
       </table>

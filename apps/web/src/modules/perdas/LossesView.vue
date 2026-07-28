@@ -9,6 +9,8 @@ import BaseModal from '@/components/ui/BaseModal.vue'
 import BaseBadge from '@/components/ui/BaseBadge.vue'
 import Pagination from '@/components/ui/Pagination.vue'
 import FilterButton from '@/components/ui/FilterButton.vue'
+import PrintButton from '@/components/ui/PrintButton.vue'
+import SearchInput from '@/components/ui/SearchInput.vue'
 import PeriodPicker from '@/components/ui/PeriodPicker.vue'
 import type { PeriodValue } from '@/lib/period'
 import { getApiErrorMessage, resolveFormError } from '@/services/api'
@@ -36,6 +38,7 @@ const products = ref<Product[]>([])
 const loading = ref(true)
 const errorMessage = ref('')
 
+const search = ref('')
 function emptyFilters() {
   return { productId: 'todos', reason: 'todos', period: { preset: 'todos', from: '', to: '' } as PeriodValue }
 }
@@ -67,6 +70,7 @@ async function loadLosses() {
     const result = await listLosses({
       page: page.value,
       pageSize: pageSize.value,
+      search: search.value || undefined,
       productId: filters.value.productId !== 'todos' ? filters.value.productId : undefined,
       reason: filters.value.reason !== 'todos' ? (filters.value.reason as LossReason) : undefined,
       from: filters.value.period.from || undefined,
@@ -154,6 +158,10 @@ async function handleSubmit() {
   }
 }
 
+watch(search, () => {
+  if (page.value !== 1) page.value = 1
+  else loadLosses()
+})
 watch([page, pageSize], loadLosses)
 onMounted(loadAll)
 </script>
@@ -162,7 +170,9 @@ onMounted(loadAll)
   <div>
     <PageHeader title="Perdas" subtitle="Registro de perdas com baixa automática no estoque">
       <template #actions>
+        <SearchInput v-model="search" placeholder="Buscar por produto ou observação..." />
         <FilterButton :active="activeFilterCount" @click="openFilterModal" />
+        <PrintButton />
         <BaseButton @click="openCreateModal"><Plus :size="16" /> Registrar perda</BaseButton>
       </template>
     </PageHeader>

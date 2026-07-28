@@ -10,6 +10,8 @@ import BaseBadge from '@/components/ui/BaseBadge.vue'
 import BaseToggle from '@/components/ui/BaseToggle.vue'
 import Pagination from '@/components/ui/Pagination.vue'
 import FilterButton from '@/components/ui/FilterButton.vue'
+import PrintButton from '@/components/ui/PrintButton.vue'
+import SearchInput from '@/components/ui/SearchInput.vue'
 import { getApiErrorMessage, resolveFormError } from '@/services/api'
 import { confirmDelete, toastError, toastSuccess } from '@/lib/alerts'
 import { generateRandomPassword } from '@/lib/password'
@@ -35,6 +37,7 @@ const users = ref<User[]>([])
 const loading = ref(true)
 const errorMessage = ref('')
 
+const search = ref('')
 const emptyFilters = { role: 'todos', active: 'todos' }
 const filters = ref({ ...emptyFilters })
 const draftFilters = ref({ ...emptyFilters })
@@ -57,6 +60,7 @@ async function loadUsers() {
     const result = await listUsers({
       page: page.value,
       pageSize: pageSize.value,
+      search: search.value || undefined,
       role: filters.value.role !== 'todos' ? (filters.value.role as UserRole) : undefined,
       active: filters.value.active === 'todos' ? undefined : filters.value.active === 'true',
     })
@@ -163,6 +167,10 @@ async function handleDelete(user: User) {
   }
 }
 
+watch(search, () => {
+  if (page.value !== 1) page.value = 1
+  else loadUsers()
+})
 watch([page, pageSize], loadUsers)
 onMounted(loadUsers)
 </script>
@@ -171,7 +179,9 @@ onMounted(loadUsers)
   <div>
     <PageHeader title="Usuários" subtitle="Gerencie os acessos ao sistema">
       <template #actions>
+        <SearchInput v-model="search" placeholder="Buscar por nome ou e-mail..." />
         <FilterButton :active="activeFilterCount" @click="openFilterModal" />
+        <PrintButton />
         <BaseButton @click="openCreateModal"><Plus :size="16" /> Novo usuário</BaseButton>
       </template>
     </PageHeader>
@@ -192,7 +202,7 @@ onMounted(loadUsers)
             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
               Status
             </th>
-            <th class="px-4 py-3" />
+            <th class="print:hidden px-4 py-3" />
           </tr>
         </thead>
         <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
@@ -224,7 +234,7 @@ onMounted(loadUsers)
                 {{ user.active ? 'Ativo' : 'Inativo' }}
               </BaseBadge>
             </td>
-            <td class="px-4 py-3 text-right space-x-1 whitespace-nowrap" @dblclick.stop>
+            <td class="print:hidden px-4 py-3 text-right space-x-1 whitespace-nowrap" @dblclick.stop>
               <button
                 class="inline-flex items-center justify-center h-8 w-8 rounded-lg text-primary-600 hover:bg-primary-50 dark:text-primary-400 dark:hover:bg-primary-900/30"
                 title="Editar"

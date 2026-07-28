@@ -4,6 +4,7 @@ import { paginationQuerySchema } from '../../shared/schemas/pagination.schema.js
 export const lossReasons = ['vencido', 'avariado', 'roubo_furto', 'erro_operacional', 'outro'] as const
 
 export const listLossesQuerySchema = paginationQuerySchema.extend({
+  search: z.string().trim().min(1).optional(),
   productId: z.string().uuid().optional(),
   reason: z.enum(lossReasons).optional(),
   from: z.coerce.date().optional(),
