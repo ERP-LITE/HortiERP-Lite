@@ -33,8 +33,8 @@ function handleClickOutside(event: MouseEvent) {
   }
 }
 
-function handleLogout() {
-  auth.logout()
+async function handleLogout() {
+  await auth.logout()
   window.location.href = '/login'
 }
 

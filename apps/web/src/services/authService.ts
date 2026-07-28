@@ -2,13 +2,16 @@ import { api } from './api'
 import type { AuthUser } from '@/types'
 
 export interface LoginResponse {
-  token: string
   user: AuthUser
 }
 
 export async function login(email: string, password: string, turnstileToken: string) {
   const { data } = await api.post<LoginResponse>('/auth/login', { email, password, turnstileToken })
   return data
+}
+
+export async function logout() {
+  await api.post('/auth/logout')
 }
 
 export async function fetchMe() {
