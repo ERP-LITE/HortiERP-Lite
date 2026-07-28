@@ -5,7 +5,8 @@ import BaseBadge from '@/components/ui/BaseBadge.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseModal from '@/components/ui/BaseModal.vue'
 import FilterButton from '@/components/ui/FilterButton.vue'
-import DateInput from '@/components/ui/DateInput.vue'
+import PeriodPicker from '@/components/ui/PeriodPicker.vue'
+import type { PeriodValue } from '@/lib/period'
 import { getApiErrorMessage } from '@/services/api'
 import {
   fetchLossesReport,
@@ -28,30 +29,30 @@ const activeTab = ref<TabKey>('estoque')
 const loading = ref(false)
 const errorMessage = ref('')
 
-const from = ref('')
-const to = ref('')
+const period = ref<PeriodValue>({ preset: 'todos', from: '', to: '' })
+const draftPeriod = ref<PeriodValue>({ ...period.value })
 const filterModalOpen = ref(false)
-const draftFrom = ref('')
-const draftTo = ref('')
 const hasDateFilterTab = computed(() => activeTab.value !== 'estoque')
-const activeFilterCount = computed(() => Number(Boolean(from.value)) + Number(Boolean(to.value)))
+const activeFilterCount = computed(() => Number(period.value.preset !== 'todos'))
+const from = computed(() => period.value.from)
+const to = computed(() => period.value.to)
 
 function openFilterModal() {
-  draftFrom.value = from.value
-  draftTo.value = to.value
+  draftPeriod.value = { ...period.value }
   filterModalOpen.value = true
 }
 
 function applyFilters() {
-  from.value = draftFrom.value
-  to.value = draftTo.value
+  period.value = { ...draftPeriod.value }
   filterModalOpen.value = false
   loadActiveTab()
 }
 
 function clearFilters() {
-  draftFrom.value = ''
-  draftTo.value = ''
+  period.value = { preset: 'todos', from: '', to: '' }
+  draftPeriod.value = { ...period.value }
+  filterModalOpen.value = false
+  loadActiveTab()
 }
 
 const stockByCategory = ref<StockByCategoryRow[]>([])
@@ -68,6 +69,11 @@ const reasonLabels: Record<string, string> = {
 
 function formatDate(value: string) {
   return new Date(value).toLocaleDateString('pt-BR')
+}
+
+function formatPeriodDate(value: string) {
+  const [year, month, day] = value.split('-')
+  return `${day}/${month}/${year}`
 }
 
 async function loadStockByCategory() {
@@ -127,7 +133,7 @@ onMounted(loadActiveTab)
     </div>
 
     <p v-if="activeFilterCount > 0 && hasDateFilterTab" class="text-sm text-gray-500 dark:text-gray-400 mb-4">
-      Período: {{ from ? formatDate(from) : 'início' }} até {{ to ? formatDate(to) : 'hoje' }}
+      Período: {{ from ? formatPeriodDate(from) : 'início' }} até {{ to ? formatPeriodDate(to) : 'hoje' }}
     </p>
 
     <p v-if="errorMessage" class="text-sm text-red-600 dark:text-red-400 mb-4">{{ errorMessage }}</p>
@@ -262,10 +268,7 @@ onMounted(loadActiveTab)
 
     <BaseModal :open="filterModalOpen" title="Filtrar por período" @close="filterModalOpen = false">
       <form class="space-y-4" @submit.prevent="applyFilters">
-        <div class="grid grid-cols-2 gap-4">
-          <DateInput v-model="draftFrom" label="De" />
-          <DateInput v-model="draftTo" label="Até" />
-        </div>
+        <PeriodPicker v-model="draftPeriod" />
 
         <div class="flex justify-between items-center pt-2">
           <button

@@ -6,7 +6,7 @@ import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
 import BaseModal from '@/components/ui/BaseModal.vue'
 import Pagination from '@/components/ui/Pagination.vue'
-import FilterButton from '@/components/ui/FilterButton.vue'
+import SearchInput from '@/components/ui/SearchInput.vue'
 import { getApiErrorMessage, resolveFormError } from '@/services/api'
 import { confirmDelete, toastError, toastSuccess } from '@/lib/alerts'
 import {
@@ -30,9 +30,6 @@ const loading = ref(true)
 const errorMessage = ref('')
 
 const search = ref('')
-const draftSearch = ref('')
-const filterModalOpen = ref(false)
-const activeFilterCount = computed(() => Number(search.value !== ''))
 
 const modalOpen = ref(false)
 const editingId = ref<string | null>(null)
@@ -51,22 +48,6 @@ async function loadCategories() {
   } finally {
     loading.value = false
   }
-}
-
-function openFilterModal() {
-  draftSearch.value = search.value
-  filterModalOpen.value = true
-}
-
-function applyFilters() {
-  search.value = draftSearch.value
-  filterModalOpen.value = false
-  page.value = 1
-  loadCategories()
-}
-
-function clearFilters() {
-  draftSearch.value = ''
 }
 
 function openCreateModal() {
@@ -128,6 +109,10 @@ async function handleDelete(category: Category) {
   }
 }
 
+watch(search, () => {
+  if (page.value !== 1) page.value = 1
+  else loadCategories()
+})
 watch([page, pageSize], loadCategories)
 onMounted(loadCategories)
 </script>
@@ -136,7 +121,7 @@ onMounted(loadCategories)
   <div>
     <PageHeader title="Categorias" subtitle="Organize seus produtos por categoria">
       <template #actions>
-        <FilterButton :active="activeFilterCount" @click="openFilterModal" />
+        <SearchInput v-model="search" placeholder="Buscar por nome..." />
         <BaseButton v-if="canManage" @click="openCreateModal"><Plus :size="16" /> Nova categoria</BaseButton>
       </template>
     </PageHeader>
@@ -215,22 +200,6 @@ onMounted(loadCategories)
         <div class="flex justify-end gap-2 pt-2">
           <BaseButton variant="secondary" type="button" @click="modalOpen = false">Cancelar</BaseButton>
           <BaseButton type="submit" :disabled="saving">{{ saving ? 'Salvando...' : 'Salvar' }}</BaseButton>
-        </div>
-      </form>
-    </BaseModal>
-
-    <BaseModal :open="filterModalOpen" title="Filtrar categorias" @close="filterModalOpen = false">
-      <form class="space-y-4" @submit.prevent="applyFilters">
-        <BaseInput v-model="draftSearch" label="Nome" placeholder="Buscar..." />
-
-        <div class="flex justify-between items-center pt-2">
-          <button type="button" class="text-sm text-gray-500 hover:underline dark:text-gray-400" @click="clearFilters">
-            Limpar
-          </button>
-          <div class="flex gap-2">
-            <BaseButton variant="secondary" type="button" @click="filterModalOpen = false">Cancelar</BaseButton>
-            <BaseButton type="submit">Aplicar</BaseButton>
-          </div>
         </div>
       </form>
     </BaseModal>

@@ -8,7 +8,8 @@ import BaseInput from '@/components/ui/BaseInput.vue'
 import BaseModal from '@/components/ui/BaseModal.vue'
 import Pagination from '@/components/ui/Pagination.vue'
 import FilterButton from '@/components/ui/FilterButton.vue'
-import DateInput from '@/components/ui/DateInput.vue'
+import PeriodPicker from '@/components/ui/PeriodPicker.vue'
+import type { PeriodValue } from '@/lib/period'
 import { getApiErrorMessage } from '@/services/api'
 import { listStockEntries } from '@/services/stockEntriesService'
 import { usePagination } from '@/composables/usePagination'
@@ -20,13 +21,14 @@ const entries = ref<StockEntry[]>([])
 const loading = ref(true)
 const errorMessage = ref('')
 
-const emptyFilters = { search: '', from: '', to: '' }
-const filters = ref({ ...emptyFilters })
-const draftFilters = ref({ ...emptyFilters })
+function emptyFilters() {
+  return { search: '', period: { preset: 'todos', from: '', to: '' } as PeriodValue }
+}
+const filters = ref(emptyFilters())
+const draftFilters = ref(emptyFilters())
 const filterModalOpen = ref(false)
 const activeFilterCount = computed(
-  () =>
-    Number(filters.value.search !== '') + Number(filters.value.from !== '') + Number(filters.value.to !== ''),
+  () => Number(filters.value.search !== '') + Number(filters.value.period.preset !== 'todos'),
 )
 
 function itemsSummary(entry: StockEntry) {
@@ -44,8 +46,8 @@ async function loadEntries() {
       page: page.value,
       pageSize: pageSize.value,
       search: filters.value.search || undefined,
-      from: filters.value.from || undefined,
-      to: filters.value.to || undefined,
+      from: filters.value.period.from || undefined,
+      to: filters.value.period.to || undefined,
     })
     entries.value = result.data
     applyMeta(result)
@@ -69,7 +71,11 @@ function applyFilters() {
 }
 
 function clearFilters() {
-  draftFilters.value = { ...emptyFilters }
+  filters.value = emptyFilters()
+  draftFilters.value = emptyFilters()
+  filterModalOpen.value = false
+  page.value = 1
+  loadEntries()
 }
 
 watch([page, pageSize], loadEntries)
@@ -133,10 +139,7 @@ onMounted(loadEntries)
     <BaseModal :open="filterModalOpen" title="Filtrar entradas" @close="filterModalOpen = false">
       <form class="space-y-4" @submit.prevent="applyFilters">
         <BaseInput v-model="draftFilters.search" label="Fornecedor" placeholder="Buscar..." />
-        <div class="grid grid-cols-2 gap-4">
-          <DateInput v-model="draftFilters.from" label="De" />
-          <DateInput v-model="draftFilters.to" label="Até" />
-        </div>
+        <PeriodPicker v-model="draftFilters.period" />
 
         <div class="flex justify-between items-center pt-2">
           <button type="button" class="text-sm text-gray-500 hover:underline dark:text-gray-400" @click="clearFilters">

@@ -4,10 +4,11 @@ import PageHeader from '@/components/ui/PageHeader.vue'
 import BaseBadge from '@/components/ui/BaseBadge.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseSelect from '@/components/ui/BaseSelect.vue'
-import DateInput from '@/components/ui/DateInput.vue'
 import BaseModal from '@/components/ui/BaseModal.vue'
 import Pagination from '@/components/ui/Pagination.vue'
 import FilterButton from '@/components/ui/FilterButton.vue'
+import PeriodPicker from '@/components/ui/PeriodPicker.vue'
+import type { PeriodValue } from '@/lib/period'
 import { getApiErrorMessage } from '@/services/api'
 import { listStockMovements } from '@/services/stockService'
 import { listProducts } from '@/services/productsService'
@@ -40,16 +41,17 @@ const typeFilterOptions = [
   { value: 'ajuste', label: 'Ajuste' },
 ]
 
-const emptyFilters = { productId: 'todos', type: 'todos', from: '', to: '' }
-const filters = ref({ ...emptyFilters })
-const draftFilters = ref({ ...emptyFilters })
+function emptyFilters() {
+  return { productId: 'todos', type: 'todos', period: { preset: 'todos', from: '', to: '' } as PeriodValue }
+}
+const filters = ref(emptyFilters())
+const draftFilters = ref(emptyFilters())
 const filterModalOpen = ref(false)
 const activeFilterCount = computed(
   () =>
     Number(filters.value.productId !== 'todos') +
     Number(filters.value.type !== 'todos') +
-    Number(filters.value.from !== '') +
-    Number(filters.value.to !== ''),
+    Number(filters.value.period.preset !== 'todos'),
 )
 const productFilterOptions = computed(() => [
   { value: 'todos', label: 'Todos os produtos' },
@@ -68,8 +70,8 @@ async function loadMovements() {
       pageSize: pageSize.value,
       productId: filters.value.productId !== 'todos' ? filters.value.productId : undefined,
       type: filters.value.type !== 'todos' ? (filters.value.type as MovementType) : undefined,
-      from: filters.value.from || undefined,
-      to: filters.value.to || undefined,
+      from: filters.value.period.from || undefined,
+      to: filters.value.period.to || undefined,
     })
     movements.value = result.data
     applyMeta(result)
@@ -101,7 +103,11 @@ function applyFilters() {
 }
 
 function clearFilters() {
-  draftFilters.value = { ...emptyFilters }
+  filters.value = emptyFilters()
+  draftFilters.value = emptyFilters()
+  filterModalOpen.value = false
+  page.value = 1
+  loadMovements()
 }
 
 watch([page, pageSize], loadMovements)
@@ -180,10 +186,7 @@ onMounted(() => {
       <form class="space-y-4" @submit.prevent="applyFilters">
         <BaseSelect v-model="draftFilters.productId" label="Produto" :options="productFilterOptions" />
         <BaseSelect v-model="draftFilters.type" label="Tipo" :options="typeFilterOptions" />
-        <div class="grid grid-cols-2 gap-4">
-          <DateInput v-model="draftFilters.from" label="De" />
-          <DateInput v-model="draftFilters.to" label="Até" />
-        </div>
+        <PeriodPicker v-model="draftFilters.period" />
 
         <div class="flex justify-between items-center pt-2">
           <button type="button" class="text-sm text-gray-500 hover:underline dark:text-gray-400" @click="clearFilters">
