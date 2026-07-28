@@ -2,6 +2,7 @@ import Fastify from 'fastify'
 import cookie from '@fastify/cookie'
 import cors from '@fastify/cors'
 import jwt from '@fastify/jwt'
+import rateLimit from '@fastify/rate-limit'
 import { env } from './shared/config/env.js'
 import { errorHandler } from './shared/middlewares/errorHandler.js'
 import { authRoutes } from './modules/auth/auth.routes.js'
@@ -29,6 +30,12 @@ export function buildApp() {
   app.register(cors, {
     origin: env.CORS_ORIGIN,
     credentials: true,
+    methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE'],
+  })
+
+  app.register(rateLimit, {
+    max: 300,
+    timeWindow: '1 minute',
   })
 
   app.register(cookie)

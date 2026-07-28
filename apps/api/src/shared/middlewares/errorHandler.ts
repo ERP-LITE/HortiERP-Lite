@@ -23,6 +23,15 @@ export function errorHandler(error: FastifyError | Error, request: FastifyReques
     })
   }
 
+  if ('statusCode' in error && typeof error.statusCode === 'number' && error.statusCode < 500) {
+    return reply.status(error.statusCode).send({
+      error: {
+        code: error.code ?? 'ERROR',
+        message: error.message,
+      },
+    })
+  }
+
   request.log.error(error)
 
   return reply.status(500).send({
