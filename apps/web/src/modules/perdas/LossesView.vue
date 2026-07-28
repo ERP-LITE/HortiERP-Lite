@@ -9,7 +9,8 @@ import BaseModal from '@/components/ui/BaseModal.vue'
 import BaseBadge from '@/components/ui/BaseBadge.vue'
 import Pagination from '@/components/ui/Pagination.vue'
 import FilterButton from '@/components/ui/FilterButton.vue'
-import DateInput from '@/components/ui/DateInput.vue'
+import PeriodPicker from '@/components/ui/PeriodPicker.vue'
+import type { PeriodValue } from '@/lib/period'
 import { getApiErrorMessage, resolveFormError } from '@/services/api'
 import { toastSuccess } from '@/lib/alerts'
 import { listProducts } from '@/services/productsService'
@@ -35,16 +36,17 @@ const products = ref<Product[]>([])
 const loading = ref(true)
 const errorMessage = ref('')
 
-const emptyFilters = { productId: 'todos', reason: 'todos', from: '', to: '' }
-const filters = ref({ ...emptyFilters })
-const draftFilters = ref({ ...emptyFilters })
+function emptyFilters() {
+  return { productId: 'todos', reason: 'todos', period: { preset: 'todos', from: '', to: '' } as PeriodValue }
+}
+const filters = ref(emptyFilters())
+const draftFilters = ref(emptyFilters())
 const filterModalOpen = ref(false)
 const activeFilterCount = computed(
   () =>
     Number(filters.value.productId !== 'todos') +
     Number(filters.value.reason !== 'todos') +
-    Number(filters.value.from !== '') +
-    Number(filters.value.to !== ''),
+    Number(filters.value.period.preset !== 'todos'),
 )
 
 const modalOpen = ref(false)
@@ -67,8 +69,8 @@ async function loadLosses() {
       pageSize: pageSize.value,
       productId: filters.value.productId !== 'todos' ? filters.value.productId : undefined,
       reason: filters.value.reason !== 'todos' ? (filters.value.reason as LossReason) : undefined,
-      from: filters.value.from || undefined,
-      to: filters.value.to || undefined,
+      from: filters.value.period.from || undefined,
+      to: filters.value.period.to || undefined,
     })
     losses.value = result.data
     applyMeta(result)
@@ -105,7 +107,11 @@ function applyFilters() {
 }
 
 function clearFilters() {
-  draftFilters.value = { ...emptyFilters }
+  filters.value = emptyFilters()
+  draftFilters.value = emptyFilters()
+  filterModalOpen.value = false
+  page.value = 1
+  loadLosses()
 }
 
 function openCreateModal() {
@@ -248,10 +254,7 @@ onMounted(loadAll)
       <form class="space-y-4" @submit.prevent="applyFilters">
         <BaseSelect v-model="draftFilters.productId" label="Produto" :options="productFilterOptions" />
         <BaseSelect v-model="draftFilters.reason" label="Motivo" :options="reasonFilterOptions" />
-        <div class="grid grid-cols-2 gap-4">
-          <DateInput v-model="draftFilters.from" label="De" />
-          <DateInput v-model="draftFilters.to" label="Até" />
-        </div>
+        <PeriodPicker v-model="draftFilters.period" />
 
         <div class="flex justify-between items-center pt-2">
           <button type="button" class="text-sm text-gray-500 hover:underline dark:text-gray-400" @click="clearFilters">

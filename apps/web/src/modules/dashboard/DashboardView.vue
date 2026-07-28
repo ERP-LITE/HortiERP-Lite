@@ -1,9 +1,14 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { AlertTriangle, Coins, Package, TrendingDown } from '@lucide/vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import StatCard from '@/components/ui/StatCard.vue'
 import BaseBadge from '@/components/ui/BaseBadge.vue'
+import BaseButton from '@/components/ui/BaseButton.vue'
+import BaseModal from '@/components/ui/BaseModal.vue'
+import FilterButton from '@/components/ui/FilterButton.vue'
+import PeriodPicker from '@/components/ui/PeriodPicker.vue'
+import { rangeForPreset, type PeriodValue } from '@/lib/period'
 import DonutChart from '@/components/charts/DonutChart.vue'
 import MovementsTrendChart from '@/components/charts/MovementsTrendChart.vue'
 import LossesByReasonChart from '@/components/charts/LossesByReasonChart.vue'
@@ -11,9 +16,23 @@ import { getApiErrorMessage } from '@/services/api'
 import { fetchDashboardSummary } from '@/services/dashboardService'
 import type { DashboardSummary, MovementType } from '@/types'
 
+function defaultPeriod(): PeriodValue {
+  return { preset: '30dias', ...rangeForPreset('30dias') }
+}
+
+const period = ref<PeriodValue>(defaultPeriod())
+const draftPeriod = ref<PeriodValue>({ ...period.value })
+const filterModalOpen = ref(false)
+const activeFilterCount = computed(() => (period.value.preset === '30dias' ? 0 : 1))
+
 const summary = ref<DashboardSummary | null>(null)
 const loading = ref(true)
 const errorMessage = ref('')
+
+function formatDate(value: string) {
+  const [year, month, day] = value.split('-')
+  return `${day}/${month}/${year}`
+}
 
 const typeLabels: Record<MovementType, string> = {
   entrada: 'Entrada',
@@ -38,7 +57,7 @@ function formatDateTime(value: string) {
 async function loadSummary() {
   loading.value = true
   try {
-    summary.value = await fetchDashboardSummary()
+    summary.value = await fetchDashboardSummary({ from: period.value.from || undefined, to: period.value.to || undefined })
   } catch (error) {
     errorMessage.value = getApiErrorMessage(error)
   } finally {
@@ -46,12 +65,38 @@ async function loadSummary() {
   }
 }
 
+function openFilterModal() {
+  draftPeriod.value = { ...period.value }
+  filterModalOpen.value = true
+}
+
+function applyFilters() {
+  period.value = { ...draftPeriod.value }
+  filterModalOpen.value = false
+  loadSummary()
+}
+
+function clearFilters() {
+  period.value = defaultPeriod()
+  draftPeriod.value = { ...period.value }
+  filterModalOpen.value = false
+  loadSummary()
+}
+
 onMounted(loadSummary)
 </script>
 
 <template>
   <div>
-    <PageHeader title="Dashboard" subtitle="Visão geral do estoque" />
+    <PageHeader title="Dashboard" subtitle="Visão geral do estoque">
+      <template #actions>
+        <FilterButton :active="activeFilterCount" @click="openFilterModal" />
+      </template>
+    </PageHeader>
+
+    <p v-if="summary" class="text-sm text-gray-500 dark:text-gray-400 mb-4">
+      Período: {{ formatDate(summary.periodFrom) }} até {{ formatDate(summary.periodTo) }}
+    </p>
 
     <p v-if="errorMessage" class="text-sm text-red-600 dark:text-red-400 mb-4">{{ errorMessage }}</p>
     <p v-else-if="loading" class="text-sm text-gray-500 dark:text-gray-400">Carregando...</p>
@@ -67,8 +112,8 @@ onMounted(loadSummary)
         />
         <StatCard label="Valor de estoque (custo)" :value="formatCurrency(summary.stockValue)" :icon="Coins" />
         <StatCard
-          label="Perdas (últimos 30 dias)"
-          :value="`${summary.last30Days.lossesQuantity} un. / ${summary.last30Days.lossesCount} registros`"
+          label="Perdas no período"
+          :value="`${summary.lossesInPeriod.lossesQuantity} un. / ${summary.lossesInPeriod.lossesCount} registros`"
           tone="danger"
           :icon="TrendingDown"
         />
@@ -79,7 +124,9 @@ onMounted(loadSummary)
           class="lg:col-span-2 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden"
         >
           <div class="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
-            <h2 class="text-sm font-semibold text-gray-700 dark:text-gray-300">Movimentações — últimos 14 dias</h2>
+            <h2 class="text-sm font-semibold text-gray-700 dark:text-gray-300">
+              Movimentações no período
+            </h2>
           </div>
           <div class="p-4">
             <MovementsTrendChart :data="summary.movementsTimeline" />
@@ -101,7 +148,9 @@ onMounted(loadSummary)
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
           <div class="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
-            <h2 class="text-sm font-semibold text-gray-700 dark:text-gray-300">Perdas por motivo (30 dias)</h2>
+            <h2 class="text-sm font-semibold text-gray-700 dark:text-gray-300">
+              Perdas por motivo no período
+            </h2>
           </div>
           <div class="p-4">
             <LossesByReasonChart :data="summary.lossesByReason" />
@@ -156,5 +205,21 @@ onMounted(loadSummary)
         </div>
       </div>
     </template>
+
+    <BaseModal :open="filterModalOpen" title="Filtrar por período" @close="filterModalOpen = false">
+      <form class="space-y-4" @submit.prevent="applyFilters">
+        <PeriodPicker v-model="draftPeriod" :include-all-time="false" />
+
+        <div class="flex justify-between items-center pt-2">
+          <button type="button" class="text-sm text-gray-500 hover:underline dark:text-gray-400" @click="clearFilters">
+            Limpar
+          </button>
+          <div class="flex gap-2">
+            <BaseButton variant="secondary" type="button" @click="filterModalOpen = false">Cancelar</BaseButton>
+            <BaseButton type="submit">Aplicar</BaseButton>
+          </div>
+        </div>
+      </form>
+    </BaseModal>
   </div>
 </template>

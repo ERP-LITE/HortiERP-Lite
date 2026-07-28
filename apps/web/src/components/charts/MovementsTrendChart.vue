@@ -23,9 +23,10 @@ const maxValue = computed(() => {
 const ticks = computed(() => [0, maxValue.value / 2, maxValue.value])
 
 const slotWidth = computed(() => CHART_WIDTH / Math.max(props.data.length, 1))
+const labelStep = computed(() => Math.max(1, Math.ceil(props.data.length / 12)))
 
 const bars = computed(() => {
-  const gap = 3
+  const gap = Math.min(3, slotWidth.value * 0.15)
   return props.data.map((day, index) => {
     const slotX = MARGIN.left + index * slotWidth.value
     const barWidth = (slotWidth.value - gap * 3) / 2
@@ -43,7 +44,7 @@ const bars = computed(() => {
       perdaY: MARGIN.top + CHART_HEIGHT - perdaHeight,
       perdaHeight,
       labelX: slotX + slotWidth.value / 2,
-      showLabel: props.data.length <= 10 || index % 2 === 0,
+      showLabel: index % labelStep.value === 0,
     }
   })
 })

@@ -113,7 +113,9 @@ export interface DashboardSummary {
   lowStockCount: number
   lowStockProducts: Product[]
   stockValue: number
-  last30Days: {
+  periodFrom: string
+  periodTo: string
+  lossesInPeriod: {
     lossesCount: number
     lossesQuantity: number
   }

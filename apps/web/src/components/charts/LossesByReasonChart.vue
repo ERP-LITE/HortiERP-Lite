@@ -32,7 +32,7 @@ function formatNumber(value: number) {
 <template>
   <div class="space-y-3">
     <p v-if="sorted.length === 0" class="text-sm text-gray-500 dark:text-gray-400">
-      Nenhuma perda nos últimos 30 dias.
+      Nenhuma perda no período selecionado.
     </p>
     <div v-for="(item, index) in sorted" :key="item.reason" class="space-y-1">
       <div class="flex items-center justify-between text-sm">

@@ -82,7 +82,11 @@ function applyFilters() {
 }
 
 function clearFilters() {
+  filters.value = { ...emptyFilters }
   draftFilters.value = { ...emptyFilters }
+  filterModalOpen.value = false
+  page.value = 1
+  loadUsers()
 }
 
 function openCreateModal() {
