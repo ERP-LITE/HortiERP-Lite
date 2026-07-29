@@ -1,5 +1,5 @@
 import bcrypt from 'bcryptjs'
-import { and, asc, count, eq, ilike, isNull, or } from 'drizzle-orm'
+import { and, asc, count, eq, ilike, isNull, notInArray, or } from 'drizzle-orm'
 import { db } from '../../db/client.js'
 import { companies, users } from '../../db/schema/index.js'
 import { AppError } from '../../shared/errors/AppError.js'
@@ -22,8 +22,22 @@ function isUniqueViolation(error: unknown): boolean {
   return typeof error === 'object' && error !== null && 'code' in error && (error as { code: unknown }).code === '23505'
 }
 
+function platformCompanyIdsSubquery() {
+  return db.select({ id: users.companyId }).from(users).where(eq(users.role, 'super_admin'))
+}
+
+async function isPlatformCompany(companyId: string): Promise<boolean> {
+  const [row] = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(and(eq(users.companyId, companyId), eq(users.role, 'super_admin')))
+    .limit(1)
+
+  return Boolean(row)
+}
+
 export async function listCompanies(query: ListCompaniesQuery) {
-  const conditions = [isNull(companies.deletedAt)]
+  const conditions = [isNull(companies.deletedAt), notInArray(companies.id, platformCompanyIdsSubquery())]
   if (query.search) {
     conditions.push(or(ilike(companies.name, `%${query.search}%`), ilike(companies.document, `%${query.search}%`))!)
   }
@@ -113,11 +127,19 @@ export async function updateCompany(id: string, data: UpdateCompanyInput) {
 export async function setCompanyActive(id: string, active: boolean) {
   await getCompany(id)
 
-  const [company] = await db
-    .update(companies)
-    .set({ active, updatedAt: new Date() })
-    .where(eq(companies.id, id))
-    .returning()
+  if (await isPlatformCompany(id)) {
+    throw AppError.forbidden('Não é possível suspender a empresa da plataforma')
+  }
 
-  return company
+  return db.transaction(async (tx) => {
+    const [company] = await tx
+      .update(companies)
+      .set({ active, updatedAt: new Date() })
+      .where(eq(companies.id, id))
+      .returning()
+
+    await tx.update(users).set({ active, updatedAt: new Date() }).where(and(eq(users.companyId, id), isNull(users.deletedAt)))
+
+    return company
+  })
 }
