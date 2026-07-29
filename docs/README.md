@@ -1,7 +1,9 @@
 # Documentação
 
-Esta pasta reunirá a documentação técnica do projeto conforme ele evolui:
+Documentação técnica do projeto:
 
-- Modelagem de dados (ER)
-- Decisões arquiteturais
-- Fluxos de negócio (entrada de mercadorias, perdas, estoque)
+- [Modelo de dados](./modelo-de-dados.md) — tabelas, relacionamentos e enums.
+- [Decisões arquiteturais](./decisoes-arquiteturais.md) — multiempresa, autenticação, papéis, super_admin/impersonação, soft delete.
+- [Fluxos de negócio](./fluxos-de-negocio.md) — entrada de mercadorias, perdas, estoque, dashboard, cadastro de empresas-cliente.
+
+Mantenha estes documentos atualizados conforme o sistema evolui — decisões e fluxos que mudarem aqui tendem a ficar desatualizados rápido se não forem revisados junto com o código.
