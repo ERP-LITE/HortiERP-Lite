@@ -1,27 +1,45 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import { fetchMe, login as loginRequest, logout as logoutRequest } from '@/services/authService'
-import type { AuthUser } from '@/types'
+import {
+  exitImpersonation as exitImpersonationRequest,
+  fetchMe,
+  login as loginRequest,
+  logout as logoutRequest,
+} from '@/services/authService'
+import { impersonateCompany } from '@/services/companiesService'
+import type { AuthUser, SessionResponse } from '@/types'
 
 export const useAuthStore = defineStore('auth', () => {
   const user = ref<AuthUser | null>(null)
+  const impersonating = ref(false)
+  const impersonatingCompanyName = ref<string | null>(null)
   const initialized = ref(false)
   let sessionPromise: Promise<void> | null = null
 
+  function applySession(session: SessionResponse) {
+    user.value = session.user
+    impersonating.value = session.impersonating
+    impersonatingCompanyName.value = session.impersonating ? session.companyName : null
+  }
+
+  function clearSession() {
+    user.value = null
+    impersonating.value = false
+    impersonatingCompanyName.value = null
+  }
+
   async function login(email: string, password: string, turnstileToken: string) {
     const response = await loginRequest(email, password, turnstileToken)
-    user.value = response.user
+    applySession(response)
     initialized.value = true
   }
 
   function restoreSession() {
     if (!sessionPromise) {
       sessionPromise = fetchMe()
-        .then((fetchedUser) => {
-          user.value = fetchedUser
-        })
+        .then((session) => applySession(session))
         .catch(() => {
-          user.value = null
+          clearSession()
         })
         .finally(() => {
           initialized.value = true
@@ -31,19 +49,33 @@ export const useAuthStore = defineStore('auth', () => {
     return sessionPromise
   }
 
+  async function enterCompany(companyId: string) {
+    const response = await impersonateCompany(companyId)
+    applySession(response)
+  }
+
+  async function exitImpersonation() {
+    const response = await exitImpersonationRequest()
+    applySession(response)
+  }
+
   async function logout() {
     try {
       await logoutRequest()
     } finally {
-      user.value = null
+      clearSession()
       sessionPromise = null
     }
   }
 
   return {
     user,
+    impersonating,
+    impersonatingCompanyName,
     initialized,
     login,
+    enterCompany,
+    exitImpersonation,
     logout,
     restoreSession,
   }

@@ -2,6 +2,8 @@
 
 Sistema web modular para controle de estoque, entradas de mercadorias e perdas voltado para hortifrutis, frutarias, verdureiras, sacolões e pequenos mercados.
 
+Multiempresa: cada empresa-cliente tem seus dados totalmente isolados (produtos, estoque, entradas, perdas, usuários). Empresas-cliente são cadastradas por um usuário `super_admin` pela tela `/empresas`, que também cria o primeiro admin de cada uma.
+
 Ver [CLAUDE.md](./CLAUDE.md) para a visão completa do projeto.
 
 ## Stack
@@ -29,9 +31,11 @@ ERP-LITE/
 
 1. Copie os arquivos de ambiente:
    ```bash
+   cp .env.example .env
    cp apps/api/.env.example apps/api/.env
    cp apps/web/.env.example apps/web/.env
    ```
+   O `.env` da raiz define usuário/senha/porta do Postgres para o Docker Compose (fonte única — troque só ali). Se você mudar esses valores, atualize também `DATABASE_URL` em `apps/api/.env` para bater com eles.
 2. Suba os containers:
    ```bash
    docker compose up --build -d
@@ -41,13 +45,18 @@ ERP-LITE/
    docker compose exec api npm run db:migrate
    docker compose exec api npm run db:seed
    ```
-4. Acesse:
+4. Crie a empresa da plataforma e o primeiro usuário `super_admin` (uma única vez, só para conseguir cadastrar empresas-cliente pela tela `/empresas`):
+   ```bash
+   docker compose exec -e PLATFORM_ADMIN_EMAIL=voce@exemplo.com -e PLATFORM_ADMIN_PASSWORD=senha-forte api npm run db:seed:platform
+   ```
+5. Acesse:
    - Frontend: http://localhost:5173
    - API: http://localhost:3333
    - Logins de teste (criados pelo seed):
      - Admin: `admin@hortierp.com` / `admin123`
      - Gerente: `gerente@hortierp.com` / `gerente123`
      - Operador: `operador@hortierp.com` / `operador123`
+   - Super admin: o e-mail/senha definidos no passo 4 (tela `/empresas`, para cadastrar novas empresas-cliente)
 
 ### Sem Docker
 
@@ -60,6 +69,7 @@ ERP-LITE/
    ```bash
    npm run db:migrate
    npm run db:seed
+   PLATFORM_ADMIN_EMAIL=voce@exemplo.com PLATFORM_ADMIN_PASSWORD=senha-forte npm run db:seed:platform
    ```
 4. Suba o backend e o frontend em terminais separados:
    ```bash

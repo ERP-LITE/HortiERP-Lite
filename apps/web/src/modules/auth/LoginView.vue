@@ -27,7 +27,8 @@ async function handleSubmit() {
 
   try {
     await auth.login(email.value, password.value, turnstileToken.value)
-    const redirect = (route.query.redirect as string) || '/'
+    const fallback = auth.user?.role === 'super_admin' ? '/selecionar-empresa' : '/'
+    const redirect = (route.query.redirect as string) || fallback
     router.push(redirect)
   } catch (error) {
     const resolved = resolveFormError(error, 'Não foi possível entrar. Verifique suas credenciais.')

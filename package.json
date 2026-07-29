@@ -14,6 +14,7 @@
     "build:web": "npm run build --workspace=apps/web",
     "db:generate": "npm run db:generate --workspace=apps/api",
     "db:migrate": "npm run db:migrate --workspace=apps/api",
-    "db:seed": "npm run db:seed --workspace=apps/api"
+    "db:seed": "npm run db:seed --workspace=apps/api",
+    "db:seed:platform": "npm run db:seed:platform --workspace=apps/api"
   }
 }

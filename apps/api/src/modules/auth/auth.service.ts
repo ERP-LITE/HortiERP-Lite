@@ -7,9 +7,14 @@ import { AppError } from '../../shared/errors/AppError.js'
 export async function authenticateUser(email: string, password: string) {
   const user = await db.query.users.findFirst({
     where: and(eq(users.email, email), isNull(users.deletedAt)),
+    with: { company: true },
   })
 
   if (!user || !user.active) {
+    throw AppError.unauthorized('Credenciais inválidas')
+  }
+
+  if (!user.company || !user.company.active || user.company.deletedAt) {
     throw AppError.unauthorized('Credenciais inválidas')
   }
 
@@ -25,9 +30,14 @@ export async function authenticateUser(email: string, password: string) {
 export async function getUserProfile(companyId: string, userId: string) {
   const user = await db.query.users.findFirst({
     where: and(eq(users.id, userId), eq(users.companyId, companyId), isNull(users.deletedAt)),
+    with: { company: true },
   })
 
   if (!user || !user.active) {
+    throw AppError.unauthorized('Usuário não encontrado')
+  }
+
+  if (!user.company || !user.company.active || user.company.deletedAt) {
     throw AppError.unauthorized('Usuário não encontrado')
   }
 

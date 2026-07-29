@@ -4,15 +4,15 @@ services:
     container_name: hortierp-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_USER: hortierp
-      POSTGRES_PASSWORD: hortierp
-      POSTGRES_DB: hortierp_lite
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
     ports:
-      - "5433:5432"
+      - "${DB_PORT}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U hortierp -d hortierp_lite"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -27,7 +27,7 @@ services:
     env_file:
       - apps/api/.env
     environment:
-      DATABASE_URL: postgres://hortierp:hortierp@postgres:5432/hortierp_lite
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
     ports:
       - "3333:3333"
     volumes:

@@ -71,6 +71,18 @@ const router = createRouter({
       name: 'perfil',
       component: () => import('@/modules/perfil/ProfileView.vue'),
     },
+    {
+      path: '/empresas',
+      name: 'empresas',
+      component: () => import('@/modules/empresas/CompaniesView.vue'),
+      meta: { roles: ['super_admin'] },
+    },
+    {
+      path: '/selecionar-empresa',
+      name: 'selecionar-empresa',
+      component: () => import('@/modules/empresas/SelectCompanyView.vue'),
+      meta: { roles: ['super_admin'] },
+    },
   ],
 })
 
@@ -82,13 +94,24 @@ router.beforeEach(async (to) => {
   }
 
   const isAuthenticated = !!auth.user
+  const isSuperAdmin = auth.user?.role === 'super_admin'
 
   if (!to.meta.public && !isAuthenticated) {
     return { name: 'login', query: { redirect: to.fullPath } }
   }
 
   if (to.name === 'login' && isAuthenticated) {
-    return { name: 'dashboard' }
+    return { name: isSuperAdmin ? 'selecionar-empresa' : 'dashboard' }
+  }
+
+  if (
+    isSuperAdmin &&
+    !to.meta.public &&
+    to.name !== 'empresas' &&
+    to.name !== 'selecionar-empresa' &&
+    to.name !== 'perfil'
+  ) {
+    return { name: 'selecionar-empresa' }
   }
 
   const allowedRoles = to.meta.roles as string[] | undefined

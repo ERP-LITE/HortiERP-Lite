@@ -6,7 +6,7 @@ export interface PaginatedResult<T> {
   totalPages: number
 }
 
-export type UserRole = 'admin' | 'gerente' | 'operador'
+export type UserRole = 'admin' | 'gerente' | 'operador' | 'super_admin'
 
 export interface AuthUser {
   id: string
@@ -16,11 +16,26 @@ export interface AuthUser {
   companyId: string
 }
 
+export interface SessionResponse {
+  user: AuthUser
+  impersonating: boolean
+  companyName: string
+}
+
 export interface User {
   id: string
   name: string
   email: string
   role: UserRole
+  active: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+export interface Company {
+  id: string
+  name: string
+  document: string | null
   active: boolean
   createdAt: string
   updatedAt: string
