@@ -15,6 +15,7 @@ const roleLabels: Record<UserRole, string> = {
   admin: 'Administrador',
   gerente: 'Gerente',
   operador: 'Operador',
+  super_admin: 'Super Admin',
 }
 
 const currentPassword = ref('')

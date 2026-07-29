@@ -1,14 +1,17 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import {
   AlertTriangle,
   BarChart3,
+  Building2,
   LayoutDashboard,
+  LogOut,
   Menu,
   PackagePlus,
   Ruler,
   Sprout,
+  Store,
   Tag,
   Users,
   Warehouse,
@@ -19,13 +22,36 @@ import BaseModal from '@/components/ui/BaseModal.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useIdleLogout } from '@/composables/useIdleLogout'
+import { getApiErrorMessage } from '@/services/api'
+import { toastError } from '@/lib/alerts'
 
 const auth = useAuthStore()
 const route = useRoute()
+const router = useRouter()
 const sidebarOpen = ref(false)
+const exitingImpersonation = ref(false)
 const { showWarning, secondsLeft, stayLoggedIn } = useIdleLogout()
 
+async function handleExitImpersonation() {
+  exitingImpersonation.value = true
+  try {
+    await auth.exitImpersonation()
+    router.push({ name: 'selecionar-empresa' })
+  } catch (error) {
+    toastError(getApiErrorMessage(error, 'Não foi possível voltar ao painel de super admin'))
+  } finally {
+    exitingImpersonation.value = false
+  }
+}
+
 const navItems = computed(() => {
+  if (auth.user?.role === 'super_admin') {
+    return [
+      { name: 'selecionar-empresa', label: 'Selecionar empresa', icon: Store },
+      { name: 'empresas', label: 'Configurações', icon: Building2 },
+    ]
+  }
+
   const items = [
     { name: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { name: 'produtos', label: 'Produtos', icon: Sprout },
@@ -43,6 +69,8 @@ const navItems = computed(() => {
 
   return items
 })
+
+const homeRoute = computed(() => (auth.user?.role === 'super_admin' ? 'selecionar-empresa' : 'dashboard'))
 
 function isActive(name: string) {
   return route.name === name
@@ -62,7 +90,7 @@ function isActive(name: string) {
       :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full'"
     >
       <div class="h-16 flex items-center px-6 border-b border-gray-200 dark:border-gray-800">
-        <RouterLink :to="{ name: 'dashboard' }" class="flex items-center gap-2">
+        <RouterLink :to="{ name: homeRoute }" class="flex items-center gap-2">
           <img src="/favicon.svg" alt="" class="h-8 w-8 rounded-md" />
           <span class="text-lg font-bold text-primary-700 dark:text-primary-400">HortiERP Lite</span>
         </RouterLink>
@@ -87,6 +115,21 @@ function isActive(name: string) {
     </aside>
 
     <div class="flex-1 flex flex-col min-w-0 print:block">
+      <div
+        v-if="auth.impersonating"
+        class="print:hidden flex items-center justify-between gap-3 px-4 lg:px-6 py-2 bg-amber-100 dark:bg-amber-900/40 border-b border-amber-200 dark:border-amber-800 text-amber-900 dark:text-amber-200 text-sm"
+      >
+        <span>Você está acessando como suporte em <strong>{{ auth.impersonatingCompanyName }}</strong></span>
+        <button
+          type="button"
+          class="inline-flex items-center gap-1.5 font-medium hover:underline disabled:opacity-60"
+          :disabled="exitingImpersonation"
+          @click="handleExitImpersonation"
+        >
+          <LogOut :size="14" />
+          {{ exitingImpersonation ? 'Saindo...' : 'Voltar ao super admin' }}
+        </button>
+      </div>
       <header
         class="print:hidden h-16 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between px-4 lg:px-6"
       >

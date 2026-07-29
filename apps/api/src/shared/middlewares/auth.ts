@@ -9,7 +9,7 @@ export async function authenticate(request: FastifyRequest) {
   }
 }
 
-export function requireRole(...roles: Array<'admin' | 'gerente' | 'operador'>) {
+export function requireRole(...roles: Array<'admin' | 'gerente' | 'operador' | 'super_admin'>) {
   return async function (request: FastifyRequest) {
     if (!roles.includes(request.user.role)) {
       throw AppError.forbidden('Você não tem permissão para executar esta ação')

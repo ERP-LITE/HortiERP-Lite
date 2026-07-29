@@ -1,12 +1,8 @@
 import { api } from './api'
-import type { AuthUser } from '@/types'
-
-export interface LoginResponse {
-  user: AuthUser
-}
+import type { SessionResponse } from '@/types'
 
 export async function login(email: string, password: string, turnstileToken: string) {
-  const { data } = await api.post<LoginResponse>('/auth/login', { email, password, turnstileToken })
+  const { data } = await api.post<SessionResponse>('/auth/login', { email, password, turnstileToken })
   return data
 }
 
@@ -15,8 +11,13 @@ export async function logout() {
 }
 
 export async function fetchMe() {
-  const { data } = await api.get<{ user: AuthUser }>('/auth/me')
-  return data.user
+  const { data } = await api.get<SessionResponse>('/auth/me')
+  return data
+}
+
+export async function exitImpersonation() {
+  const { data } = await api.post<SessionResponse>('/auth/exit-impersonation')
+  return data
 }
 
 export async function changePassword(currentPassword: string, newPassword: string) {

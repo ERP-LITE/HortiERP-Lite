@@ -8,6 +8,13 @@
       "when": 1784815916490,
       "tag": "0000_sour_shocker",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1785328962518,
+      "tag": "0001_wakeful_mongoose",
+      "breakpoints": true
     }
   ]
 }

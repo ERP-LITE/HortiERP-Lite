@@ -6,6 +6,7 @@ import rateLimit from '@fastify/rate-limit'
 import { env } from './shared/config/env.js'
 import { errorHandler } from './shared/middlewares/errorHandler.js'
 import { authRoutes } from './modules/auth/auth.routes.js'
+import { companiesRoutes } from './modules/companies/companies.routes.js'
 import { categoriesRoutes } from './modules/categories/categories.routes.js'
 import { unitsRoutes } from './modules/units/units.routes.js'
 import { productsRoutes } from './modules/products/products.routes.js'
@@ -53,6 +54,7 @@ export function buildApp() {
   app.get('/health', async () => ({ status: 'ok' }))
 
   app.register(authRoutes, { prefix: '/api' })
+  app.register(companiesRoutes, { prefix: '/api' })
   app.register(categoriesRoutes, { prefix: '/api' })
   app.register(unitsRoutes, { prefix: '/api' })
   app.register(productsRoutes, { prefix: '/api' })
