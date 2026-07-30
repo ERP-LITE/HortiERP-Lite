@@ -30,3 +30,8 @@ export async function updateCategory(id: string, payload: CategoryInput) {
 export async function deleteCategory(id: string) {
   await api.delete(`/categories/${id}`)
 }
+
+export async function deleteCategories(ids: string[]) {
+  const { data } = await api.post<{ deleted: number }>('/categories/bulk-delete', { ids })
+  return data
+}

@@ -8,11 +8,13 @@ import BaseModal from '@/components/ui/BaseModal.vue'
 import Pagination from '@/components/ui/Pagination.vue'
 import SearchInput from '@/components/ui/SearchInput.vue'
 import PrintButton from '@/components/ui/PrintButton.vue'
+import BulkSelectionBar from '@/components/ui/BulkSelectionBar.vue'
 import { getApiErrorMessage, resolveFormError } from '@/services/api'
 import { confirmDelete, toastError, toastSuccess } from '@/lib/alerts'
-import { createUnit, deleteUnit, listUnits, updateUnit, type UnitInput } from '@/services/unitsService'
+import { createUnit, deleteUnit, deleteUnits, listUnits, updateUnit, type UnitInput } from '@/services/unitsService'
 import { useAuthStore } from '@/stores/auth'
 import { usePagination } from '@/composables/usePagination'
+import { useBulkSelection } from '@/composables/useBulkSelection'
 import type { Unit } from '@/types'
 
 const auth = useAuthStore()
@@ -21,6 +23,10 @@ const canManage = computed(() => auth.user?.role === 'admin' || auth.user?.role 
 const { page, pageSize, total, totalPages, applyMeta } = usePagination()
 
 const units = ref<Unit[]>([])
+const { selectedIds, allVisibleSelected, toggleOne, toggleAllVisible, clearSelection } = useBulkSelection(() =>
+  units.value.map(({ id }) => id),
+)
+const deletingSelected = ref(false)
 const loading = ref(true)
 const errorMessage = ref('')
 
@@ -37,6 +43,7 @@ async function loadUnits() {
   try {
     const result = await listUnits({ page: page.value, pageSize: pageSize.value, search: search.value || undefined })
     units.value = result.data
+    clearSelection()
     applyMeta(result)
   } catch (error) {
     errorMessage.value = getApiErrorMessage(error)
@@ -105,6 +112,26 @@ async function handleDelete(unit: Unit) {
   }
 }
 
+async function handleBulkDelete() {
+  const count = selectedIds.value.length
+  const confirmed = await confirmDelete({
+    title: `Excluir ${count} ${count === 1 ? 'unidade selecionada' : 'unidades selecionadas'}?`,
+    text: 'Os registros serão excluídos logicamente e deixarão de aparecer no sistema.',
+  })
+  if (!confirmed) return
+
+  deletingSelected.value = true
+  try {
+    const result = await deleteUnits(selectedIds.value)
+    await loadUnits()
+    toastSuccess(`${result.deleted} ${result.deleted === 1 ? 'unidade excluída' : 'unidades excluídas'} com sucesso`)
+  } catch (error) {
+    toastError(getApiErrorMessage(error, 'Não foi possível excluir as unidades selecionadas'))
+  } finally {
+    deletingSelected.value = false
+  }
+}
+
 watch(search, () => {
   if (page.value !== 1) page.value = 1
   else loadUnits()
@@ -125,10 +152,27 @@ onMounted(loadUnits)
 
     <p v-if="errorMessage" class="text-sm text-red-600 dark:text-red-400 mb-4">{{ errorMessage }}</p>
 
+    <BulkSelectionBar
+      v-if="canManage"
+      :count="selectedIds.length"
+      :deleting="deletingSelected"
+      @clear="clearSelection"
+      @delete="handleBulkDelete"
+    />
+
     <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
       <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
         <thead class="bg-gray-50 dark:bg-gray-900/60">
           <tr>
+            <th v-if="canManage" class="print:hidden w-12 px-4 py-3">
+              <input
+                type="checkbox"
+                class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                :checked="allVisibleSelected"
+                aria-label="Selecionar todas as unidades desta página"
+                @change="toggleAllVisible"
+              />
+            </th>
             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Nome</th>
             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
               Abreviação
@@ -138,10 +182,10 @@ onMounted(loadUnits)
         </thead>
         <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
           <tr v-if="loading">
-            <td colspan="3" class="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">Carregando...</td>
+            <td :colspan="canManage ? 4 : 3" class="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">Carregando...</td>
           </tr>
           <tr v-else-if="units.length === 0">
-            <td colspan="3" class="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">
+            <td :colspan="canManage ? 4 : 3" class="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">
               Nenhuma unidade cadastrada.
             </td>
           </tr>
@@ -154,6 +198,15 @@ onMounted(loadUnits)
             :title="canManage ? 'Duplo clique para editar' : ''"
             @dblclick="canManage && openEditModal(unit)"
           >
+            <td v-if="canManage" class="print:hidden px-4 py-3" @dblclick.stop @click.stop>
+              <input
+                type="checkbox"
+                class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                :checked="selectedIds.includes(unit.id)"
+                :aria-label="`Selecionar unidade ${unit.name}`"
+                @change="toggleOne(unit.id)"
+              />
+            </td>
             <td class="px-4 py-3 text-sm font-medium text-gray-900 dark:text-gray-100">{{ unit.name }}</td>
             <td class="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">{{ unit.abbreviation }}</td>
             <td v-if="canManage" class="print:hidden px-4 py-3 text-right space-x-1 whitespace-nowrap" @dblclick.stop>

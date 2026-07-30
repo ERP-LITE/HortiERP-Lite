@@ -35,3 +35,8 @@ export async function updateUser(id: string, payload: Partial<UserInput>) {
 export async function deleteUser(id: string) {
   await api.delete(`/users/${id}`)
 }
+
+export async function deleteUsers(ids: string[]) {
+  const { data } = await api.post<{ deleted: number }>('/users/bulk-delete', { ids })
+  return data
+}

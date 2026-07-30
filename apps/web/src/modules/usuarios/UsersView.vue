@@ -12,11 +12,13 @@ import Pagination from '@/components/ui/Pagination.vue'
 import FilterButton from '@/components/ui/FilterButton.vue'
 import PrintButton from '@/components/ui/PrintButton.vue'
 import SearchInput from '@/components/ui/SearchInput.vue'
+import BulkSelectionBar from '@/components/ui/BulkSelectionBar.vue'
 import { getApiErrorMessage, resolveFormError } from '@/services/api'
 import { confirmDelete, toastError, toastSuccess } from '@/lib/alerts'
 import { generateRandomPassword } from '@/lib/password'
-import { createUser, deleteUser, listUsers, updateUser } from '@/services/usersService'
+import { createUser, deleteUser, deleteUsers, listUsers, updateUser } from '@/services/usersService'
 import { usePagination } from '@/composables/usePagination'
+import { useBulkSelection } from '@/composables/useBulkSelection'
 import type { User, UserRole } from '@/types'
 
 const roleOptions: { value: UserRole; label: string }[] = [
@@ -34,6 +36,10 @@ const statusFilterOptions = [
 const { page, pageSize, total, totalPages, applyMeta } = usePagination()
 
 const users = ref<User[]>([])
+const { selectedIds, allVisibleSelected, toggleOne, toggleAllVisible, clearSelection } = useBulkSelection(() =>
+  users.value.map(({ id }) => id),
+)
+const deletingSelected = ref(false)
 const loading = ref(true)
 const errorMessage = ref('')
 
@@ -65,6 +71,7 @@ async function loadUsers() {
       active: filters.value.active === 'todos' ? undefined : filters.value.active === 'true',
     })
     users.value = result.data
+    clearSelection()
     applyMeta(result)
   } catch (error) {
     errorMessage.value = getApiErrorMessage(error)
@@ -167,6 +174,26 @@ async function handleDelete(user: User) {
   }
 }
 
+async function handleBulkDelete() {
+  const count = selectedIds.value.length
+  const confirmed = await confirmDelete({
+    title: `Excluir ${count} ${count === 1 ? 'usuário selecionado' : 'usuários selecionados'}?`,
+    text: 'Os registros serão excluídos logicamente e os acessos serão desativados.',
+  })
+  if (!confirmed) return
+
+  deletingSelected.value = true
+  try {
+    const result = await deleteUsers(selectedIds.value)
+    await loadUsers()
+    toastSuccess(`${result.deleted} ${result.deleted === 1 ? 'usuário excluído' : 'usuários excluídos'} com sucesso`)
+  } catch (error) {
+    toastError(getApiErrorMessage(error, 'Não foi possível excluir os usuários selecionados'))
+  } finally {
+    deletingSelected.value = false
+  }
+}
+
 watch(search, () => {
   if (page.value !== 1) page.value = 1
   else loadUsers()
@@ -188,10 +215,26 @@ onMounted(loadUsers)
 
     <p v-if="errorMessage" class="text-sm text-red-600 dark:text-red-400 mb-4">{{ errorMessage }}</p>
 
+    <BulkSelectionBar
+      :count="selectedIds.length"
+      :deleting="deletingSelected"
+      @clear="clearSelection"
+      @delete="handleBulkDelete"
+    />
+
     <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-x-auto">
       <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
         <thead class="bg-gray-50 dark:bg-gray-900/60">
           <tr>
+            <th class="print:hidden w-12 px-4 py-3">
+              <input
+                type="checkbox"
+                class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                :checked="allVisibleSelected"
+                aria-label="Selecionar todos os usuários desta página"
+                @change="toggleAllVisible"
+              />
+            </th>
             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Nome</th>
             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
               E-mail
@@ -207,10 +250,10 @@ onMounted(loadUsers)
         </thead>
         <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
           <tr v-if="loading">
-            <td colspan="5" class="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">Carregando...</td>
+            <td colspan="6" class="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">Carregando...</td>
           </tr>
           <tr v-else-if="users.length === 0">
-            <td colspan="5" class="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">
+            <td colspan="6" class="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">
               Nenhum usuário cadastrado.
             </td>
           </tr>
@@ -222,6 +265,15 @@ onMounted(loadUsers)
             title="Duplo clique para editar"
             @dblclick="openEditModal(user)"
           >
+            <td class="print:hidden px-4 py-3" @dblclick.stop @click.stop>
+              <input
+                type="checkbox"
+                class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                :checked="selectedIds.includes(user.id)"
+                :aria-label="`Selecionar usuário ${user.name}`"
+                @change="toggleOne(user.id)"
+              />
+            </td>
             <td class="px-4 py-3 text-sm font-medium text-gray-900 dark:text-gray-100 whitespace-nowrap">
               {{ user.name }}
             </td>

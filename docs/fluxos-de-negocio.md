@@ -6,6 +6,8 @@ Todos os fluxos abaixo são escopados por `companyId` (ver [decisões arquitetur
 
 Pré-requisito dos fluxos de estoque: **categoria** e **unidade de medida** existem independentes de produto (telas `/categorias` e `/unidades`); um **produto** exige uma categoria e uma unidade já cadastradas (`categoryId`/`unitId` validados como pertencentes à mesma empresa na criação/edição — `assertCategoryAndUnitBelongToCompany`). `currentStock` do produto nasce em `0` e só é alterado pelos fluxos de entrada/perda abaixo — nunca é editado diretamente pela tela de produto.
 
+As listagens de categorias, unidades, produtos e usuários permitem selecionar os registros visíveis por checkbox e excluí-los em lote. A exclusão é lógica e auditada; está disponível para `admin` e `gerente` nos cadastros gerais e somente para `admin` em usuários. Históricos operacionais (entradas, perdas e movimentações) não oferecem exclusão.
+
 ## Entrada de mercadoria
 
 Tela `/entradas` → `/entradas/nova`. Rota `POST /stock-entries`, service `stock-entries.service.ts::createStockEntry`. Qualquer usuário autenticado pode registrar (sem restrição de papel — ver decisões arquiteturais).

@@ -1,7 +1,8 @@
 import type { FastifyInstance } from 'fastify'
 import { authenticate, requireRole } from '../../shared/middlewares/auth.js'
+import { bulkDeleteSchema } from '../../shared/schemas/bulk-delete.schema.js'
 import { createUnitSchema, listUnitsQuerySchema, updateUnitSchema } from './units.schema.js'
-import { createUnit, deleteUnit, getUnit, listUnits, updateUnit } from './units.service.js'
+import { createUnit, deleteUnit, deleteUnits, getUnit, listUnits, updateUnit } from './units.service.js'
 
 export async function unitsRoutes(app: FastifyInstance) {
   app.addHook('preHandler', authenticate)
@@ -19,6 +20,11 @@ export async function unitsRoutes(app: FastifyInstance) {
     const data = createUnitSchema.parse(request.body)
     const unit = await createUnit(request.user.companyId, request.user.sub, data)
     return reply.status(201).send(unit)
+  })
+
+  app.post('/units/bulk-delete', { preHandler: requireRole('admin', 'gerente') }, async (request) => {
+    const { ids } = bulkDeleteSchema.parse(request.body)
+    return deleteUnits(request.user.companyId, request.user.sub, ids)
   })
 
   app.put<{ Params: { id: string } }>(

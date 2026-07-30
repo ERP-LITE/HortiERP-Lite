@@ -30,3 +30,8 @@ export async function updateUnit(id: string, payload: UnitInput) {
 export async function deleteUnit(id: string) {
   await api.delete(`/units/${id}`)
 }
+
+export async function deleteUnits(ids: string[]) {
+  const { data } = await api.post<{ deleted: number }>('/units/bulk-delete', { ids })
+  return data
+}

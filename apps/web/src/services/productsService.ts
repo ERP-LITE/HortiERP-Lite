@@ -39,3 +39,8 @@ export async function updateProduct(id: string, payload: Partial<ProductInput>) 
 export async function deleteProduct(id: string) {
   await api.delete(`/products/${id}`)
 }
+
+export async function deleteProducts(ids: string[]) {
+  const { data } = await api.post<{ deleted: number }>('/products/bulk-delete', { ids })
+  return data
+}
