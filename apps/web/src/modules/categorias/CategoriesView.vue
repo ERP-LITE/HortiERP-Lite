@@ -8,10 +8,12 @@ import BaseModal from '@/components/ui/BaseModal.vue'
 import Pagination from '@/components/ui/Pagination.vue'
 import SearchInput from '@/components/ui/SearchInput.vue'
 import PrintButton from '@/components/ui/PrintButton.vue'
+import BulkSelectionBar from '@/components/ui/BulkSelectionBar.vue'
 import { getApiErrorMessage, resolveFormError } from '@/services/api'
 import { confirmDelete, toastError, toastSuccess } from '@/lib/alerts'
 import {
   createCategory,
+  deleteCategories,
   deleteCategory,
   listCategories,
   updateCategory,
@@ -19,6 +21,7 @@ import {
 } from '@/services/categoriesService'
 import { useAuthStore } from '@/stores/auth'
 import { usePagination } from '@/composables/usePagination'
+import { useBulkSelection } from '@/composables/useBulkSelection'
 import type { Category } from '@/types'
 
 const auth = useAuthStore()
@@ -27,6 +30,10 @@ const canManage = computed(() => auth.user?.role === 'admin' || auth.user?.role 
 const { page, pageSize, total, totalPages, applyMeta } = usePagination()
 
 const categories = ref<Category[]>([])
+const { selectedIds, allVisibleSelected, toggleOne, toggleAllVisible, clearSelection } = useBulkSelection(() =>
+  categories.value.map(({ id }) => id),
+)
+const deletingSelected = ref(false)
 const loading = ref(true)
 const errorMessage = ref('')
 
@@ -43,6 +50,7 @@ async function loadCategories() {
   try {
     const result = await listCategories({ page: page.value, pageSize: pageSize.value, search: search.value || undefined })
     categories.value = result.data
+    clearSelection()
     applyMeta(result)
   } catch (error) {
     errorMessage.value = getApiErrorMessage(error)
@@ -110,6 +118,26 @@ async function handleDelete(category: Category) {
   }
 }
 
+async function handleBulkDelete() {
+  const count = selectedIds.value.length
+  const confirmed = await confirmDelete({
+    title: `Excluir ${count} ${count === 1 ? 'categoria selecionada' : 'categorias selecionadas'}?`,
+    text: 'Os registros serão excluídos logicamente e deixarão de aparecer no sistema.',
+  })
+  if (!confirmed) return
+
+  deletingSelected.value = true
+  try {
+    const result = await deleteCategories(selectedIds.value)
+    await loadCategories()
+    toastSuccess(`${result.deleted} ${result.deleted === 1 ? 'categoria excluída' : 'categorias excluídas'} com sucesso`)
+  } catch (error) {
+    toastError(getApiErrorMessage(error, 'Não foi possível excluir as categorias selecionadas'))
+  } finally {
+    deletingSelected.value = false
+  }
+}
+
 watch(search, () => {
   if (page.value !== 1) page.value = 1
   else loadCategories()
@@ -130,10 +158,27 @@ onMounted(loadCategories)
 
     <p v-if="errorMessage" class="text-sm text-red-600 dark:text-red-400 mb-4">{{ errorMessage }}</p>
 
+    <BulkSelectionBar
+      v-if="canManage"
+      :count="selectedIds.length"
+      :deleting="deletingSelected"
+      @clear="clearSelection"
+      @delete="handleBulkDelete"
+    />
+
     <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
       <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
         <thead class="bg-gray-50 dark:bg-gray-900/60">
           <tr>
+            <th v-if="canManage" class="print:hidden w-12 px-4 py-3">
+              <input
+                type="checkbox"
+                class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                :checked="allVisibleSelected"
+                aria-label="Selecionar todas as categorias desta página"
+                @change="toggleAllVisible"
+              />
+            </th>
             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Nome</th>
             <th
               class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase hidden sm:table-cell"
@@ -145,10 +190,10 @@ onMounted(loadCategories)
         </thead>
         <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
           <tr v-if="loading">
-            <td colspan="3" class="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">Carregando...</td>
+            <td :colspan="canManage ? 4 : 3" class="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">Carregando...</td>
           </tr>
           <tr v-else-if="categories.length === 0">
-            <td colspan="3" class="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">
+            <td :colspan="canManage ? 4 : 3" class="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">
               Nenhuma categoria cadastrada.
             </td>
           </tr>
@@ -161,6 +206,15 @@ onMounted(loadCategories)
             :title="canManage ? 'Duplo clique para editar' : ''"
             @dblclick="canManage && openEditModal(category)"
           >
+            <td v-if="canManage" class="print:hidden px-4 py-3" @dblclick.stop @click.stop>
+              <input
+                type="checkbox"
+                class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                :checked="selectedIds.includes(category.id)"
+                :aria-label="`Selecionar categoria ${category.name}`"
+                @change="toggleOne(category.id)"
+              />
+            </td>
             <td class="px-4 py-3 text-sm font-medium text-gray-900 dark:text-gray-100">{{ category.name }}</td>
             <td class="px-4 py-3 text-sm text-gray-500 dark:text-gray-400 hidden sm:table-cell">
               {{ category.description || '—' }}

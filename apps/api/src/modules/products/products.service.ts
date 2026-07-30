@@ -1,4 +1,4 @@
-import { and, asc, count, eq, ilike, isNull, or } from 'drizzle-orm'
+import { and, asc, count, eq, ilike, inArray, isNull, or } from 'drizzle-orm'
 import { db } from '../../db/client.js'
 import { categories, products, units } from '../../db/schema/index.js'
 import { AppError } from '../../shared/errors/AppError.js'
@@ -161,4 +161,14 @@ export async function deleteProduct(companyId: string, userId: string, id: strin
     .update(products)
     .set({ deletedAt: new Date(), updatedBy: userId })
     .where(and(eq(products.id, id), eq(products.companyId, companyId)))
+}
+
+export async function deleteProducts(companyId: string, userId: string, ids: string[]) {
+  const deleted = await db
+    .update(products)
+    .set({ deletedAt: new Date(), updatedBy: userId, updatedAt: new Date() })
+    .where(and(eq(products.companyId, companyId), inArray(products.id, ids), isNull(products.deletedAt)))
+    .returning({ id: products.id })
+
+  return { deleted: deleted.length }
 }

@@ -1,8 +1,10 @@
 import type { FastifyInstance } from 'fastify'
 import { authenticate, requireRole } from '../../shared/middlewares/auth.js'
+import { bulkDeleteSchema } from '../../shared/schemas/bulk-delete.schema.js'
 import { createCategorySchema, listCategoriesQuerySchema, updateCategorySchema } from './categories.schema.js'
 import {
   createCategory,
+  deleteCategories,
   deleteCategory,
   getCategory,
   listCategories,
@@ -25,6 +27,11 @@ export async function categoriesRoutes(app: FastifyInstance) {
     const data = createCategorySchema.parse(request.body)
     const category = await createCategory(request.user.companyId, request.user.sub, data)
     return reply.status(201).send(category)
+  })
+
+  app.post('/categories/bulk-delete', { preHandler: requireRole('admin', 'gerente') }, async (request) => {
+    const { ids } = bulkDeleteSchema.parse(request.body)
+    return deleteCategories(request.user.companyId, request.user.sub, ids)
   })
 
   app.put<{ Params: { id: string } }>(

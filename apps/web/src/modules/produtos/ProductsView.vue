@@ -12,13 +12,15 @@ import Pagination from '@/components/ui/Pagination.vue'
 import FilterButton from '@/components/ui/FilterButton.vue'
 import PrintButton from '@/components/ui/PrintButton.vue'
 import SearchInput from '@/components/ui/SearchInput.vue'
+import BulkSelectionBar from '@/components/ui/BulkSelectionBar.vue'
 import { getApiErrorMessage, resolveFormError } from '@/services/api'
 import { confirmDelete, toastError, toastSuccess } from '@/lib/alerts'
 import { listCategories } from '@/services/categoriesService'
 import { listUnits } from '@/services/unitsService'
-import { createProduct, deleteProduct, listProducts, updateProduct } from '@/services/productsService'
+import { createProduct, deleteProduct, deleteProducts, listProducts, updateProduct } from '@/services/productsService'
 import { useAuthStore } from '@/stores/auth'
 import { usePagination } from '@/composables/usePagination'
+import { useBulkSelection } from '@/composables/useBulkSelection'
 import type { Category, Product, Unit } from '@/types'
 
 const auth = useAuthStore()
@@ -27,6 +29,10 @@ const canManage = computed(() => auth.user?.role === 'admin' || auth.user?.role 
 const { page, pageSize, total, totalPages, applyMeta } = usePagination()
 
 const products = ref<Product[]>([])
+const { selectedIds, allVisibleSelected, toggleOne, toggleAllVisible, clearSelection } = useBulkSelection(() =>
+  products.value.map(({ id }) => id),
+)
+const deletingSelected = ref(false)
 const categories = ref<Category[]>([])
 const units = ref<Unit[]>([])
 const loading = ref(true)
@@ -87,6 +93,7 @@ async function loadProducts() {
       active: filters.value.active === 'todos' ? undefined : filters.value.active === 'true',
     })
     products.value = result.data
+    clearSelection()
     applyMeta(result)
   } catch (error) {
     errorMessage.value = getApiErrorMessage(error)
@@ -215,6 +222,26 @@ async function handleDelete(product: Product) {
   }
 }
 
+async function handleBulkDelete() {
+  const count = selectedIds.value.length
+  const confirmed = await confirmDelete({
+    title: `Excluir ${count} ${count === 1 ? 'produto selecionado' : 'produtos selecionados'}?`,
+    text: 'Os registros serão excluídos logicamente e deixarão de aparecer no sistema.',
+  })
+  if (!confirmed) return
+
+  deletingSelected.value = true
+  try {
+    const result = await deleteProducts(selectedIds.value)
+    await loadProducts()
+    toastSuccess(`${result.deleted} ${result.deleted === 1 ? 'produto excluído' : 'produtos excluídos'} com sucesso`)
+  } catch (error) {
+    toastError(getApiErrorMessage(error, 'Não foi possível excluir os produtos selecionados'))
+  } finally {
+    deletingSelected.value = false
+  }
+}
+
 watch(search, () => {
   if (page.value !== 1) page.value = 1
   else loadProducts()
@@ -236,10 +263,27 @@ onMounted(loadAll)
 
     <p v-if="errorMessage" class="text-sm text-red-600 dark:text-red-400 mb-4">{{ errorMessage }}</p>
 
+    <BulkSelectionBar
+      v-if="canManage"
+      :count="selectedIds.length"
+      :deleting="deletingSelected"
+      @clear="clearSelection"
+      @delete="handleBulkDelete"
+    />
+
     <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-x-auto">
       <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
         <thead class="bg-gray-50 dark:bg-gray-900/60">
           <tr>
+            <th v-if="canManage" class="print:hidden w-12 px-4 py-3">
+              <input
+                type="checkbox"
+                class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                :checked="allVisibleSelected"
+                aria-label="Selecionar todos os produtos desta página"
+                @change="toggleAllVisible"
+              />
+            </th>
             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
               Produto
             </th>
@@ -255,10 +299,10 @@ onMounted(loadAll)
         </thead>
         <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
           <tr v-if="loading">
-            <td colspan="5" class="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">Carregando...</td>
+            <td :colspan="canManage ? 6 : 5" class="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">Carregando...</td>
           </tr>
           <tr v-else-if="products.length === 0">
-            <td colspan="5" class="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">
+            <td :colspan="canManage ? 6 : 5" class="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">
               Nenhum produto cadastrado.
             </td>
           </tr>
@@ -271,6 +315,15 @@ onMounted(loadAll)
             :title="canManage ? 'Duplo clique para editar' : ''"
             @dblclick="canManage && openEditModal(product)"
           >
+            <td v-if="canManage" class="print:hidden px-4 py-3" @dblclick.stop @click.stop>
+              <input
+                type="checkbox"
+                class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                :checked="selectedIds.includes(product.id)"
+                :aria-label="`Selecionar produto ${product.name}`"
+                @change="toggleOne(product.id)"
+              />
+            </td>
             <td class="px-4 py-3 text-sm font-medium text-gray-900 dark:text-gray-100 whitespace-nowrap">
               {{ product.name }}
             </td>

@@ -1,4 +1,4 @@
-import { and, asc, count, eq, ilike, isNull, or } from 'drizzle-orm'
+import { and, asc, count, eq, ilike, inArray, isNull, or } from 'drizzle-orm'
 import { db } from '../../db/client.js'
 import { units } from '../../db/schema/index.js'
 import { AppError } from '../../shared/errors/AppError.js'
@@ -101,4 +101,14 @@ export async function deleteUnit(companyId: string, userId: string, id: string) 
     .update(units)
     .set({ deletedAt: new Date(), updatedBy: userId })
     .where(and(eq(units.id, id), eq(units.companyId, companyId)))
+}
+
+export async function deleteUnits(companyId: string, userId: string, ids: string[]) {
+  const deleted = await db
+    .update(units)
+    .set({ deletedAt: new Date(), updatedBy: userId, updatedAt: new Date() })
+    .where(and(eq(units.companyId, companyId), inArray(units.id, ids), isNull(units.deletedAt)))
+    .returning({ id: units.id })
+
+  return { deleted: deleted.length }
 }
