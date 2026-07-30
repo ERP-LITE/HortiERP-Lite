@@ -51,8 +51,12 @@ function formatCurrency(value: number) {
   return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 }
 
-function formatDateTime(value: string) {
-  return new Date(value).toLocaleString('pt-BR')
+function formatMovementDate(value: string) {
+  return new Date(value).toLocaleDateString('pt-BR')
+}
+
+function formatMovementTime(value: string) {
+  return new Date(value).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
 }
 
 async function loadSummary() {
@@ -147,7 +151,7 @@ onMounted(loadSummary)
         </div>
       </div>
 
-      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
         <div class="print:hidden bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
           <div class="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
             <h2 class="text-sm font-semibold text-gray-700 dark:text-gray-300">
@@ -182,28 +186,40 @@ onMounted(loadSummary)
 
         <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
           <div class="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
-            <h2 class="text-sm font-semibold text-gray-700 dark:text-gray-300">Movimentações recentes</h2>
+            <h2 class="text-sm font-semibold text-gray-700 dark:text-gray-300">Movimentações no período</h2>
+            <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+              {{ formatDate(summary.periodFrom) }} até {{ formatDate(summary.periodTo) }}
+            </p>
           </div>
-          <table class="min-w-full divide-y divide-gray-100 dark:divide-gray-700">
-            <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
-              <tr v-if="summary.recentMovements.length === 0">
-                <td class="px-4 py-4 text-sm text-gray-500 dark:text-gray-400 text-center">
-                  Nenhuma movimentação registrada.
-                </td>
-              </tr>
-              <tr v-for="movement in summary.recentMovements" v-else :key="movement.id">
-                <td class="px-4 py-3 text-sm text-gray-900 dark:text-gray-100 whitespace-nowrap">
+          <p
+            v-if="summary.recentMovements.length === 0"
+            class="px-4 py-4 text-center text-sm text-gray-500 dark:text-gray-400"
+          >
+            Nenhuma movimentação registrada neste período.
+          </p>
+          <ul v-else class="divide-y divide-gray-100 dark:divide-gray-700">
+            <li
+              v-for="movement in summary.recentMovements"
+              :key="movement.id"
+              class="flex min-w-0 items-center justify-between gap-3 px-4 py-3"
+            >
+              <div class="min-w-0">
+                <p class="truncate text-sm font-medium text-gray-900 dark:text-gray-100" :title="movement.product?.name">
                   {{ movement.product?.name }}
-                </td>
-                <td class="px-4 py-3 whitespace-nowrap">
-                  <BaseBadge :variant="typeVariant[movement.type]">{{ typeLabels[movement.type] }}</BaseBadge>
-                </td>
-                <td class="px-4 py-3 text-sm text-gray-500 dark:text-gray-400 text-right whitespace-nowrap">
-                  {{ formatDateTime(movement.createdAt) }}
-                </td>
-              </tr>
-            </tbody>
-          </table>
+                </p>
+                <BaseBadge class="mt-1" :variant="typeVariant[movement.type]">
+                  {{ typeLabels[movement.type] }}
+                </BaseBadge>
+              </div>
+              <time
+                :datetime="movement.createdAt"
+                class="shrink-0 text-right text-xs leading-5 text-gray-500 dark:text-gray-400"
+              >
+                <span class="block">{{ formatMovementDate(movement.createdAt) }}</span>
+                <span class="block">{{ formatMovementTime(movement.createdAt) }}</span>
+              </time>
+            </li>
+          </ul>
         </div>
       </div>
     </template>

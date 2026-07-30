@@ -18,6 +18,7 @@ import {
 } from '@lucide/vue'
 import ThemeToggle from '@/components/ui/ThemeToggle.vue'
 import AppUserMenu from '@/components/AppUserMenu.vue'
+import AppFooter from '@/components/AppFooter.vue'
 import BaseModal from '@/components/ui/BaseModal.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import { useAuthStore } from '@/stores/auth'
@@ -146,6 +147,7 @@ function isActive(name: string) {
       <main class="flex-1 p-4 lg:p-6 overflow-y-auto print:overflow-visible print:h-auto print:p-0">
         <RouterView />
       </main>
+      <AppFooter class="print:hidden" />
     </div>
 
     <BaseModal :open="showWarning" title="Sessão prestes a expirar" @close="stayLoggedIn">
