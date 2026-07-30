@@ -63,7 +63,11 @@ export async function getDashboardSummary(companyId: string, range: { from?: Dat
   const lossesByReason = Array.from(lossesByReasonMap, ([reason, quantity]) => ({ reason, quantity }))
 
   const recentMovements = await db.query.stockMovements.findMany({
-    where: eq(stockMovements.companyId, companyId),
+    where: and(
+      eq(stockMovements.companyId, companyId),
+      gte(stockMovements.createdAt, periodStart),
+      lte(stockMovements.createdAt, periodEnd),
+    ),
     with: { product: true },
     orderBy: desc(stockMovements.createdAt),
     limit: 10,

@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { Sprout, Apple, Carrot, Grape, Citrus, LeafyGreen, Banana } from '@lucide/vue'
 import ThemeToggle from '@/components/ui/ThemeToggle.vue'
+import AppFooter from '@/components/AppFooter.vue'
 </script>
 
 <template>
   <div
-    class="min-h-screen flex items-center justify-center px-4 relative overflow-hidden bg-gradient-to-br from-primary-50 via-white to-primary-100 dark:from-gray-950 dark:via-gray-950 dark:to-[#052e16]"
+    class="min-h-screen flex flex-col relative overflow-hidden bg-gradient-to-br from-primary-50 via-white to-primary-100 dark:from-gray-950 dark:via-gray-950 dark:to-[#052e16]"
   >
     <div class="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
       <Apple class="absolute -top-10 -left-10 h-56 w-56 text-primary-600/10 dark:text-primary-400/10 -rotate-12" />
@@ -20,21 +21,25 @@ import ThemeToggle from '@/components/ui/ThemeToggle.vue'
       <ThemeToggle />
     </div>
 
-    <div class="w-full max-w-sm relative z-10">
-      <div class="text-center mb-8">
-        <div
-          class="inline-flex items-center justify-center h-12 w-12 rounded-xl bg-primary-600 text-white mb-3 shadow-lg shadow-primary-600/20"
-        >
-          <Sprout :size="24" />
+    <div class="relative z-10 flex flex-1 items-center justify-center px-4 py-16">
+      <div class="w-full max-w-sm">
+        <div class="text-center mb-8">
+          <div
+            class="inline-flex items-center justify-center h-12 w-12 rounded-xl bg-primary-600 text-white mb-3 shadow-lg shadow-primary-600/20"
+          >
+            <Sprout :size="24" />
+          </div>
+          <h1 class="text-2xl font-bold text-primary-700 dark:text-primary-400">HortiERP Lite</h1>
+          <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Controle de estoque para hortifrutis</p>
         </div>
-        <h1 class="text-2xl font-bold text-primary-700 dark:text-primary-400">HortiERP Lite</h1>
-        <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Controle de estoque para hortifrutis</p>
-      </div>
-      <div
-        class="bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm rounded-xl shadow-lg border border-gray-200 dark:border-gray-800 p-6"
-      >
-        <slot />
+        <div
+          class="bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm rounded-xl shadow-lg border border-gray-200 dark:border-gray-800 p-6"
+        >
+          <slot />
+        </div>
       </div>
     </div>
+
+    <AppFooter class="relative z-10" />
   </div>
 </template>

@@ -39,7 +39,7 @@ Não existe ainda fluxo de **ajuste manual de estoque** (contagem/inventário) �
 
 ## Dashboard
 
-`GET /dashboard/summary` agrega, para o período selecionado: total de produtos ativos, quantidade com estoque baixo, valor de estoque (soma de `currentStock * costPrice`), contagem/quantidade de perdas no período, timeline diária de entradas × perdas, distribuição de estoque por categoria e de perdas por motivo, e as movimentações mais recentes.
+`GET /dashboard/summary` agrega, para o período selecionado: total de produtos ativos, quantidade com estoque baixo, valor de estoque (soma de `currentStock * costPrice`), contagem/quantidade de perdas no período, timeline diária de entradas × perdas, distribuição de estoque por categoria e de perdas por motivo, e as 10 movimentações mais recentes dentro do mesmo período. O card de movimentações exibe explicitamente o intervalo aplicado.
 
 ## Cadastro de empresas-cliente e acesso como suporte
 
