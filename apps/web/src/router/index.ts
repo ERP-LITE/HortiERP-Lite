@@ -72,6 +72,13 @@ const router = createRouter({
       component: () => import('@/modules/perfil/ProfileView.vue'),
     },
     {
+      path: '/logs/atividades',
+      name: 'logs-atividades',
+      component: () => import('@/modules/logs/SystemLogsView.vue'),
+      props: { mode: 'activity' },
+      meta: { roles: ['admin'] },
+    },
+    {
       path: '/empresas',
       name: 'empresas',
       component: () => import('@/modules/empresas/CompaniesView.vue'),
@@ -81,6 +88,13 @@ const router = createRouter({
       path: '/selecionar-empresa',
       name: 'selecionar-empresa',
       component: () => import('@/modules/empresas/SelectCompanyView.vue'),
+      meta: { roles: ['super_admin'] },
+    },
+    {
+      path: '/logs/tecnicos',
+      name: 'logs-tecnicos',
+      component: () => import('@/modules/logs/SystemLogsView.vue'),
+      props: { mode: 'technical' },
       meta: { roles: ['super_admin'] },
     },
   ],
@@ -109,6 +123,7 @@ router.beforeEach(async (to) => {
     !to.meta.public &&
     to.name !== 'empresas' &&
     to.name !== 'selecionar-empresa' &&
+    to.name !== 'logs-tecnicos' &&
     to.name !== 'perfil'
   ) {
     return { name: 'selecionar-empresa' }

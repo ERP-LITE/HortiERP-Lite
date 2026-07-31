@@ -15,6 +15,13 @@
       "when": 1785328962518,
       "tag": "0001_wakeful_mongoose",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1785456203621,
+      "tag": "0002_grey_night_thrasher",
+      "breakpoints": true
     }
   ]
 }

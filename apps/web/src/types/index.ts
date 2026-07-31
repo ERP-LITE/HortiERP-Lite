@@ -140,6 +140,30 @@ export interface DashboardSummary {
   lossesByReason: { reason: LossReason; quantity: number }[]
 }
 
+export type SystemLogLevel = 'info' | 'warning' | 'error'
+export type SystemLogMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
+
+export interface SystemLog {
+  id: string
+  companyId: string | null
+  companyName: string | null
+  actorId: string | null
+  actorName: string | null
+  actorEmail: string | null
+  actorRole: UserRole | null
+  method: SystemLogMethod
+  path: string
+  statusCode: number
+  durationMs: number
+  level: SystemLogLevel
+  errorCode: string | null
+  errorMessage: string | null
+  ip: string | null
+  userAgent: string | null
+  metadata: Record<string, unknown> | null
+  createdAt: string
+}
+
 export interface ApiErrorPayload {
   error: {
     code: string
