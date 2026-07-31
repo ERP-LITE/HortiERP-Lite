@@ -15,7 +15,7 @@ Tela `/entradas` → `/entradas/nova`. Rota `POST /stock-entries`, service `stoc
 Uma entrada tem um cabeçalho (`stock_entries`: fornecedor em texto livre, data, observações) e uma lista de itens (`stock_entry_items`: produto + quantidade + custo unitário opcional). Tudo roda numa única transação:
 
 1. Cria a linha em `stock_entries`.
-2. Para cada item: valida que o produto existe na empresa, insere a linha em `stock_entry_items`, soma a quantidade ao `currentStock` do produto, e grava um `stock_movements` com `type: 'entrada'`, quantidade positiva e `balanceAfter` = novo saldo.
+2. Para cada item: soma a quantidade ao `currentStock` com um `UPDATE` atômico escopado por empresa, valida pelo retorno que o produto existe, insere a linha em `stock_entry_items` e grava um `stock_movements` com `type: 'entrada'`, quantidade positiva e `balanceAfter` = novo saldo retornado pelo banco.
 
 Se qualquer produto do lote não existir, a transação inteira é revertida (nenhum item é gravado, nenhum estoque é alterado).
 
@@ -23,11 +23,10 @@ Se qualquer produto do lote não existir, a transação inteira é revertida (ne
 
 Tela `/perdas`. Rota `POST /losses`, service `losses.service.ts::createLoss`. Mesma liberação de papel que entradas.
 
-1. Busca o produto e o `currentStock` atual.
-2. **Valida que a quantidade da perda não é maior que o estoque disponível** — se for, rejeita com `422 INSUFFICIENT_STOCK` antes de gravar qualquer coisa.
+1. **Subtrai e valida o saldo numa única atualização atômica** (`currentStock >= quantidade`). A condição é reavaliada pelo PostgreSQL mesmo quando existem perdas simultâneas.
+2. Se o produto não existir, rejeita com `404`; se existir mas não houver saldo suficiente, rejeita com `422 INSUFFICIENT_STOCK`.
 3. Insere a linha em `losses` (motivo: `vencido` / `avariado` / `roubo_furto` / `erro_operacional` / `outro`).
-4. Subtrai a quantidade do `currentStock` do produto.
-5. Grava um `stock_movements` com `type: 'perda'`, **quantidade negativa** e `balanceAfter` = novo saldo.
+4. Grava um `stock_movements` com `type: 'perda'`, **quantidade negativa** e `balanceAfter` = novo saldo retornado pelo banco.
 
 Tudo em uma transação — perda só é registrada se o estoque puder de fato ser decrementado.
 

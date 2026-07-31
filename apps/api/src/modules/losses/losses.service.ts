@@ -1,4 +1,4 @@
-import { and, count, desc, eq, gte, ilike, inArray, lte, or } from 'drizzle-orm'
+import { and, count, desc, eq, gte, ilike, inArray, lte, or, sql } from 'drizzle-orm'
 import { db } from '../../db/client.js'
 import { losses, products, stockMovements } from '../../db/schema/index.js'
 import { AppError } from '../../shared/errors/AppError.js'
@@ -48,20 +48,33 @@ export async function getLoss(companyId: string, id: string) {
 
 export async function createLoss(companyId: string, userId: string, data: CreateLossInput) {
   return db.transaction(async (tx) => {
-    const [product] = await tx
-      .select()
-      .from(products)
-      .where(and(eq(products.id, data.productId), eq(products.companyId, companyId)))
+    const quantity = data.quantity.toString()
+    const [updatedProduct] = await tx
+      .update(products)
+      .set({
+        currentStock: sql`${products.currentStock} - ${quantity}`,
+        updatedAt: new Date(),
+        updatedBy: userId,
+      })
+      .where(
+        and(
+          eq(products.id, data.productId),
+          eq(products.companyId, companyId),
+          gte(products.currentStock, quantity),
+        ),
+      )
+      .returning({ currentStock: products.currentStock })
 
-    if (!product) {
-      throw AppError.notFound('Produto não encontrado')
-    }
+    if (!updatedProduct) {
+      const [product] = await tx
+        .select({ currentStock: products.currentStock })
+        .from(products)
+        .where(and(eq(products.id, data.productId), eq(products.companyId, companyId)))
 
-    const currentStock = Number(product.currentStock)
+      if (!product) throw AppError.notFound('Produto não encontrado')
 
-    if (data.quantity > currentStock) {
       throw new AppError(
-        `Quantidade de perda (${data.quantity}) maior que o estoque disponível (${currentStock})`,
+        `Quantidade de perda (${data.quantity}) maior que o estoque disponível (${product.currentStock})`,
         422,
         'INSUFFICIENT_STOCK',
       )
@@ -80,19 +93,12 @@ export async function createLoss(companyId: string, userId: string, data: Create
       })
       .returning()
 
-    const newStock = currentStock - data.quantity
-
-    await tx
-      .update(products)
-      .set({ currentStock: newStock.toString(), updatedAt: new Date(), updatedBy: userId })
-      .where(and(eq(products.id, data.productId), eq(products.companyId, companyId)))
-
     await tx.insert(stockMovements).values({
       companyId,
       productId: data.productId,
       type: 'perda',
       quantity: (-data.quantity).toString(),
-      balanceAfter: newStock.toString(),
+      balanceAfter: updatedProduct.currentStock,
       referenceType: 'loss',
       referenceId: loss.id,
       createdBy: userId,
