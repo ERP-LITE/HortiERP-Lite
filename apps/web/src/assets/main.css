@@ -2,6 +2,114 @@
 @tailwind components;
 @tailwind utilities;
 
+@media (max-width: 639px) {
+  table.mobile-accordion-table,
+  table.mobile-accordion-table tbody {
+    display: block;
+    width: 100%;
+  }
+
+  table.mobile-accordion-table thead {
+    display: none;
+  }
+
+  table.mobile-accordion-table tbody tr {
+    display: block;
+    position: relative;
+    margin: 0.75rem;
+    overflow: hidden;
+    border: 1px solid rgb(229 231 235);
+    border-radius: 0.75rem;
+  }
+
+  .dark table.mobile-accordion-table tbody tr {
+    border-color: rgb(55 65 81);
+  }
+
+  table.mobile-accordion-table tbody tr > td {
+    display: none;
+    width: 100%;
+    padding: 0.75rem 1rem;
+    white-space: normal;
+  }
+
+  table.mobile-accordion-table tbody tr > td.mobile-accordion-summary,
+  table.mobile-accordion-table tbody tr > td.mobile-accordion-selection,
+  table.mobile-accordion-table tbody tr.mobile-accordion-open > td,
+  table.mobile-accordion-table tbody tr.mobile-accordion-static > td {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+  }
+
+  table.mobile-accordion-table tbody tr.mobile-accordion-open > td + td {
+    border-top: 1px solid rgb(243 244 246);
+  }
+
+  .dark table.mobile-accordion-table tbody tr.mobile-accordion-open > td + td {
+    border-color: rgb(55 65 81);
+  }
+
+  table.mobile-accordion-table tbody tr > td:not(.mobile-accordion-summary)::before {
+    content: attr(data-mobile-label);
+    flex: 0 0 auto;
+    color: rgb(107 114 128);
+    font-size: 0.75rem;
+    font-weight: 500;
+  }
+
+  table.mobile-accordion-table tbody tr > td.mobile-accordion-summary {
+    cursor: pointer;
+    padding-right: 2.75rem;
+    position: relative;
+  }
+
+  table.mobile-accordion-table tbody tr:has(> td.mobile-accordion-selection) > td.mobile-accordion-summary {
+    padding-left: 3.5rem;
+  }
+
+  table.mobile-accordion-table tbody tr > td.mobile-accordion-selection {
+    position: absolute;
+    z-index: 1;
+    left: 0.5rem;
+    top: 0.25rem;
+    width: 2.5rem;
+    min-height: 2.75rem;
+    padding: 0;
+    justify-content: flex-start;
+  }
+
+  table.mobile-accordion-table tbody tr.mobile-accordion-open > td.mobile-accordion-selection {
+    border-top: 0;
+  }
+
+  table.mobile-accordion-table tbody tr > td.mobile-accordion-selection::before {
+    display: none;
+  }
+
+  table.mobile-accordion-table tbody tr.mobile-accordion-open > td.mobile-accordion-actions {
+    justify-content: flex-end;
+    gap: 0.25rem;
+  }
+
+  table.mobile-accordion-table tbody tr > td.mobile-accordion-actions::before {
+    display: none;
+  }
+
+  table.mobile-accordion-table tbody tr > td.mobile-accordion-summary::after {
+    content: '⌄';
+    position: absolute;
+    right: 1rem;
+    font-size: 1.25rem;
+    transition: transform 0.2s ease;
+  }
+
+  table.mobile-accordion-table tbody tr.mobile-accordion-open > td.mobile-accordion-summary::after {
+    transform: rotate(180deg);
+  }
+}
+
 /* Remove as setas de incremento/decremento dos campos numéricos em todo o sistema */
 input[type='number']::-webkit-outer-spin-button,
 input[type='number']::-webkit-inner-spin-button {

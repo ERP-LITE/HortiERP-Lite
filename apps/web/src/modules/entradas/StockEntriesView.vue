@@ -94,7 +94,9 @@ onMounted(loadEntries)
         <FilterButton :active="activeFilterCount" @click="openFilterModal" />
         <PrintButton />
         <RouterLink :to="{ name: 'entradas-nova' }">
-          <BaseButton><Plus :size="16" /> Nova entrada</BaseButton>
+          <BaseButton class="!px-2.5 sm:!px-4" title="Nova entrada" aria-label="Nova entrada">
+            <Plus :size="16" /> <span class="hidden sm:inline">Nova entrada</span>
+          </BaseButton>
         </RouterLink>
       </template>
     </PageHeader>
@@ -102,7 +104,7 @@ onMounted(loadEntries)
     <p v-if="errorMessage" class="text-sm text-red-600 dark:text-red-400 mb-4">{{ errorMessage }}</p>
 
     <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-x-auto">
-      <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+      <table v-mobile-accordion class="mobile-accordion-table min-w-full divide-y divide-gray-200 dark:divide-gray-700">
         <thead class="bg-gray-50 dark:bg-gray-900/60">
           <tr>
             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Data</th>

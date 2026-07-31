@@ -137,8 +137,39 @@ onMounted(() => {
 
     <p v-if="errorMessage" class="text-sm text-red-600 dark:text-red-400 mb-4">{{ errorMessage }}</p>
 
-    <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-x-auto">
-      <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+    <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700">
+      <div class="divide-y divide-gray-100 dark:divide-gray-700 sm:hidden">
+        <div v-if="loading" class="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">Carregando...</div>
+        <div v-else-if="movements.length === 0" class="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">
+          Nenhuma movimentação registrada.
+        </div>
+        <article v-for="movement in movements" v-else :key="movement.id" class="space-y-3 p-4">
+          <div class="flex items-start justify-between gap-3">
+            <div class="min-w-0">
+              <h2 class="truncate text-sm font-semibold text-gray-900 dark:text-gray-100">
+                {{ movement.product?.name }}
+              </h2>
+              <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+                {{ formatDateTime(movement.createdAt) }}
+              </p>
+            </div>
+            <BaseBadge :variant="typeVariant[movement.type]">{{ typeLabels[movement.type] }}</BaseBadge>
+          </div>
+          <dl class="grid grid-cols-2 gap-3 rounded-lg bg-gray-50 p-3 dark:bg-gray-900/50">
+            <div>
+              <dt class="text-xs text-gray-500 dark:text-gray-400">Quantidade</dt>
+              <dd class="mt-0.5 text-sm font-semibold text-gray-900 dark:text-gray-100">
+                {{ Number(movement.quantity) }}
+              </dd>
+            </div>
+            <div>
+              <dt class="text-xs text-gray-500 dark:text-gray-400">Saldo após</dt>
+              <dd class="mt-0.5 text-sm text-gray-700 dark:text-gray-300">{{ Number(movement.balanceAfter) }}</dd>
+            </div>
+          </dl>
+        </article>
+      </div>
+      <table class="hidden min-w-full divide-y divide-gray-200 dark:divide-gray-700 sm:table">
         <thead class="bg-gray-50 dark:bg-gray-900/60">
           <tr>
             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Data</th>

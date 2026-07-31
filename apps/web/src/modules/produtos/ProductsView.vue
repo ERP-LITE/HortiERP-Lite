@@ -258,7 +258,9 @@ onMounted(loadAll)
         <SearchInput v-model="search" placeholder="Buscar por nome, SKU ou código de barras..." />
         <FilterButton :active="activeFilterCount" @click="openFilterModal" />
         <PrintButton />
-        <BaseButton v-if="canManage" @click="openCreateModal"><Plus :size="16" /> Novo produto</BaseButton>
+        <BaseButton v-if="canManage" class="!px-2.5 sm:!px-4" title="Novo produto" aria-label="Novo produto" @click="openCreateModal">
+          <Plus :size="16" /> <span class="hidden sm:inline">Novo produto</span>
+        </BaseButton>
       </template>
     </PageHeader>
 
@@ -273,7 +275,7 @@ onMounted(loadAll)
     />
 
     <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-x-auto">
-      <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+      <table v-mobile-accordion class="mobile-accordion-table min-w-full divide-y divide-gray-200 dark:divide-gray-700">
         <thead class="bg-gray-50 dark:bg-gray-900/60">
           <tr>
             <th v-if="canManage" class="print:hidden w-12 px-4 py-3">
@@ -393,9 +395,9 @@ onMounted(loadAll)
         </div>
 
         <div class="grid grid-cols-3 gap-4">
-          <BaseInput v-model="form.costPrice" type="number" step="0.01" label="Custo (R$)" />
-          <BaseInput v-model="form.salePrice" type="number" step="0.01" label="Venda (R$)" />
-          <BaseInput v-model="form.minStock" type="number" step="0.001" label="Estoque mínimo" required />
+          <BaseInput v-model="form.costPrice" :decimal-places="2" label="Custo (R$)" />
+          <BaseInput v-model="form.salePrice" :decimal-places="2" label="Venda (R$)" />
+          <BaseInput v-model="form.minStock" :decimal-places="3" label="Estoque mínimo" required />
         </div>
 
         <BaseToggle v-model="form.active" label="Produto ativo" />

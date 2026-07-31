@@ -169,7 +169,7 @@ onMounted(loadActiveTab)
         v-if="activeTab === 'estoque'"
         class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden"
       >
-        <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+        <table v-mobile-accordion class="mobile-accordion-table min-w-full divide-y divide-gray-200 dark:divide-gray-700">
           <thead class="bg-gray-50 dark:bg-gray-900/60">
             <tr>
               <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
@@ -201,7 +201,7 @@ onMounted(loadActiveTab)
           <div class="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
             <h2 class="text-sm font-semibold text-gray-700 dark:text-gray-300">Perdas por motivo</h2>
           </div>
-          <table class="min-w-full divide-y divide-gray-100 dark:divide-gray-700">
+          <table v-mobile-accordion class="mobile-accordion-table min-w-full divide-y divide-gray-100 dark:divide-gray-700">
             <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
               <tr v-if="lossesReport.byReason.length === 0">
                 <td class="px-4 py-4 text-sm text-gray-500 dark:text-gray-400 text-center">
@@ -225,7 +225,7 @@ onMounted(loadActiveTab)
           <div class="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
             <h2 class="text-sm font-semibold text-gray-700 dark:text-gray-300">Detalhamento</h2>
           </div>
-          <table class="min-w-full divide-y divide-gray-100 dark:divide-gray-700">
+          <table v-mobile-accordion class="mobile-accordion-table min-w-full divide-y divide-gray-100 dark:divide-gray-700">
             <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
               <tr v-if="filteredLossItems.length === 0">
                 <td class="px-4 py-4 text-sm text-gray-500 dark:text-gray-400 text-center">
@@ -255,7 +255,7 @@ onMounted(loadActiveTab)
         v-else-if="activeTab === 'entradas'"
         class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden"
       >
-        <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+        <table v-mobile-accordion class="mobile-accordion-table min-w-full divide-y divide-gray-200 dark:divide-gray-700">
           <thead class="bg-gray-50 dark:bg-gray-900/60">
             <tr>
               <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">

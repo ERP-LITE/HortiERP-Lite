@@ -173,14 +173,16 @@ onMounted(loadAll)
         <SearchInput v-model="search" placeholder="Buscar por produto ou observação..." />
         <FilterButton :active="activeFilterCount" @click="openFilterModal" />
         <PrintButton />
-        <BaseButton @click="openCreateModal"><Plus :size="16" /> Registrar perda</BaseButton>
+        <BaseButton class="!px-2.5 sm:!px-4" title="Registrar perda" aria-label="Registrar perda" @click="openCreateModal">
+          <Plus :size="16" /> <span class="hidden sm:inline">Registrar perda</span>
+        </BaseButton>
       </template>
     </PageHeader>
 
     <p v-if="errorMessage" class="text-sm text-red-600 dark:text-red-400 mb-4">{{ errorMessage }}</p>
 
     <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-x-auto">
-      <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+      <table v-mobile-accordion class="mobile-accordion-table min-w-full divide-y divide-gray-200 dark:divide-gray-700">
         <thead class="bg-gray-50 dark:bg-gray-900/60">
           <tr>
             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Data</th>
@@ -243,8 +245,7 @@ onMounted(loadAll)
         <BaseSelect v-model="form.productId" label="Produto" :options="productOptions" :error="fieldErrors.productId" />
         <BaseInput
           v-model="form.quantity"
-          type="number"
-          step="0.001"
+          :decimal-places="3"
           label="Quantidade"
           :error="fieldErrors.quantity"
         />

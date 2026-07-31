@@ -22,7 +22,7 @@ watch(local, (value) => {
 </script>
 
 <template>
-  <div class="relative">
+  <div class="relative min-w-0 flex-1 sm:flex-none">
     <Search :size="16" class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
     <input
       v-model="local"
