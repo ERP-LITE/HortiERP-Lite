@@ -1,20 +1,12 @@
-import type { FastifyInstance, FastifyRequest } from 'fastify'
+import type { FastifyInstance } from 'fastify'
 import { db } from '../../db/client.js'
 import { systemLogs } from '../../db/schema/index.js'
-
-function getAuthenticatedUser(request: FastifyRequest) {
-  try {
-    return request.user
-  } catch {
-    return undefined
-  }
-}
 
 export function registerSystemLogsHook(app: FastifyInstance) {
   app.addHook('onResponse', async (request, reply) => {
     if (request.routeOptions.url === '/health' || request.routeOptions.url?.includes('/logs/')) return
 
-    const user = getAuthenticatedUser(request)
+    const user = request.user
     const statusCode = reply.statusCode
     const level = statusCode >= 500 ? 'error' : statusCode >= 400 ? 'warning' : 'info'
 

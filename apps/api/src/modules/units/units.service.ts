@@ -99,7 +99,7 @@ export async function deleteUnit(companyId: string, userId: string, id: string) 
 
   await db
     .update(units)
-    .set({ deletedAt: new Date(), updatedBy: userId })
+    .set({ deletedAt: new Date(), updatedBy: userId, updatedAt: new Date() })
     .where(and(eq(units.id, id), eq(units.companyId, companyId)))
 }
 

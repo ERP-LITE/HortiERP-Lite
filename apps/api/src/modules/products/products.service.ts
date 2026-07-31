@@ -159,7 +159,7 @@ export async function deleteProduct(companyId: string, userId: string, id: strin
 
   await db
     .update(products)
-    .set({ deletedAt: new Date(), updatedBy: userId })
+    .set({ deletedAt: new Date(), updatedBy: userId, updatedAt: new Date() })
     .where(and(eq(products.id, id), eq(products.companyId, companyId)))
 }
 

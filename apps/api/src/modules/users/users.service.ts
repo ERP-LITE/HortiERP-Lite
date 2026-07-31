@@ -126,7 +126,7 @@ export async function deleteUser(companyId: string, requesterId: string, id: str
 
   await db
     .update(users)
-    .set({ deletedAt: new Date(), active: false, updatedBy: requesterId })
+    .set({ deletedAt: new Date(), active: false, updatedBy: requesterId, updatedAt: new Date() })
     .where(and(eq(users.id, id), eq(users.companyId, companyId)))
 }
 
