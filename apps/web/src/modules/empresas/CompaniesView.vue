@@ -145,14 +145,16 @@ onMounted(loadCompanies)
     <PageHeader title="Empresas" subtitle="Cadastre e gerencie as empresas-cliente do sistema">
       <template #actions>
         <SearchInput v-model="search" placeholder="Buscar por nome ou documento..." />
-        <BaseButton @click="openCreateModal"><Plus :size="16" /> Nova empresa</BaseButton>
+        <BaseButton class="!px-2.5 sm:!px-4" title="Nova empresa" aria-label="Nova empresa" @click="openCreateModal">
+          <Plus :size="16" /> <span class="hidden sm:inline">Nova empresa</span>
+        </BaseButton>
       </template>
     </PageHeader>
 
     <p v-if="errorMessage" class="text-sm text-red-600 dark:text-red-400 mb-4">{{ errorMessage }}</p>
 
     <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-x-auto">
-      <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+      <table v-mobile-accordion class="mobile-accordion-table min-w-full divide-y divide-gray-200 dark:divide-gray-700">
         <thead class="bg-gray-50 dark:bg-gray-900/60">
           <tr>
             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Nome</th>

@@ -210,7 +210,9 @@ onMounted(loadUsers)
         <SearchInput v-model="search" placeholder="Buscar por nome ou e-mail..." />
         <FilterButton :active="activeFilterCount" @click="openFilterModal" />
         <PrintButton />
-        <BaseButton @click="openCreateModal"><Plus :size="16" /> Novo usuário</BaseButton>
+        <BaseButton class="!px-2.5 sm:!px-4" title="Novo usuário" aria-label="Novo usuário" @click="openCreateModal">
+          <Plus :size="16" /> <span class="hidden sm:inline">Novo usuário</span>
+        </BaseButton>
       </template>
     </PageHeader>
 
@@ -224,7 +226,7 @@ onMounted(loadUsers)
     />
 
     <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-x-auto">
-      <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+      <table v-mobile-accordion class="mobile-accordion-table min-w-full divide-y divide-gray-200 dark:divide-gray-700">
         <thead class="bg-gray-50 dark:bg-gray-900/60">
           <tr>
             <th class="print:hidden w-12 px-4 py-3">

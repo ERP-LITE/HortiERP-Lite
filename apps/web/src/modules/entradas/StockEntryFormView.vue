@@ -133,12 +133,11 @@ onMounted(loadProducts)
             />
             <BaseInput
               v-model="item.quantity"
-              type="number"
-              step="0.001"
+              :decimal-places="3"
               label="Quantidade"
               :error="itemErrors[index]?.quantity"
             />
-            <BaseInput v-model="item.unitCost" type="number" step="0.01" label="Custo unit. (opcional)" />
+            <BaseInput v-model="item.unitCost" :decimal-places="2" label="Custo unit. (opcional)" />
             <div class="flex flex-col">
               <span class="block text-sm font-medium mb-1 invisible">Remover</span>
               <button

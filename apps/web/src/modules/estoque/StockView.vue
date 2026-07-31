@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
-import { ArrowRight } from '@lucide/vue'
+import { History } from '@lucide/vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import BaseBadge from '@/components/ui/BaseBadge.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
@@ -105,17 +105,50 @@ onMounted(() => {
         <PrintButton />
         <RouterLink
           :to="{ name: 'movimentacoes' }"
-          class="inline-flex items-center gap-1 text-sm text-primary-600 hover:underline dark:text-primary-400"
+          class="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-lg bg-primary-600 px-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-700 sm:px-4"
+          title="Ver histórico de movimentações"
+          aria-label="Ver histórico de movimentações"
         >
-          Ver histórico de movimentações <ArrowRight :size="14" />
+          <History :size="18" /> <span class="hidden sm:inline">Ver histórico</span>
         </RouterLink>
       </template>
     </PageHeader>
 
     <p v-if="errorMessage" class="text-sm text-red-600 dark:text-red-400 mb-4">{{ errorMessage }}</p>
 
-    <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-x-auto">
-      <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+    <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700">
+      <div class="divide-y divide-gray-100 dark:divide-gray-700 sm:hidden">
+        <div v-if="loading" class="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">Carregando...</div>
+        <div v-else-if="products.length === 0" class="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">
+          Nenhum produto cadastrado.
+        </div>
+        <article v-for="product in products" v-else :key="product.id" class="space-y-3 p-4">
+          <div class="flex items-start justify-between gap-3">
+            <div class="min-w-0">
+              <h2 class="truncate text-sm font-semibold text-gray-900 dark:text-gray-100">{{ product.name }}</h2>
+              <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">{{ product.category?.name }}</p>
+            </div>
+            <BaseBadge v-if="Number(product.currentStock) <= Number(product.minStock)" variant="warning">
+              Estoque baixo
+            </BaseBadge>
+          </div>
+          <dl class="grid grid-cols-2 gap-3 rounded-lg bg-gray-50 p-3 dark:bg-gray-900/50">
+            <div>
+              <dt class="text-xs text-gray-500 dark:text-gray-400">Estoque atual</dt>
+              <dd class="mt-0.5 text-sm font-semibold text-gray-900 dark:text-gray-100">
+                {{ Number(product.currentStock) }} {{ product.unit?.abbreviation }}
+              </dd>
+            </div>
+            <div>
+              <dt class="text-xs text-gray-500 dark:text-gray-400">Estoque mínimo</dt>
+              <dd class="mt-0.5 text-sm text-gray-700 dark:text-gray-300">
+                {{ Number(product.minStock) }} {{ product.unit?.abbreviation }}
+              </dd>
+            </div>
+          </dl>
+        </article>
+      </div>
+      <table class="hidden min-w-full divide-y divide-gray-200 dark:divide-gray-700 sm:table">
         <thead class="bg-gray-50 dark:bg-gray-900/60">
           <tr>
             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">

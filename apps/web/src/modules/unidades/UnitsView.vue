@@ -147,7 +147,9 @@ onMounted(loadUnits)
       <template #actions>
         <SearchInput v-model="search" placeholder="Buscar por nome ou abreviação..." />
         <PrintButton />
-        <BaseButton v-if="canManage" @click="openCreateModal"><Plus :size="16" /> Nova unidade</BaseButton>
+        <BaseButton v-if="canManage" class="!px-2.5 sm:!px-4" title="Nova unidade" aria-label="Nova unidade" @click="openCreateModal">
+          <Plus :size="16" /> <span class="hidden sm:inline">Nova unidade</span>
+        </BaseButton>
       </template>
     </PageHeader>
 
@@ -162,7 +164,7 @@ onMounted(loadUnits)
     />
 
     <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
-      <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+      <table v-mobile-accordion class="mobile-accordion-table min-w-full divide-y divide-gray-200 dark:divide-gray-700">
         <thead class="bg-gray-50 dark:bg-gray-900/60">
           <tr>
             <th v-if="canManage" class="print:hidden w-12 px-4 py-3">
