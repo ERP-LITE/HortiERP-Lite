@@ -9,6 +9,7 @@ import Pagination from '@/components/ui/Pagination.vue'
 import SearchInput from '@/components/ui/SearchInput.vue'
 import PrintButton from '@/components/ui/PrintButton.vue'
 import BulkSelectionBar from '@/components/ui/BulkSelectionBar.vue'
+import TableCheckbox from '@/components/ui/TableCheckbox.vue'
 import { getApiErrorMessage, resolveFormError } from '@/services/api'
 import { confirmDelete, toastError, toastSuccess } from '@/lib/alerts'
 import { createUnit, deleteUnit, deleteUnits, listUnits, updateUnit, type UnitInput } from '@/services/unitsService'
@@ -165,12 +166,10 @@ onMounted(loadUnits)
         <thead class="bg-gray-50 dark:bg-gray-900/60">
           <tr>
             <th v-if="canManage" class="print:hidden w-12 px-4 py-3">
-              <input
-                type="checkbox"
-                class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+              <TableCheckbox
                 :checked="allVisibleSelected"
-                aria-label="Selecionar todas as unidades desta página"
-                @change="toggleAllVisible"
+                label="Selecionar todas as unidades desta página"
+                @toggle="toggleAllVisible"
               />
             </th>
             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Nome</th>
@@ -199,12 +198,10 @@ onMounted(loadUnits)
             @dblclick="canManage && openEditModal(unit)"
           >
             <td v-if="canManage" class="print:hidden px-4 py-3" @dblclick.stop @click.stop>
-              <input
-                type="checkbox"
-                class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+              <TableCheckbox
                 :checked="selectedIds.includes(unit.id)"
-                :aria-label="`Selecionar unidade ${unit.name}`"
-                @change="toggleOne(unit.id)"
+                :label="`Selecionar unidade ${unit.name}`"
+                @toggle="toggleOne(unit.id)"
               />
             </td>
             <td class="px-4 py-3 text-sm font-medium text-gray-900 dark:text-gray-100">{{ unit.name }}</td>

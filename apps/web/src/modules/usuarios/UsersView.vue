@@ -13,6 +13,7 @@ import FilterButton from '@/components/ui/FilterButton.vue'
 import PrintButton from '@/components/ui/PrintButton.vue'
 import SearchInput from '@/components/ui/SearchInput.vue'
 import BulkSelectionBar from '@/components/ui/BulkSelectionBar.vue'
+import TableCheckbox from '@/components/ui/TableCheckbox.vue'
 import { getApiErrorMessage, resolveFormError } from '@/services/api'
 import { confirmDelete, toastError, toastSuccess } from '@/lib/alerts'
 import { generateRandomPassword } from '@/lib/password'
@@ -227,12 +228,10 @@ onMounted(loadUsers)
         <thead class="bg-gray-50 dark:bg-gray-900/60">
           <tr>
             <th class="print:hidden w-12 px-4 py-3">
-              <input
-                type="checkbox"
-                class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+              <TableCheckbox
                 :checked="allVisibleSelected"
-                aria-label="Selecionar todos os usuários desta página"
-                @change="toggleAllVisible"
+                label="Selecionar todos os usuários desta página"
+                @toggle="toggleAllVisible"
               />
             </th>
             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Nome</th>
@@ -266,12 +265,10 @@ onMounted(loadUsers)
             @dblclick="openEditModal(user)"
           >
             <td class="print:hidden px-4 py-3" @dblclick.stop @click.stop>
-              <input
-                type="checkbox"
-                class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+              <TableCheckbox
                 :checked="selectedIds.includes(user.id)"
-                :aria-label="`Selecionar usuário ${user.name}`"
-                @change="toggleOne(user.id)"
+                :label="`Selecionar usuário ${user.name}`"
+                @toggle="toggleOne(user.id)"
               />
             </td>
             <td class="px-4 py-3 text-sm font-medium text-gray-900 dark:text-gray-100 whitespace-nowrap">
