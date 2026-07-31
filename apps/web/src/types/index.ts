@@ -154,14 +154,15 @@ export interface SystemLog {
   method: SystemLogMethod
   path: string
   statusCode: number
-  durationMs: number
   level: SystemLogLevel
-  errorCode: string | null
-  errorMessage: string | null
-  ip: string | null
-  userAgent: string | null
-  metadata: Record<string, unknown> | null
   createdAt: string
+  /** Presente apenas em `/logs/technical` (super_admin) */
+  durationMs?: number
+  errorCode?: string | null
+  errorMessage?: string | null
+  ip?: string | null
+  userAgent?: string | null
+  metadata?: Record<string, unknown> | null
 }
 
 export interface ApiErrorPayload {
