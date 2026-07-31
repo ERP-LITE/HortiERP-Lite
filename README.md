@@ -80,3 +80,26 @@ ERP-LITE/
 ## Status
 
 Projeto em desenvolvimento inicial (MVP). Consulte o `CLAUDE.md` para escopo e roadmap.
+
+## Produção
+
+O ambiente de produção usa imagens compiladas, Nginx para o frontend, Caddy para HTTPS, PostgreSQL privado, health
+checks, migrations obrigatórias e backups criptografados com teste seguro de restauração. Consulte o
+[guia de deploy](./docs/deploy-producao.md).
+
+## Testes
+
+A suíte de integração usa um PostgreSQL temporário e isolado na porta `5434`. Ela cobre isolamento multiempresa,
+permissões, invalidação de sessão, concorrência de estoque e impersonação.
+
+Com Docker disponível, execute na raiz:
+
+```bash
+npm test
+```
+
+O comando cria o container `hortierp-tests-postgres-test-1`, aplica as migrations, executa os testes e remove o
+container ao terminar. A suíte recusa executar se o nome do banco em `DATABASE_URL` não contiver `test`.
+
+O workflow em `.github/workflows/ci.yml` também executa os builds da API e do frontend, aplica as migrations em um
+banco descartável e roda a suíte a cada push e pull request.

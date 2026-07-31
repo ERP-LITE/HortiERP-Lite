@@ -1,0 +1,54 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: hortierp_test
+          POSTGRES_PASSWORD: hortierp_test
+          POSTGRES_DB: hortierp_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U hortierp_test -d hortierp_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgres://hortierp_test:hortierp_test@127.0.0.1:5432/hortierp_test
+      NODE_ENV: test
+      JWT_SECRET: integration-test-secret-with-at-least-32-characters
+      TURNSTILE_SECRET_KEY: 1x0000000000000000000000000000000AA
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build API
+        run: npm run build:api
+
+      - name: Build web
+        run: npm run build:web
+
+      - name: Apply test migrations
+        run: npm run db:migrate
+
+      - name: Run integration tests
+        run: npm run test:run --workspace=apps/api
