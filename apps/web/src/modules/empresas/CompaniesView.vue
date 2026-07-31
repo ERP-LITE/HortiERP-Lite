@@ -22,6 +22,7 @@ import {
 } from '@/services/companiesService'
 import { usePagination } from '@/composables/usePagination'
 import type { Company } from '@/types'
+import PlatformUsersPanel from './PlatformUsersPanel.vue'
 
 const { page, pageSize, total, totalPages, applyMeta } = usePagination()
 
@@ -210,6 +211,8 @@ onMounted(loadCompanies)
         @update:page-size="pageSize = $event"
       />
     </div>
+
+    <PlatformUsersPanel />
 
     <BaseModal :open="modalOpen" :title="editingId ? 'Editar empresa' : 'Nova empresa'" @close="modalOpen = false">
       <form v-if="editingId" class="space-y-4" @submit.prevent="handleSubmit">

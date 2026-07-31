@@ -17,7 +17,7 @@ import AppFooter from '@/components/AppFooter.vue'
       <Banana class="absolute bottom-1/3 right-1/4 h-32 w-32 text-primary-600/10 dark:text-primary-400/10 -rotate-12" />
     </div>
 
-    <div class="absolute top-4 right-4 z-10">
+    <div class="absolute top-4 right-4 z-20">
       <ThemeToggle />
     </div>
 
