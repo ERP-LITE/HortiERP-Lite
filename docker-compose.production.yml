@@ -1,0 +1,158 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?Defina POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Defina POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:?Defina POSTGRES_DB}
+    volumes:
+      - postgres_production_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - backend
+
+  migrate:
+    image: hortierp-api:${IMAGE_TAG:-latest}
+    environment: &api_environment
+      NODE_ENV: production
+      PORT: 3333
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      JWT_SECRET: ${JWT_SECRET:?Defina JWT_SECRET}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-8h}
+      TURNSTILE_SECRET_KEY: ${TURNSTILE_SECRET_KEY:?Defina TURNSTILE_SECRET_KEY}
+      CORS_ORIGIN: https://${APP_DOMAIN:?Defina APP_DOMAIN}
+      TRUST_PROXY: "true"
+    command: ["node", "dist/db/migrate.js"]
+    restart: "no"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - backend
+
+  api:
+    image: hortierp-api:${IMAGE_TAG:-latest}
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+      target: production
+    restart: unless-stopped
+    environment: *api_environment
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3333/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      start_period: 10s
+      retries: 5
+    networks:
+      - backend
+      - frontend
+
+  web:
+    image: hortierp-web:${IMAGE_TAG:-latest}
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      target: production
+      args:
+        VITE_API_URL: ""
+        VITE_TURNSTILE_SITE_KEY: ${VITE_TURNSTILE_SITE_KEY:?Defina VITE_TURNSTILE_SITE_KEY}
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    networks:
+      - frontend
+
+  gateway:
+    image: caddy:2.8-alpine
+    restart: unless-stopped
+    environment:
+      APP_DOMAIN: ${APP_DOMAIN:?Defina APP_DOMAIN}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      api:
+        condition: service_healthy
+      web:
+        condition: service_healthy
+    networks:
+      - frontend
+
+  backup:
+    build:
+      context: .
+      dockerfile: deploy/backup/Dockerfile
+    image: hortierp-backup:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    environment: &backup_environment
+      PGHOST: postgres
+      PGPORT: 5432
+      PGUSER: ${POSTGRES_USER:?Defina POSTGRES_USER}
+      PGPASSWORD: ${POSTGRES_PASSWORD:?Defina POSTGRES_PASSWORD}
+      PGDATABASE: ${POSTGRES_DB:?Defina POSTGRES_DB}
+      BACKUP_ENCRYPTION_PASSWORD: ${BACKUP_ENCRYPTION_PASSWORD:?Defina BACKUP_ENCRYPTION_PASSWORD}
+      BACKUP_INTERVAL_SECONDS: ${BACKUP_INTERVAL_SECONDS:-86400}
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-30}
+      BACKUP_REMOTE_PATH: ${BACKUP_REMOTE_PATH:-}
+      RCLONE_CONFIG_STORAGE_TYPE: ${RCLONE_CONFIG_STORAGE_TYPE:-}
+      RCLONE_CONFIG_STORAGE_PROVIDER: ${RCLONE_CONFIG_STORAGE_PROVIDER:-}
+      RCLONE_CONFIG_STORAGE_ACCESS_KEY_ID: ${RCLONE_CONFIG_STORAGE_ACCESS_KEY_ID:-}
+      RCLONE_CONFIG_STORAGE_SECRET_ACCESS_KEY: ${RCLONE_CONFIG_STORAGE_SECRET_ACCESS_KEY:-}
+      RCLONE_CONFIG_STORAGE_ENDPOINT: ${RCLONE_CONFIG_STORAGE_ENDPOINT:-}
+      RCLONE_CONFIG_STORAGE_ACL: private
+    volumes:
+      - backup_data:/backups
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD-SHELL", "test -f /backups/.last-success && find /backups/.last-success -mmin -2880 | grep -q ."]
+      interval: 15m
+      timeout: 5s
+      start_period: 2m
+      retries: 3
+    networks:
+      - backend
+
+  restore-check:
+    image: hortierp-backup:${IMAGE_TAG:-latest}
+    profiles: ["maintenance"]
+    environment:
+      <<: *backup_environment
+      RESTORE_TEST_DATABASE: hortierp_restore_test
+    command: ["/usr/local/bin/restore-test.sh"]
+    volumes:
+      - backup_data:/backups:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - backend
+
+volumes:
+  postgres_production_data:
+  caddy_data:
+  caddy_config:
+  backup_data:
+
+networks:
+  backend:
+    internal: true
+  frontend:

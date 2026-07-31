@@ -19,8 +19,9 @@ import { reportsRoutes } from './modules/reports/reports.routes.js'
 import { logsRoutes } from './modules/logs/logs.routes.js'
 import { registerSystemLogsHook } from './modules/logs/logs.hook.js'
 
-export function buildApp() {
+export function buildApp(options: { systemLogs?: boolean } = {}) {
   const app = Fastify({
+    trustProxy: env.TRUST_PROXY,
     logger: {
       level: env.NODE_ENV === 'production' ? 'info' : 'debug',
       transport:
@@ -52,7 +53,7 @@ export function buildApp() {
   })
 
   app.setErrorHandler(errorHandler)
-  registerSystemLogsHook(app)
+  if (options.systemLogs !== false) registerSystemLogsHook(app)
 
   app.get('/health', async () => ({ status: 'ok' }))
 
