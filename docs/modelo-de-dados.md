@@ -20,6 +20,7 @@ erDiagram
   COMPANIES ||--o{ STOCK_ENTRIES : ""
   COMPANIES ||--o{ LOSSES : ""
   COMPANIES ||--o{ STOCK_MOVEMENTS : ""
+  COMPANIES ||--o{ SYSTEM_LOGS : ""
   CATEGORIES ||--o{ PRODUCTS : classifica
   UNITS ||--o{ PRODUCTS : mede
   STOCK_ENTRIES ||--o{ STOCK_ENTRY_ITEMS : contem
@@ -97,6 +98,22 @@ Histórico append-only de toda variação de estoque — nunca é editado ou apa
 | `createdAt`, `createdBy` | | sem `updatedBy`/`deletedAt` — registro imutável |
 
 **Nota:** o valor `ajuste` do enum existe e já é aceito como filtro em `GET /stock/movements`, mas nenhum fluxo do sistema cria movimentos desse tipo hoje — é espaço reservado para uma futura tela de "ajuste manual de estoque" (contagem/inventário), ainda não implementada.
+
+### `system_logs`
+Registro append-only das requisições processadas pela API, usado para diagnóstico técnico da plataforma e auditoria de atividades por empresa.
+
+| Coluna | Tipo | Observação |
+|---|---|---|
+| `id` | uuid | PK |
+| `companyId` | uuid | FK opcional; nulo em requisições públicas sem empresa identificada |
+| `actorId`, `actorRole` | uuid/text | usuário e papel presentes na sessão |
+| `method`, `path`, `statusCode`, `durationMs` | text/integer | dados da operação HTTP |
+| `level` | text | `info`, `warning` ou `error`, derivado do status HTTP |
+| `errorCode`, `errorMessage` | text | preenchidos quando a requisição falha |
+| `ip`, `userAgent`, `metadata` | text/jsonb | contexto técnico; não inclui corpo, senha, cookie ou token |
+| `createdAt` | timestamp | momento do evento |
+
+Índices por data, nível e empresa/data sustentam os filtros das telas. A tabela não possui edição ou exclusão pela aplicação.
 
 ## Enums (`apps/api/src/db/schema/enums.ts`)
 

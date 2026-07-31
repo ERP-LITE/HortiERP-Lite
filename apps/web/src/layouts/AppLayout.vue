@@ -6,6 +6,8 @@ import {
   BarChart3,
   Building2,
   LayoutDashboard,
+  FileClock,
+  Bug,
   LogOut,
   Menu,
   PackagePlus,
@@ -50,6 +52,7 @@ const navItems = computed(() => {
     return [
       { name: 'selecionar-empresa', label: 'Selecionar empresa', icon: Store },
       { name: 'empresas', label: 'Configurações', icon: Building2 },
+      { name: 'logs-tecnicos', label: 'Logs técnicos', icon: Bug },
     ]
   }
 
@@ -66,6 +69,7 @@ const navItems = computed(() => {
 
   if (auth.user?.role === 'admin') {
     items.push({ name: 'usuarios', label: 'Usuários', icon: Users })
+    items.push({ name: 'logs-atividades', label: 'Logs de atividades', icon: FileClock })
   }
 
   return items
