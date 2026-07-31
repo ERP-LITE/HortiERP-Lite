@@ -16,6 +16,17 @@ import {
   setCompanyActive,
   updateCompany,
 } from './companies.service.js'
+import {
+  createPlatformUserSchema,
+  listPlatformUsersQuerySchema,
+  updatePlatformUserSchema,
+} from './platform-users.schema.js'
+import {
+  createPlatformUser,
+  deletePlatformUser,
+  listPlatformUsers,
+  updatePlatformUser,
+} from './platform-users.service.js'
 
 export async function companiesRoutes(app: FastifyInstance) {
   app.addHook('preHandler', authenticate)
@@ -24,6 +35,27 @@ export async function companiesRoutes(app: FastifyInstance) {
   app.get('/companies', async (request) => {
     const query = listCompaniesQuerySchema.parse(request.query)
     return listCompanies(query)
+  })
+
+  app.get('/platform-users', async (request) => {
+    const query = listPlatformUsersQuerySchema.parse(request.query)
+    return listPlatformUsers(request.user.companyId, query)
+  })
+
+  app.post('/platform-users', async (request, reply) => {
+    const data = createPlatformUserSchema.parse(request.body)
+    const user = await createPlatformUser(request.user.companyId, request.user.sub, data)
+    return reply.status(201).send(user)
+  })
+
+  app.put<{ Params: { id: string } }>('/platform-users/:id', async (request) => {
+    const data = updatePlatformUserSchema.parse(request.body)
+    return updatePlatformUser(request.user.companyId, request.user.sub, request.params.id, data)
+  })
+
+  app.delete<{ Params: { id: string } }>('/platform-users/:id', async (request, reply) => {
+    await deletePlatformUser(request.user.companyId, request.user.sub, request.params.id)
+    return reply.status(204).send()
   })
 
   app.get<{ Params: { id: string } }>('/companies/:id', async (request) => {
