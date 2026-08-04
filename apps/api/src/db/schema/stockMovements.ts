@@ -16,6 +16,7 @@ export const stockMovements = pgTable('stock_movements', {
   balanceAfter: numeric('balance_after', { precision: 12, scale: 3 }).notNull(),
   referenceType: text('reference_type').notNull(),
   referenceId: uuid('reference_id').notNull(),
+  notes: text('notes'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   createdBy: uuid('created_by'),
 }, (table) => ({

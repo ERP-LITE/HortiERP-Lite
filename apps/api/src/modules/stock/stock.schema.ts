@@ -18,3 +18,11 @@ export const listStockMovementsQuerySchema = paginationQuerySchema.extend({
 })
 
 export type ListStockMovementsQuery = z.infer<typeof listStockMovementsQuerySchema>
+
+export const createStockAdjustmentSchema = z.object({
+  productId: z.string().uuid('Produto inválido'),
+  quantity: z.coerce.number().min(0, 'Quantidade não pode ser negativa'),
+  notes: z.string().trim().min(1, 'Informe o motivo do ajuste'),
+})
+
+export type CreateStockAdjustmentInput = z.infer<typeof createStockAdjustmentSchema>

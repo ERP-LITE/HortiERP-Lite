@@ -28,3 +28,14 @@ export async function listStockMovements(params: ListStockMovementsParams) {
   const { data } = await api.get<PaginatedResult<StockMovement>>('/stock/movements', { params })
   return data
 }
+
+export interface AdjustStockPayload {
+  productId: string
+  quantity: number
+  notes: string
+}
+
+export async function adjustStock(payload: AdjustStockPayload) {
+  const { data } = await api.post<StockMovement>('/stock/adjust', payload)
+  return data
+}

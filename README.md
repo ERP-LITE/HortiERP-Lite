@@ -90,7 +90,8 @@ checks, migrations obrigatórias e backups criptografados com teste seguro de re
 ## Testes
 
 A suíte de integração usa um PostgreSQL temporário e isolado na porta `5434`. Ela cobre isolamento multiempresa,
-permissões, invalidação de sessão, concorrência de estoque e impersonação.
+permissões, invalidação de sessão, concorrência de estoque, busca/paginação, integridade de dados (índices únicos)
+e impersonação.
 
 Com Docker disponível, execute na raiz:
 

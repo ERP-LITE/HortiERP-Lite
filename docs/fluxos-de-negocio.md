@@ -32,9 +32,17 @@ Tudo em uma transação — perda só é registrada se o estoque puder de fato s
 
 ## Consulta de estoque
 
-Tela `/estoque` (`GET /stock`): lista produtos ativos com estoque atual, com filtro "só estoque baixo" (`currentStock <= minStock`, comparação feita no banco). Tela `/estoque/movimentacoes` (`GET /stock/movements`): histórico completo e imutável de todo `stock_movements` gerado pelos dois fluxos acima, filtrável por produto/tipo/período.
+Tela `/estoque` (`GET /stock`): lista produtos ativos com estoque atual, com filtro "só estoque baixo" (`currentStock <= minStock`, comparação feita no banco). Tela `/estoque/movimentacoes` (`GET /stock/movements`): histórico completo e imutável de todo `stock_movements` gerado pelos três fluxos abaixo, filtrável por produto/tipo/período.
 
-Não existe ainda fluxo de **ajuste manual de estoque** (contagem/inventário) — o tipo `ajuste` já existe no enum de movimentação e no filtro da listagem, reservado para essa futura tela.
+## Ajuste manual de estoque
+
+Tela `/estoque`, botão de editar (ícone de lápis) na linha do produto. Rota `POST /stock/adjust`, service `stock.service.ts::createStockAdjustment`. Exige `admin` ou `gerente` — ao contrário de entrada/perda, não é uma operação do dia a dia do estoquista, e sim uma correção que sobrescreve o saldo calculado pelo sistema sem passar pelas validações de fornecedor/motivo dos outros fluxos, então fica no mesmo padrão de permissão dos módulos de cadastro (ver decisões arquiteturais).
+
+O usuário informa a **nova quantidade absoluta** em estoque (o formulário já vem preenchido com o valor atual, como qualquer edição) e um motivo obrigatório (ex: "contagem física apontou divergência"). O modal exibe um aviso deixando claro que esse caminho é só para corrigir divergências de contagem/inventário — entradas e perdas continuam sendo lançadas pelas telas próprias.
+
+1. Lê o `currentStock` atual do produto com lock de linha (`SELECT ... FOR UPDATE`) dentro de uma transação.
+2. Se a nova quantidade for igual à atual, rejeita com `422` (nada a ajustar).
+3. Atualiza `products.currentStock` para o novo valor e grava um `stock_movements` com `type: 'ajuste'`, `quantity` = diferença (novo − antigo, pode ser positiva ou negativa) e `balanceAfter` = novo saldo. O motivo informado é salvo na coluna `notes` do movimento e aparece no histórico de movimentações.
 
 ## Dashboard
 

@@ -91,13 +91,12 @@ Histórico append-only de toda variação de estoque — nunca é editado ou apa
 |---|---|---|
 | `id` | uuid | PK |
 | `companyId`, `productId` | uuid | FKs |
-| `type` | enum `movement_type` | `entrada` \| `perda` \| `ajuste` (`ajuste` reservado, ver nota abaixo) |
-| `quantity` | numeric(12,3) | positiva em entradas, **negativa** em perdas |
+| `type` | enum `movement_type` | `entrada` \| `perda` \| `ajuste` |
+| `quantity` | numeric(12,3) | positiva em entradas, **negativa** em perdas, positiva ou negativa em ajustes (diferença entre saldo novo e antigo) |
 | `balanceAfter` | numeric(12,3) | saldo do produto após o movimento (snapshot, não recalculado) |
-| `referenceType`, `referenceId` | text/uuid | aponta pra `stock_entry` ou `loss` que originou o movimento |
+| `referenceType`, `referenceId` | text/uuid | em `entrada`/`perda`, aponta pra `stock_entry`/`loss` que originou o movimento; em `ajuste`, não existe entidade própria, então `referenceType: 'adjustment'` e `referenceId` é o próprio `productId` |
+| `notes` | text | nulável; só preenchido em `ajuste`, com o motivo digitado pelo usuário (ver [fluxo de ajuste manual](./fluxos-de-negocio.md#ajuste-manual-de-estoque)) |
 | `createdAt`, `createdBy` | | sem `updatedBy`/`deletedAt` — registro imutável |
-
-**Nota:** o valor `ajuste` do enum existe e já é aceito como filtro em `GET /stock/movements`, mas nenhum fluxo do sistema cria movimentos desse tipo hoje — é espaço reservado para uma futura tela de "ajuste manual de estoque" (contagem/inventário), ainda não implementada.
 
 ### `system_logs`
 Registro append-only das requisições processadas pela API, usado para diagnóstico técnico da plataforma e auditoria de atividades por empresa.

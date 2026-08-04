@@ -36,6 +36,13 @@
       "when": 1785844900914,
       "tag": "0004_hard_owl",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1785848099330,
+      "tag": "0005_dusty_meltdown",
+      "breakpoints": true
     }
   ]
 }

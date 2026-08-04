@@ -1,8 +1,9 @@
 import { and, asc, count, desc, eq, gte, ilike, inArray, isNull, lte, or } from 'drizzle-orm'
 import { db } from '../../db/client.js'
 import { products, stockMovements } from '../../db/schema/index.js'
+import { AppError } from '../../shared/errors/AppError.js'
 import { buildPaginatedResult } from '../../shared/db/paginate.js'
-import type { ListStockMovementsQuery, ListStockQuery } from './stock.schema.js'
+import type { CreateStockAdjustmentInput, ListStockMovementsQuery, ListStockQuery } from './stock.schema.js'
 
 export async function listCurrentStock(companyId: string, query: ListStockQuery) {
   const conditions = [eq(products.companyId, companyId), isNull(products.deletedAt)]
@@ -53,4 +54,47 @@ export async function listStockMovements(companyId: string, query: ListStockMove
   ])
 
   return buildPaginatedResult(data, total, query.page, query.pageSize)
+}
+
+export async function createStockAdjustment(companyId: string, userId: string, data: CreateStockAdjustmentInput) {
+  return db.transaction(async (tx) => {
+    const [product] = await tx
+      .select({ currentStock: products.currentStock })
+      .from(products)
+      .where(and(eq(products.id, data.productId), eq(products.companyId, companyId), isNull(products.deletedAt)))
+      .for('update')
+
+    if (!product) throw AppError.notFound('Produto não encontrado')
+
+    const previousStock = Number(product.currentStock)
+    const delta = data.quantity - previousStock
+
+    if (delta === 0) {
+      throw new AppError('A nova quantidade informada é igual ao estoque atual', 422, 'NO_CHANGE')
+    }
+
+    const newStock = data.quantity.toString()
+
+    await tx
+      .update(products)
+      .set({ currentStock: newStock, updatedAt: new Date(), updatedBy: userId })
+      .where(and(eq(products.id, data.productId), eq(products.companyId, companyId)))
+
+    const [movement] = await tx
+      .insert(stockMovements)
+      .values({
+        companyId,
+        productId: data.productId,
+        type: 'ajuste',
+        quantity: delta.toString(),
+        balanceAfter: newStock,
+        referenceType: 'adjustment',
+        referenceId: data.productId,
+        notes: data.notes,
+        createdBy: userId,
+      })
+      .returning()
+
+    return movement
+  })
 }

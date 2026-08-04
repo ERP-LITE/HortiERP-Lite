@@ -167,6 +167,7 @@ onMounted(() => {
               <dd class="mt-0.5 text-sm text-gray-700 dark:text-gray-300">{{ Number(movement.balanceAfter) }}</dd>
             </div>
           </dl>
+          <p v-if="movement.notes" class="text-xs text-gray-500 dark:text-gray-400">{{ movement.notes }}</p>
         </article>
       </div>
       <table class="hidden min-w-full divide-y divide-gray-200 dark:divide-gray-700 sm:table">
@@ -183,14 +184,17 @@ onMounted(() => {
             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
               Saldo após
             </th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+              Motivo
+            </th>
           </tr>
         </thead>
         <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
           <tr v-if="loading">
-            <td colspan="5" class="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">Carregando...</td>
+            <td colspan="6" class="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">Carregando...</td>
           </tr>
           <tr v-else-if="movements.length === 0">
-            <td colspan="5" class="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">
+            <td colspan="6" class="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">
               Nenhuma movimentação registrada.
             </td>
           </tr>
@@ -210,6 +214,7 @@ onMounted(() => {
             <td class="px-4 py-3 text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">
               {{ Number(movement.balanceAfter) }}
             </td>
+            <td class="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">{{ movement.notes || '—' }}</td>
           </tr>
         </tbody>
       </table>
