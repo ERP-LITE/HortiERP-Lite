@@ -1,4 +1,4 @@
-import { numeric, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core'
+import { index, numeric, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core'
 import { companies } from './companies.js'
 import { products } from './products.js'
 import { movementTypeEnum } from './enums.js'
@@ -18,4 +18,7 @@ export const stockMovements = pgTable('stock_movements', {
   referenceId: uuid('reference_id').notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   createdBy: uuid('created_by'),
-})
+}, (table) => ({
+  companyCreatedAtIdx: index('stock_movements_company_created_at_idx').on(table.companyId, table.createdAt),
+  companyProductIdx: index('stock_movements_company_product_idx').on(table.companyId, table.productId),
+}))

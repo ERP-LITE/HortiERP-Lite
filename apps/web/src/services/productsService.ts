@@ -1,5 +1,6 @@
 import { api } from './api'
 import type { PaginatedResult, Product } from '@/types'
+import { fetchAllPages } from './paginatedOptions'
 
 export interface ProductInput {
   categoryId: string
@@ -24,6 +25,10 @@ export interface ListProductsParams {
 export async function listProducts(params: ListProductsParams) {
   const { data } = await api.get<PaginatedResult<Product>>('/products', { params })
   return data
+}
+
+export function listAllProducts(params: Omit<ListProductsParams, 'page' | 'pageSize'> = {}) {
+  return fetchAllPages((page, pageSize) => listProducts({ ...params, page, pageSize }))
 }
 
 export async function createProduct(payload: ProductInput) {

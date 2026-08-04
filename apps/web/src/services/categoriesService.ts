@@ -1,5 +1,6 @@
 import { api } from './api'
 import type { Category, PaginatedResult } from '@/types'
+import { fetchAllPages } from './paginatedOptions'
 
 export interface CategoryInput {
   name: string
@@ -15,6 +16,10 @@ export interface ListCategoriesParams {
 export async function listCategories(params: ListCategoriesParams) {
   const { data } = await api.get<PaginatedResult<Category>>('/categories', { params })
   return data
+}
+
+export function listAllCategories(params: Omit<ListCategoriesParams, 'page' | 'pageSize'> = {}) {
+  return fetchAllPages((page, pageSize) => listCategories({ ...params, page, pageSize }))
 }
 
 export async function createCategory(payload: CategoryInput) {

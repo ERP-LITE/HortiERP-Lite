@@ -13,7 +13,7 @@ import PeriodPicker from '@/components/ui/PeriodPicker.vue'
 import type { PeriodValue } from '@/lib/period'
 import { getApiErrorMessage } from '@/services/api'
 import { listStockMovements } from '@/services/stockService'
-import { listProducts } from '@/services/productsService'
+import { listAllProducts } from '@/services/productsService'
 import { usePagination } from '@/composables/usePagination'
 import type { MovementType, Product, StockMovement } from '@/types'
 
@@ -88,7 +88,7 @@ async function loadMovements() {
 
 async function loadProductOptions() {
   try {
-    products.value = (await listProducts({ page: 1, pageSize: 100 })).data
+    products.value = await listAllProducts()
   } catch (error) {
     errorMessage.value = getApiErrorMessage(error)
   }

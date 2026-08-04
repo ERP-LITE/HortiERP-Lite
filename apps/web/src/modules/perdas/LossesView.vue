@@ -15,7 +15,7 @@ import PeriodPicker from '@/components/ui/PeriodPicker.vue'
 import type { PeriodValue } from '@/lib/period'
 import { getApiErrorMessage, resolveFormError } from '@/services/api'
 import { toastSuccess } from '@/lib/alerts'
-import { listProducts } from '@/services/productsService'
+import { listAllProducts } from '@/services/productsService'
 import { createLoss, listLosses } from '@/services/lossesService'
 import { usePagination } from '@/composables/usePagination'
 import type { Loss, LossReason, Product } from '@/types'
@@ -87,8 +87,7 @@ async function loadLosses() {
 
 async function loadProductOptions() {
   try {
-    const result = await listProducts({ page: 1, pageSize: 100 })
-    products.value = result.data
+    products.value = await listAllProducts({ active: true })
   } catch (error) {
     errorMessage.value = getApiErrorMessage(error)
   }
@@ -242,7 +241,13 @@ onMounted(loadAll)
 
     <BaseModal :open="modalOpen" title="Registrar perda" @close="modalOpen = false">
       <form class="space-y-4" @submit.prevent="handleSubmit">
-        <BaseSelect v-model="form.productId" label="Produto" :options="productOptions" :error="fieldErrors.productId" />
+        <BaseSelect
+          v-model="form.productId"
+          label="Produto"
+          :options="productOptions"
+          :error="fieldErrors.productId"
+          searchable
+        />
         <BaseInput
           v-model="form.quantity"
           :decimal-places="3"
@@ -263,7 +268,7 @@ onMounted(loadAll)
 
     <BaseModal :open="filterModalOpen" title="Filtrar perdas" @close="filterModalOpen = false">
       <form class="space-y-4" @submit.prevent="applyFilters">
-        <BaseSelect v-model="draftFilters.productId" label="Produto" :options="productFilterOptions" />
+        <BaseSelect v-model="draftFilters.productId" label="Produto" :options="productFilterOptions" searchable />
         <BaseSelect v-model="draftFilters.reason" label="Motivo" :options="reasonFilterOptions" />
         <PeriodPicker v-model="draftFilters.period" />
 

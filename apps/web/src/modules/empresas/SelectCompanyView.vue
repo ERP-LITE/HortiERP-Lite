@@ -6,7 +6,7 @@ import PageHeader from '@/components/ui/PageHeader.vue'
 import BaseBadge from '@/components/ui/BaseBadge.vue'
 import { getApiErrorMessage } from '@/services/api'
 import { toastError } from '@/lib/alerts'
-import { listCompanies } from '@/services/companiesService'
+import { listAllCompanies } from '@/services/companiesService'
 import { useAuthStore } from '@/stores/auth'
 import type { Company } from '@/types'
 
@@ -20,8 +20,7 @@ const entering = ref<string | null>(null)
 async function loadCompanies() {
   loading.value = true
   try {
-    const result = await listCompanies({ page: 1, pageSize: 100 })
-    companies.value = result.data
+    companies.value = await listAllCompanies()
   } catch (error) {
     toastError(getApiErrorMessage(error, 'Não foi possível carregar as empresas'))
   } finally {

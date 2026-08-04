@@ -1,5 +1,5 @@
 import { api } from './api'
-import type { Loss, StockEntry } from '@/types'
+import type { Loss, PaginatedResult, StockEntry } from '@/types'
 
 export interface StockByCategoryRow {
   categoryId: string
@@ -8,14 +8,16 @@ export interface StockByCategoryRow {
   totalStock: number
 }
 
-export interface LossesReport {
-  items: Loss[]
+export interface LossesReport extends PaginatedResult<Loss> {
   byReason: { reason: string; quantity: number; occurrences: number }[]
 }
 
 export interface DateRangeParams {
   from?: string
   to?: string
+  search?: string
+  page?: number
+  pageSize?: number
 }
 
 export async function fetchStockByCategoryReport() {
@@ -29,6 +31,6 @@ export async function fetchLossesReport(params: DateRangeParams = {}) {
 }
 
 export async function fetchStockEntriesReport(params: DateRangeParams = {}) {
-  const { data } = await api.get<StockEntry[]>('/reports/stock-entries', { params })
+  const { data } = await api.get<PaginatedResult<StockEntry>>('/reports/stock-entries', { params })
   return data
 }

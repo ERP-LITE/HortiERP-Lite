@@ -8,6 +8,8 @@ import FilterButton from '@/components/ui/FilterButton.vue'
 import PrintButton from '@/components/ui/PrintButton.vue'
 import SearchInput from '@/components/ui/SearchInput.vue'
 import PeriodPicker from '@/components/ui/PeriodPicker.vue'
+import Pagination from '@/components/ui/Pagination.vue'
+import { usePagination } from '@/composables/usePagination'
 import type { PeriodValue } from '@/lib/period'
 import { getApiErrorMessage } from '@/services/api'
 import {
@@ -28,6 +30,7 @@ const tabs = [
 type TabKey = (typeof tabs)[number]['key']
 
 const activeTab = ref<TabKey>('estoque')
+const { page, pageSize, total, totalPages, applyMeta } = usePagination()
 const loading = ref(false)
 const errorMessage = ref('')
 
@@ -47,14 +50,16 @@ function openFilterModal() {
 function applyFilters() {
   period.value = { ...draftPeriod.value }
   filterModalOpen.value = false
-  loadActiveTab()
+  if (page.value !== 1) page.value = 1
+  else loadActiveTab()
 }
 
 function clearFilters() {
   period.value = { preset: 'todos', from: '', to: '' }
   draftPeriod.value = { ...period.value }
   filterModalOpen.value = false
-  loadActiveTab()
+  if (page.value !== 1) page.value = 1
+  else loadActiveTab()
 }
 
 const stockByCategory = ref<StockByCategoryRow[]>([])
@@ -79,16 +84,10 @@ function matches(text: string | null | undefined) {
 const filteredStockByCategory = computed(() => stockByCategory.value.filter((row) => matches(row.categoryName)))
 
 const filteredLossItems = computed(() =>
-  (lossesReport.value?.items ?? []).filter(
-    (loss) => matches(loss.product?.name) || matches(reasonLabels[loss.reason] ?? loss.reason) || matches(loss.notes),
-  ),
+  lossesReport.value?.data ?? [],
 )
 
-const filteredStockEntries = computed(() =>
-  stockEntriesReport.value.filter(
-    (entry) => matches(entry.supplierName) || entry.items.some((item) => matches(item.product.name)),
-  ),
-)
+const filteredStockEntries = computed(() => stockEntriesReport.value)
 
 function formatDate(value: string) {
   return new Date(value).toLocaleDateString('pt-BR')
@@ -104,11 +103,27 @@ async function loadStockByCategory() {
 }
 
 async function loadLosses() {
-  lossesReport.value = await fetchLossesReport({ from: from.value || undefined, to: to.value || undefined })
+  const result = await fetchLossesReport({
+    from: from.value || undefined,
+    to: to.value || undefined,
+    search: search.value || undefined,
+    page: page.value,
+    pageSize: pageSize.value,
+  })
+  lossesReport.value = result
+  applyMeta(result)
 }
 
 async function loadStockEntries() {
-  stockEntriesReport.value = await fetchStockEntriesReport({ from: from.value || undefined, to: to.value || undefined })
+  const result = await fetchStockEntriesReport({
+    from: from.value || undefined,
+    to: to.value || undefined,
+    search: search.value || undefined,
+    page: page.value,
+    pageSize: pageSize.value,
+  })
+  stockEntriesReport.value = result.data
+  applyMeta(result)
 }
 
 async function loadActiveTab() {
@@ -125,7 +140,18 @@ async function loadActiveTab() {
   }
 }
 
-watch(activeTab, loadActiveTab)
+watch(activeTab, () => {
+  if (page.value !== 1) page.value = 1
+  else loadActiveTab()
+})
+watch(search, () => {
+  if (activeTab.value === 'estoque') return
+  if (page.value !== 1) page.value = 1
+  else loadActiveTab()
+})
+watch([page, pageSize], () => {
+  if (activeTab.value !== 'estoque') loadActiveTab()
+})
 onMounted(loadActiveTab)
 </script>
 
@@ -248,6 +274,14 @@ onMounted(loadActiveTab)
               </tr>
             </tbody>
           </table>
+          <Pagination
+            :page="page"
+            :page-size="pageSize"
+            :total="total"
+            :total-pages="totalPages"
+            @update:page="page = $event"
+            @update:page-size="pageSize = $event"
+          />
         </div>
       </div>
 
@@ -288,6 +322,14 @@ onMounted(loadActiveTab)
             </tr>
           </tbody>
         </table>
+        <Pagination
+          :page="page"
+          :page-size="pageSize"
+          :total="total"
+          :total-pages="totalPages"
+          @update:page="page = $event"
+          @update:page-size="pageSize = $event"
+        />
       </div>
     </template>
 

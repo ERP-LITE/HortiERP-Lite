@@ -1,4 +1,4 @@
-import { and, count, eq, gte, ilike, lte, sql } from 'drizzle-orm'
+import { and, count, eq, gte, ilike, inArray, lte, or, sql } from 'drizzle-orm'
 import { db } from '../../db/client.js'
 import { products, stockEntries, stockMovements, stockEntryItems } from '../../db/schema/index.js'
 import { AppError } from '../../shared/errors/AppError.js'
@@ -7,7 +7,20 @@ import type { CreateStockEntryInput, ListStockEntriesQuery } from './stock-entri
 
 export async function listStockEntries(companyId: string, query: ListStockEntriesQuery) {
   const conditions = [eq(stockEntries.companyId, companyId)]
-  if (query.search) conditions.push(ilike(stockEntries.supplierName, `%${query.search}%`))
+  if (query.search) {
+    const matchingEntryIds = db
+      .select({ id: stockEntryItems.stockEntryId })
+      .from(stockEntryItems)
+      .innerJoin(products, eq(products.id, stockEntryItems.productId))
+      .where(and(eq(products.companyId, companyId), ilike(products.name, `%${query.search}%`)))
+
+    conditions.push(
+      or(
+        ilike(stockEntries.supplierName, `%${query.search}%`),
+        inArray(stockEntries.id, matchingEntryIds),
+      )!,
+    )
+  }
   if (query.from) conditions.push(gte(stockEntries.entryDate, query.from))
   if (query.to) conditions.push(lte(stockEntries.entryDate, query.to))
   const where = and(...conditions)

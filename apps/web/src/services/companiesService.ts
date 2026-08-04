@@ -1,5 +1,6 @@
 import { api } from './api'
 import type { Company, PaginatedResult, SessionResponse } from '@/types'
+import { fetchAllPages } from './paginatedOptions'
 
 export interface CreateCompanyInput {
   name: string
@@ -23,6 +24,10 @@ export interface ListCompaniesParams {
 export async function listCompanies(params: ListCompaniesParams) {
   const { data } = await api.get<PaginatedResult<Company>>('/companies', { params })
   return data
+}
+
+export function listAllCompanies(params: Omit<ListCompaniesParams, 'page' | 'pageSize'> = {}) {
+  return fetchAllPages((page, pageSize) => listCompanies({ ...params, page, pageSize }))
 }
 
 export async function createCompany(payload: CreateCompanyInput) {

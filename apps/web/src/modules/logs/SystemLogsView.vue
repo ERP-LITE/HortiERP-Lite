@@ -13,7 +13,7 @@ import PrintButton from '@/components/ui/PrintButton.vue'
 import SearchInput from '@/components/ui/SearchInput.vue'
 import { usePagination } from '@/composables/usePagination'
 import { getApiErrorMessage } from '@/services/api'
-import { listCompanies } from '@/services/companiesService'
+import { listAllCompanies } from '@/services/companiesService'
 import { listActivityLogs, listTechnicalLogs } from '@/services/logsService'
 import type { PeriodValue } from '@/lib/period'
 import type { Company, SystemLog, SystemLogLevel, SystemLogMethod } from '@/types'
@@ -143,7 +143,7 @@ async function loadLogs() {
 async function loadCompanies() {
   if (!isTechnical.value) return
   try {
-    companies.value = (await listCompanies({ page: 1, pageSize: 100 })).data
+    companies.value = await listAllCompanies()
   } catch (error) {
     errorMessage.value = getApiErrorMessage(error)
   }

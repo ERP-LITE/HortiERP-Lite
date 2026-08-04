@@ -1,4 +1,5 @@
-import { boolean, numeric, pgTable, text, uuid } from 'drizzle-orm/pg-core'
+import { sql } from 'drizzle-orm'
+import { boolean, index, numeric, pgTable, text, uniqueIndex, uuid } from 'drizzle-orm/pg-core'
 import { auditBy, timestamps } from './columns.js'
 import { companies } from './companies.js'
 import { categories } from './categories.js'
@@ -25,4 +26,12 @@ export const products = pgTable('products', {
   active: boolean('active').notNull().default(true),
   ...timestamps,
   ...auditBy,
-})
+}, (table) => ({
+  companyNameUnique: uniqueIndex('products_company_name_active_unique')
+    .on(table.companyId, sql`lower(${table.name})`)
+    .where(sql`${table.deletedAt} is null`),
+  companySkuUnique: uniqueIndex('products_company_sku_active_unique')
+    .on(table.companyId, sql`lower(${table.sku})`)
+    .where(sql`${table.deletedAt} is null and ${table.sku} is not null`),
+  companyActiveIdx: index('products_company_active_idx').on(table.companyId, table.active),
+}))

@@ -22,6 +22,20 @@
       "when": 1785456203621,
       "tag": "0002_grey_night_thrasher",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1785844676575,
+      "tag": "0003_early_marvel_boy",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1785844900914,
+      "tag": "0004_hard_owl",
+      "breakpoints": true
     }
   ]
 }

@@ -40,6 +40,12 @@ Não existe ainda fluxo de **ajuste manual de estoque** (contagem/inventário) �
 
 `GET /dashboard/summary` agrega, para o período selecionado: total de produtos ativos, quantidade com estoque baixo, valor de estoque (soma de `currentStock * costPrice`), contagem/quantidade de perdas no período, timeline diária de entradas × perdas, distribuição de estoque por categoria e de perdas por motivo, e as 10 movimentações mais recentes dentro do mesmo período. O card de movimentações exibe explicitamente o intervalo aplicado.
 
+Contagens, somas e agrupamentos são calculados no PostgreSQL; produtos e perdas completos não são carregados em memória apenas para produzir os totais. Categorias excluídas logicamente não participam dos agrupamentos.
+
+## Relatórios
+
+Os detalhamentos de perdas e entradas são paginados e pesquisados no backend, mantendo os agregados por motivo sobre todo o período selecionado. Isso evita respostas sem limite conforme o histórico da empresa cresce.
+
 ## Logs
 
 - Tela `/logs/atividades`: somente o `admin` consulta ações de escrita realizadas dentro da própria empresa. O `companyId` não é aceito da interface; é obtido obrigatoriamente da sessão.

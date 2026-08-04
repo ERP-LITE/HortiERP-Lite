@@ -90,7 +90,7 @@ onMounted(loadEntries)
   <div>
     <PageHeader title="Entradas de mercadoria" subtitle="Histórico de recebimentos de estoque">
       <template #actions>
-        <SearchInput v-model="search" placeholder="Buscar por fornecedor..." />
+        <SearchInput v-model="search" placeholder="Buscar por fornecedor ou item..." />
         <FilterButton :active="activeFilterCount" @click="openFilterModal" />
         <PrintButton />
         <RouterLink :to="{ name: 'entradas-nova' }">

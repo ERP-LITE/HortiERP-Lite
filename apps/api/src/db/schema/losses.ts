@@ -1,4 +1,4 @@
-import { numeric, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core'
+import { index, numeric, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core'
 import { auditBy, timestamps } from './columns.js'
 import { companies } from './companies.js'
 import { products } from './products.js'
@@ -18,4 +18,7 @@ export const losses = pgTable('losses', {
   lossDate: timestamp('loss_date', { withTimezone: true }).notNull().defaultNow(),
   ...timestamps,
   ...auditBy,
-})
+}, (table) => ({
+  companyLossDateIdx: index('losses_company_loss_date_idx').on(table.companyId, table.lossDate),
+  companyProductIdx: index('losses_company_product_idx').on(table.companyId, table.productId),
+}))
