@@ -3,6 +3,7 @@ import { db } from '../../db/client.js'
 import { products, stockEntries, stockMovements, stockEntryItems } from '../../db/schema/index.js'
 import { AppError } from '../../shared/errors/AppError.js'
 import { buildPaginatedResult } from '../../shared/db/paginate.js'
+import { matchingProductIds } from '../../shared/db/matchingProductIds.js'
 import type { CreateStockEntryInput, ListStockEntriesQuery } from './stock-entries.schema.js'
 
 export async function listStockEntries(companyId: string, query: ListStockEntriesQuery) {
@@ -11,8 +12,7 @@ export async function listStockEntries(companyId: string, query: ListStockEntrie
     const matchingEntryIds = db
       .select({ id: stockEntryItems.stockEntryId })
       .from(stockEntryItems)
-      .innerJoin(products, eq(products.id, stockEntryItems.productId))
-      .where(and(eq(products.companyId, companyId), ilike(products.name, `%${query.search}%`)))
+      .where(inArray(stockEntryItems.productId, matchingProductIds(companyId, query.search)))
 
     conditions.push(
       or(

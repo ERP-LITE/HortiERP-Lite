@@ -1,9 +1,10 @@
-import { and, asc, count, eq, ilike, inArray, isNull, or } from 'drizzle-orm'
+import { and, asc, count, eq, ilike, isNull, or } from 'drizzle-orm'
 import { db } from '../../db/client.js'
 import { units } from '../../db/schema/index.js'
 import { AppError } from '../../shared/errors/AppError.js'
 import { assertUniqueField } from '../../shared/db/assertUniqueField.js'
 import { buildPaginatedResult } from '../../shared/db/paginate.js'
+import { softDeleteById, softDeleteByIds } from '../../shared/db/softDelete.js'
 import type { CreateUnitInput, ListUnitsQuery, UpdateUnitInput } from './units.schema.js'
 
 function assertUniqueName(companyId: string, name: string, excludeId?: string) {
@@ -96,19 +97,9 @@ export async function updateUnit(companyId: string, userId: string, id: string, 
 
 export async function deleteUnit(companyId: string, userId: string, id: string) {
   await getUnit(companyId, id)
-
-  await db
-    .update(units)
-    .set({ deletedAt: new Date(), updatedBy: userId, updatedAt: new Date() })
-    .where(and(eq(units.id, id), eq(units.companyId, companyId)))
+  await softDeleteById(units, companyId, userId, id)
 }
 
 export async function deleteUnits(companyId: string, userId: string, ids: string[]) {
-  const deleted = await db
-    .update(units)
-    .set({ deletedAt: new Date(), updatedBy: userId, updatedAt: new Date() })
-    .where(and(eq(units.companyId, companyId), inArray(units.id, ids), isNull(units.deletedAt)))
-    .returning({ id: units.id })
-
-  return { deleted: deleted.length }
+  return softDeleteByIds(units, companyId, userId, ids)
 }

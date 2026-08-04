@@ -22,6 +22,7 @@ import { createProduct, deleteProduct, deleteProducts, listProducts, updateProdu
 import { useAuthStore } from '@/stores/auth'
 import { usePagination } from '@/composables/usePagination'
 import { useBulkSelection } from '@/composables/useBulkSelection'
+import { useFilterModal } from '@/composables/useFilterModal'
 import type { Category, Product, Unit } from '@/types'
 
 const auth = useAuthStore()
@@ -40,10 +41,13 @@ const loading = ref(true)
 const errorMessage = ref('')
 
 const search = ref('')
-const emptyFilters = { categoryId: 'todas', active: 'todos' }
-const filters = ref({ ...emptyFilters })
-const draftFilters = ref({ ...emptyFilters })
-const filterModalOpen = ref(false)
+const { filters, draftFilters, filterModalOpen, openFilterModal, applyFilters, clearFilters } = useFilterModal(
+  () => ({ categoryId: 'todas', active: 'todos' }),
+  () => {
+    page.value = 1
+    loadProducts()
+  },
+)
 const activeFilterCount = computed(
   () => Number(filters.value.categoryId !== 'todas') + Number(filters.value.active !== 'todos'),
 )
@@ -115,26 +119,6 @@ async function loadFormOptions() {
 
 async function loadAll() {
   await Promise.all([loadProducts(), loadFormOptions()])
-}
-
-function openFilterModal() {
-  draftFilters.value = { ...filters.value }
-  filterModalOpen.value = true
-}
-
-function applyFilters() {
-  filters.value = { ...draftFilters.value }
-  filterModalOpen.value = false
-  page.value = 1
-  loadProducts()
-}
-
-function clearFilters() {
-  filters.value = { ...emptyFilters }
-  draftFilters.value = { ...emptyFilters }
-  filterModalOpen.value = false
-  page.value = 1
-  loadProducts()
 }
 
 function openCreateModal() {

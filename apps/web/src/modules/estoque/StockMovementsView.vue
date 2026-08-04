@@ -15,6 +15,7 @@ import { getApiErrorMessage } from '@/services/api'
 import { listStockMovements } from '@/services/stockService'
 import { listAllProducts } from '@/services/productsService'
 import { usePagination } from '@/composables/usePagination'
+import { useFilterModal } from '@/composables/useFilterModal'
 import type { MovementType, Product, StockMovement } from '@/types'
 
 const { page, pageSize, total, totalPages, applyMeta } = usePagination()
@@ -47,9 +48,13 @@ const typeFilterOptions = [
 function emptyFilters() {
   return { productId: 'todos', type: 'todos', period: { preset: 'todos', from: '', to: '' } as PeriodValue }
 }
-const filters = ref(emptyFilters())
-const draftFilters = ref(emptyFilters())
-const filterModalOpen = ref(false)
+const { filters, draftFilters, filterModalOpen, openFilterModal, applyFilters, clearFilters } = useFilterModal(
+  emptyFilters,
+  () => {
+    page.value = 1
+    loadMovements()
+  },
+)
 const activeFilterCount = computed(
   () =>
     Number(filters.value.productId !== 'todos') +
@@ -92,26 +97,6 @@ async function loadProductOptions() {
   } catch (error) {
     errorMessage.value = getApiErrorMessage(error)
   }
-}
-
-function openFilterModal() {
-  draftFilters.value = { ...filters.value }
-  filterModalOpen.value = true
-}
-
-function applyFilters() {
-  filters.value = { ...draftFilters.value }
-  filterModalOpen.value = false
-  page.value = 1
-  loadMovements()
-}
-
-function clearFilters() {
-  filters.value = emptyFilters()
-  draftFilters.value = emptyFilters()
-  filterModalOpen.value = false
-  page.value = 1
-  loadMovements()
 }
 
 watch(search, () => {

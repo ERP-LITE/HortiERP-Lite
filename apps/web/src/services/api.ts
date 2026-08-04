@@ -25,7 +25,7 @@ export function getApiErrorMessage(error: unknown, fallback = 'Ocorreu um erro i
   return fallback
 }
 
-export function getApiFieldErrors(error: unknown): Record<string, string> {
+function getApiFieldErrors(error: unknown): Record<string, string> {
   if (!axios.isAxiosError(error)) return {}
 
   const issues = (error.response?.data as ApiErrorPayload | undefined)?.error?.issues

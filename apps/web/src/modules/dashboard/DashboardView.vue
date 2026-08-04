@@ -10,6 +10,7 @@ import FilterButton from '@/components/ui/FilterButton.vue'
 import PrintButton from '@/components/ui/PrintButton.vue'
 import PeriodPicker from '@/components/ui/PeriodPicker.vue'
 import { rangeForPreset, type PeriodValue } from '@/lib/period'
+import { useFilterModal } from '@/composables/useFilterModal'
 import DonutChart from '@/components/charts/DonutChart.vue'
 import MovementsTrendChart from '@/components/charts/MovementsTrendChart.vue'
 import LossesByReasonChart from '@/components/charts/LossesByReasonChart.vue'
@@ -21,9 +22,14 @@ function defaultPeriod(): PeriodValue {
   return { preset: '30dias', ...rangeForPreset('30dias') }
 }
 
-const period = ref<PeriodValue>(defaultPeriod())
-const draftPeriod = ref<PeriodValue>({ ...period.value })
-const filterModalOpen = ref(false)
+const {
+  filters: period,
+  draftFilters: draftPeriod,
+  filterModalOpen,
+  openFilterModal,
+  applyFilters,
+  clearFilters,
+} = useFilterModal(defaultPeriod, loadSummary)
 const activeFilterCount = computed(() => (period.value.preset === '30dias' ? 0 : 1))
 
 const summary = ref<DashboardSummary | null>(null)
@@ -68,24 +74,6 @@ async function loadSummary() {
   } finally {
     loading.value = false
   }
-}
-
-function openFilterModal() {
-  draftPeriod.value = { ...period.value }
-  filterModalOpen.value = true
-}
-
-function applyFilters() {
-  period.value = { ...draftPeriod.value }
-  filterModalOpen.value = false
-  loadSummary()
-}
-
-function clearFilters() {
-  period.value = defaultPeriod()
-  draftPeriod.value = { ...period.value }
-  filterModalOpen.value = false
-  loadSummary()
 }
 
 onMounted(loadSummary)

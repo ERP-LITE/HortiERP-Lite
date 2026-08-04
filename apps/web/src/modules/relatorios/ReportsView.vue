@@ -10,6 +10,7 @@ import SearchInput from '@/components/ui/SearchInput.vue'
 import PeriodPicker from '@/components/ui/PeriodPicker.vue'
 import Pagination from '@/components/ui/Pagination.vue'
 import { usePagination } from '@/composables/usePagination'
+import { useFilterModal } from '@/composables/useFilterModal'
 import type { PeriodValue } from '@/lib/period'
 import { getApiErrorMessage } from '@/services/api'
 import {
@@ -34,33 +35,24 @@ const { page, pageSize, total, totalPages, applyMeta } = usePagination()
 const loading = ref(false)
 const errorMessage = ref('')
 
-const period = ref<PeriodValue>({ preset: 'todos', from: '', to: '' })
-const draftPeriod = ref<PeriodValue>({ ...period.value })
-const filterModalOpen = ref(false)
+function emptyPeriod(): PeriodValue {
+  return { preset: 'todos', from: '', to: '' }
+}
+const {
+  filters: period,
+  draftFilters: draftPeriod,
+  filterModalOpen,
+  openFilterModal,
+  applyFilters,
+  clearFilters,
+} = useFilterModal(emptyPeriod, () => {
+  if (page.value !== 1) page.value = 1
+  else loadActiveTab()
+})
 const hasDateFilterTab = computed(() => activeTab.value !== 'estoque')
 const activeFilterCount = computed(() => Number(period.value.preset !== 'todos'))
 const from = computed(() => period.value.from)
 const to = computed(() => period.value.to)
-
-function openFilterModal() {
-  draftPeriod.value = { ...period.value }
-  filterModalOpen.value = true
-}
-
-function applyFilters() {
-  period.value = { ...draftPeriod.value }
-  filterModalOpen.value = false
-  if (page.value !== 1) page.value = 1
-  else loadActiveTab()
-}
-
-function clearFilters() {
-  period.value = { preset: 'todos', from: '', to: '' }
-  draftPeriod.value = { ...period.value }
-  filterModalOpen.value = false
-  if (page.value !== 1) page.value = 1
-  else loadActiveTab()
-}
 
 const stockByCategory = ref<StockByCategoryRow[]>([])
 const lossesReport = ref<LossesReport | null>(null)
