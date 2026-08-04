@@ -18,7 +18,7 @@ export async function stockRoutes(app: FastifyInstance) {
 
   app.post('/stock/adjust', { preHandler: requireRole('admin', 'gerente') }, async (request, reply) => {
     const data = createStockAdjustmentSchema.parse(request.body)
-    const movement = await createStockAdjustment(request.user.companyId, request.user.sub, data)
-    return reply.status(201).send(movement)
+    const movements = await createStockAdjustment(request.user.companyId, request.user.sub, data)
+    return reply.status(201).send(movements)
   })
 }

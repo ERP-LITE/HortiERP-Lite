@@ -12,8 +12,7 @@
     "db:seed": "tsx src/db/seed.ts",
     "db:seed:platform": "tsx src/db/seedPlatform.ts",
     "test": "sh scripts/test-integration.sh",
-    "test:run": "tsx --test --test-concurrency=1 tests/**/*.test.ts",
-    "lint": "eslint src --ext .ts"
+    "test:run": "tsx --test --test-concurrency=1 tests/**/*.test.ts"
   },
   "dependencies": {
     "@fastify/cookie": "^11.1.2",

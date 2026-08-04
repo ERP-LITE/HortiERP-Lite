@@ -54,43 +54,50 @@ export async function listStockMovements(companyId: string, query: ListStockMove
 
 export async function createStockAdjustment(companyId: string, userId: string, data: CreateStockAdjustmentInput) {
   return db.transaction(async (tx) => {
-    const [product] = await tx
-      .select({ currentStock: products.currentStock })
-      .from(products)
-      .where(and(eq(products.id, data.productId), eq(products.companyId, companyId), isNull(products.deletedAt)))
-      .for('update')
+    const movements = []
 
-    if (!product) throw AppError.notFound('Produto não encontrado')
+    for (const item of data.items) {
+      const [product] = await tx
+        .select({ currentStock: products.currentStock })
+        .from(products)
+        .where(and(eq(products.id, item.productId), eq(products.companyId, companyId), isNull(products.deletedAt)))
+        .for('update')
 
-    const previousStock = Number(product.currentStock)
-    const delta = data.quantity - previousStock
+      if (!product) throw AppError.notFound(`Produto não encontrado: ${item.productId}`)
 
-    if (delta === 0) {
-      throw new AppError('A nova quantidade informada é igual ao estoque atual', 422, 'NO_CHANGE')
+      const previousStock = Number(product.currentStock)
+      const delta = item.quantity - previousStock
+      if (delta === 0) continue
+
+      const newStock = item.quantity.toString()
+
+      await tx
+        .update(products)
+        .set({ currentStock: newStock, updatedAt: new Date(), updatedBy: userId })
+        .where(and(eq(products.id, item.productId), eq(products.companyId, companyId)))
+
+      const [movement] = await tx
+        .insert(stockMovements)
+        .values({
+          companyId,
+          productId: item.productId,
+          type: 'ajuste',
+          quantity: delta.toString(),
+          balanceAfter: newStock,
+          referenceType: 'adjustment',
+          referenceId: item.productId,
+          notes: data.notes,
+          createdBy: userId,
+        })
+        .returning()
+
+      movements.push(movement)
     }
 
-    const newStock = data.quantity.toString()
+    if (movements.length === 0) {
+      throw new AppError('Nenhuma das quantidades informadas é diferente do estoque atual', 422, 'NO_CHANGE')
+    }
 
-    await tx
-      .update(products)
-      .set({ currentStock: newStock, updatedAt: new Date(), updatedBy: userId })
-      .where(and(eq(products.id, data.productId), eq(products.companyId, companyId)))
-
-    const [movement] = await tx
-      .insert(stockMovements)
-      .values({
-        companyId,
-        productId: data.productId,
-        type: 'ajuste',
-        quantity: delta.toString(),
-        balanceAfter: newStock,
-        referenceType: 'adjustment',
-        referenceId: data.productId,
-        notes: data.notes,
-        createdBy: userId,
-      })
-      .returning()
-
-    return movement
+    return movements
   })
 }
