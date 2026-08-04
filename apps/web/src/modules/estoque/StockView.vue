@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
-import { AlertTriangle, History, Pencil } from '@lucide/vue'
+import { AlertTriangle, History, ListChecks, Pencil, Plus, Trash2 } from '@lucide/vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import BaseBadge from '@/components/ui/BaseBadge.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
@@ -17,10 +17,11 @@ import { getApiErrorMessage, resolveFormError } from '@/services/api'
 import { toastSuccess } from '@/lib/alerts'
 import { adjustStock, listCurrentStock } from '@/services/stockService'
 import { listAllCategories } from '@/services/categoriesService'
+import { listAllProducts } from '@/services/productsService'
 import { useAuthStore } from '@/stores/auth'
 import { usePagination } from '@/composables/usePagination'
 import { useFilterModal } from '@/composables/useFilterModal'
-import type { Category, ProductWithRelations } from '@/types'
+import type { Category, Product, ProductWithRelations } from '@/types'
 
 const auth = useAuthStore()
 const canManage = computed(() => auth.user?.role === 'admin' || auth.user?.role === 'gerente')
@@ -75,6 +76,15 @@ async function loadCategoryOptions() {
   }
 }
 
+const allProducts = ref<Product[]>([])
+async function loadAllProducts() {
+  try {
+    allProducts.value = await listAllProducts({ active: true })
+  } catch (error) {
+    errorMessage.value = getApiErrorMessage(error)
+  }
+}
+
 const adjustModalOpen = ref(false)
 const adjustingProduct = ref<ProductWithRelations | null>(null)
 const adjustForm = ref({ quantity: '', notes: '' })
@@ -108,9 +118,8 @@ async function handleAdjustSubmit() {
   adjustErrorMessage.value = ''
   try {
     await adjustStock({
-      productId: adjustingProduct.value.id,
-      quantity: Number(adjustForm.value.quantity),
       notes: adjustForm.value.notes.trim(),
+      items: [{ productId: adjustingProduct.value.id, quantity: Number(adjustForm.value.quantity) }],
     })
     adjustModalOpen.value = false
     toastSuccess('Estoque ajustado com sucesso')
@@ -121,6 +130,80 @@ async function handleAdjustSubmit() {
     adjustErrorMessage.value = result.message
   } finally {
     adjustSaving.value = false
+  }
+}
+
+interface BulkAdjustItemRow {
+  productId: string
+  quantity: string
+}
+
+const bulkAdjustModalOpen = ref(false)
+const bulkAdjustItems = ref<BulkAdjustItemRow[]>([])
+const bulkAdjustNotes = ref('')
+const bulkAdjustItemErrors = ref<{ productId?: string; quantity?: string }[]>([])
+const bulkAdjustNotesError = ref('')
+const bulkAdjustSaving = ref(false)
+const bulkAdjustErrorMessage = ref('')
+
+const bulkAdjustProductOptions = computed(() => allProducts.value.map((p) => ({ value: p.id, label: p.name })))
+
+async function openBulkAdjustModal() {
+  if (allProducts.value.length === 0) await loadAllProducts()
+  bulkAdjustItems.value = [{ productId: '', quantity: '' }]
+  bulkAdjustNotes.value = ''
+  bulkAdjustItemErrors.value = []
+  bulkAdjustNotesError.value = ''
+  bulkAdjustErrorMessage.value = ''
+  bulkAdjustModalOpen.value = true
+}
+
+function addBulkAdjustItem() {
+  bulkAdjustItems.value.push({ productId: '', quantity: '' })
+  bulkAdjustItemErrors.value = []
+}
+
+function removeBulkAdjustItem(index: number) {
+  bulkAdjustItems.value.splice(index, 1)
+  bulkAdjustItemErrors.value = []
+}
+
+function selectBulkAdjustProduct(index: number, productId: string) {
+  const item = bulkAdjustItems.value[index]
+  item.productId = productId
+  const product = allProducts.value.find((p) => p.id === productId)
+  if (product) item.quantity = product.currentStock
+}
+
+function validateBulkAdjustForm(): boolean {
+  bulkAdjustItemErrors.value = bulkAdjustItems.value.map((item) => {
+    const rowErrors: { productId?: string; quantity?: string } = {}
+    if (!item.productId) rowErrors.productId = 'Selecione o produto'
+    if (item.quantity === '' || Number(item.quantity) < 0) rowErrors.quantity = 'Informe uma quantidade válida'
+    return rowErrors
+  })
+  bulkAdjustNotesError.value = bulkAdjustNotes.value.trim() ? '' : 'Explique o motivo do ajuste'
+
+  return bulkAdjustItemErrors.value.every((rowErrors) => Object.keys(rowErrors).length === 0) && !bulkAdjustNotesError.value
+}
+
+async function handleBulkAdjustSubmit() {
+  if (!validateBulkAdjustForm()) return
+
+  bulkAdjustSaving.value = true
+  bulkAdjustErrorMessage.value = ''
+  try {
+    const result = await adjustStock({
+      notes: bulkAdjustNotes.value.trim(),
+      items: bulkAdjustItems.value.map((item) => ({ productId: item.productId, quantity: Number(item.quantity) })),
+    })
+    bulkAdjustModalOpen.value = false
+    toastSuccess(`${result.length} ${result.length === 1 ? 'produto ajustado' : 'produtos ajustados'} com sucesso`)
+    await Promise.all([loadStock(), loadAllProducts()])
+  } catch (error) {
+    bulkAdjustErrorMessage.value = getApiErrorMessage(error, 'Não foi possível ajustar o estoque')
+  } finally {
+    bulkAdjustSaving.value = false
   }
 }
 
@@ -142,6 +225,16 @@ onMounted(() => {
         <SearchInput v-model="search" placeholder="Buscar por produto..." />
         <FilterButton :active="activeFilterCount" @click="openFilterModal" />
         <PrintButton />
+        <BaseButton
+          v-if="canManage"
+          variant="secondary"
+          class="!px-2.5 sm:!px-4"
+          title="Ajuste em lote"
+          aria-label="Ajuste em lote"
+          @click="openBulkAdjustModal"
+        >
+          <ListChecks :size="16" /> <span class="hidden sm:inline">Ajuste em lote</span>
+        </BaseButton>
         <RouterLink
           :to="{ name: 'movimentacoes' }"
           class="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-lg bg-primary-600 px-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-700 sm:px-4"
@@ -333,6 +426,85 @@ onMounted(() => {
         <div class="flex justify-end gap-2 pt-2">
           <BaseButton variant="secondary" type="button" @click="adjustModalOpen = false">Cancelar</BaseButton>
           <BaseButton type="submit" :disabled="adjustSaving">{{ adjustSaving ? 'Salvando...' : 'Salvar' }}</BaseButton>
+        </div>
+      </form>
+    </BaseModal>
+
+    <BaseModal :open="bulkAdjustModalOpen" title="Ajuste de estoque em lote" @close="bulkAdjustModalOpen = false">
+      <form class="space-y-4" @submit.prevent="handleBulkAdjustSubmit">
+        <div
+          class="flex gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800 dark:border-amber-900/50 dark:bg-amber-900/20 dark:text-amber-300"
+        >
+          <AlertTriangle :size="16" class="mt-0.5 shrink-0" />
+          <p>
+            Use isso só pra corrigir divergências de contagem física (inventário), como depois de uma contagem
+            completa. Entradas de mercadoria e perdas devem continuar sendo lançadas pelas telas próprias — cada
+            ajuste fica registrado no histórico de movimentações com o motivo informado.
+          </p>
+        </div>
+
+        <BaseInput
+          v-model="bulkAdjustNotes"
+          label="Motivo do ajuste"
+          placeholder="Ex.: contagem física do inventário mensal"
+          :error="bulkAdjustNotesError"
+        />
+
+        <div>
+          <div class="flex items-center justify-between mb-2">
+            <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300">Produtos</h3>
+            <button
+              type="button"
+              class="inline-flex items-center justify-center h-8 w-8 rounded-lg text-primary-600 hover:bg-primary-50 dark:text-primary-400 dark:hover:bg-primary-900/30"
+              title="Adicionar produto"
+              @click="addBulkAdjustItem"
+            >
+              <Plus :size="16" />
+            </button>
+          </div>
+
+          <div class="space-y-3">
+            <div
+              v-for="(item, index) in bulkAdjustItems"
+              :key="index"
+              class="grid grid-cols-1 sm:grid-cols-[2fr_1fr_auto] gap-3 items-start border border-gray-100 dark:border-gray-700 rounded-lg p-3"
+            >
+              <BaseSelect
+                :model-value="item.productId"
+                label="Produto"
+                :options="bulkAdjustProductOptions"
+                :error="bulkAdjustItemErrors[index]?.productId"
+                @update:model-value="(value) => selectBulkAdjustProduct(index, value)"
+              />
+              <BaseInput
+                v-model="item.quantity"
+                :decimal-places="3"
+                label="Nova quantidade"
+                :error="bulkAdjustItemErrors[index]?.quantity"
+              />
+              <div class="flex flex-col">
+                <span class="block text-sm font-medium mb-1 invisible">Remover</span>
+                <button
+                  type="button"
+                  class="inline-flex items-center justify-center h-9 w-9 rounded-lg text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/30 disabled:opacity-40 disabled:pointer-events-none"
+                  title="Remover produto"
+                  :disabled="bulkAdjustItems.length === 1"
+                  @click="removeBulkAdjustItem(index)"
+                >
+                  <Trash2 :size="16" />
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <p v-if="bulkAdjustErrorMessage" class="text-sm text-red-600 dark:text-red-400">{{ bulkAdjustErrorMessage }}</p>
+
+        <div class="flex justify-end gap-2 pt-2">
+          <BaseButton variant="secondary" type="button" @click="bulkAdjustModalOpen = false">Cancelar</BaseButton>
+          <BaseButton type="submit" :disabled="bulkAdjustSaving">
+            {{ bulkAdjustSaving ? 'Salvando...' : 'Salvar ajustes' }}
+          </BaseButton>
         </div>
       </form>
     </BaseModal>

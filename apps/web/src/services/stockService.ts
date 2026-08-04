@@ -29,13 +29,17 @@ export async function listStockMovements(params: ListStockMovementsParams) {
   return data
 }
 
-export interface AdjustStockPayload {
+export interface AdjustStockItem {
   productId: string
   quantity: number
+}
+
+export interface AdjustStockPayload {
   notes: string
+  items: AdjustStockItem[]
 }
 
 export async function adjustStock(payload: AdjustStockPayload) {
-  const { data } = await api.post<StockMovement>('/stock/adjust', payload)
+  const { data } = await api.post<StockMovement[]>('/stock/adjust', payload)
   return data
 }

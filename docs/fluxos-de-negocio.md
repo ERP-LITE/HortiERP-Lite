@@ -36,13 +36,21 @@ Tela `/estoque` (`GET /stock`): lista produtos ativos com estoque atual, com fil
 
 ## Ajuste manual de estoque
 
-Tela `/estoque`, botão de editar (ícone de lápis) na linha do produto. Rota `POST /stock/adjust`, service `stock.service.ts::createStockAdjustment`. Exige `admin` ou `gerente` — ao contrário de entrada/perda, não é uma operação do dia a dia do estoquista, e sim uma correção que sobrescreve o saldo calculado pelo sistema sem passar pelas validações de fornecedor/motivo dos outros fluxos, então fica no mesmo padrão de permissão dos módulos de cadastro (ver decisões arquiteturais).
+Tela `/estoque`. Rota `POST /stock/adjust`, service `stock.service.ts::createStockAdjustment`. Exige `admin` ou `gerente` — ao contrário de entrada/perda, não é uma operação do dia a dia do estoquista, e sim uma correção que sobrescreve o saldo calculado pelo sistema sem passar pelas validações de fornecedor/motivo dos outros fluxos, então fica no mesmo padrão de permissão dos módulos de cadastro (ver decisões arquiteturais).
 
-O usuário informa a **nova quantidade absoluta** em estoque (o formulário já vem preenchido com o valor atual, como qualquer edição) e um motivo obrigatório (ex: "contagem física apontou divergência"). O modal exibe um aviso deixando claro que esse caminho é só para corrigir divergências de contagem/inventário — entradas e perdas continuam sendo lançadas pelas telas próprias.
+Dois pontos de entrada, mesmo endpoint por baixo:
 
-1. Lê o `currentStock` atual do produto com lock de linha (`SELECT ... FOR UPDATE`) dentro de uma transação.
-2. Se a nova quantidade for igual à atual, rejeita com `422` (nada a ajustar).
-3. Atualiza `products.currentStock` para o novo valor e grava um `stock_movements` com `type: 'ajuste'`, `quantity` = diferença (novo − antigo, pode ser positiva ou negativa) e `balanceAfter` = novo saldo. O motivo informado é salvo na coluna `notes` do movimento e aparece no histórico de movimentações.
+- **Correção pontual**: botão de editar (ícone de lápis) ou duplo clique numa linha da tabela — abre o modal já preenchido com aquele produto e o estoque atual.
+- **Ajuste em lote**: botão "Ajuste em lote" no cabeçalho da tela — abre um formulário com N linhas (produto + nova quantidade), no mesmo padrão de "adicionar/remover item" usado em entrada de mercadoria. Pensado para depois de uma contagem física completa, quando vários produtos precisam de correção de uma vez com o mesmo motivo.
+
+Em ambos os casos o usuário informa a **nova quantidade absoluta** por produto e um motivo obrigatório único para o lote inteiro (ex: "contagem física apontou divergência"). O modal exibe um aviso deixando claro que esse caminho é só para corrigir divergências de contagem/inventário — entradas e perdas continuam sendo lançadas pelas telas próprias.
+
+O payload sempre é `{ notes, items: [{ productId, quantity }] }` — a correção pontual só envia `items` com 1 elemento. Processamento, numa única transação:
+
+1. Para cada item, lê o `currentStock` atual do produto com lock de linha (`SELECT ... FOR UPDATE`); se o produto não existe (ou é de outra empresa), rejeita o lote inteiro com `404`.
+2. Itens cuja quantidade informada é igual à atual são **pulados silenciosamente** (sem gerar movimento) — numa contagem de vários produtos é normal que alguns já estejam certos, e isso não deveria travar o resto do lote.
+3. Para cada item com diferença real, atualiza `products.currentStock` e grava um `stock_movements` com `type: 'ajuste'`, `quantity` = diferença (novo − antigo, pode ser positiva ou negativa) e `balanceAfter` = novo saldo. O motivo informado é salvo na coluna `notes` do movimento (mesmo texto em todos os movimentos do lote) e aparece no histórico de movimentações.
+4. Se **nenhum** item do lote tinha diferença (todos pulados), rejeita com `422` — o lote inteiro não fez sentido, não só um item.
 
 ## Dashboard
 
