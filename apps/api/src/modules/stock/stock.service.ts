@@ -1,8 +1,9 @@
-import { and, asc, count, desc, eq, gte, ilike, inArray, isNull, lte, or } from 'drizzle-orm'
+import { and, asc, count, desc, eq, gte, ilike, inArray, isNull, lte } from 'drizzle-orm'
 import { db } from '../../db/client.js'
 import { products, stockMovements } from '../../db/schema/index.js'
 import { AppError } from '../../shared/errors/AppError.js'
 import { buildPaginatedResult } from '../../shared/db/paginate.js'
+import { matchingProductIds } from '../../shared/db/matchingProductIds.js'
 import type { CreateStockAdjustmentInput, ListStockMovementsQuery, ListStockQuery } from './stock.schema.js'
 
 export async function listCurrentStock(companyId: string, query: ListStockQuery) {
@@ -29,12 +30,7 @@ export async function listCurrentStock(companyId: string, query: ListStockQuery)
 export async function listStockMovements(companyId: string, query: ListStockMovementsQuery) {
   const conditions = [eq(stockMovements.companyId, companyId)]
   if (query.search) {
-    const matchingProductIds = db
-      .select({ id: products.id })
-      .from(products)
-      .where(and(eq(products.companyId, companyId), ilike(products.name, `%${query.search}%`)))
-
-    conditions.push(inArray(stockMovements.productId, matchingProductIds))
+    conditions.push(inArray(stockMovements.productId, matchingProductIds(companyId, query.search)))
   }
   if (query.productId) conditions.push(eq(stockMovements.productId, query.productId))
   if (query.type) conditions.push(eq(stockMovements.type, query.type))

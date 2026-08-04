@@ -3,17 +3,15 @@ import { db } from '../../db/client.js'
 import { losses, products, stockMovements } from '../../db/schema/index.js'
 import { AppError } from '../../shared/errors/AppError.js'
 import { buildPaginatedResult } from '../../shared/db/paginate.js'
+import { matchingProductIds } from '../../shared/db/matchingProductIds.js'
 import type { CreateLossInput, ListLossesQuery } from './losses.schema.js'
 
 export async function listLosses(companyId: string, query: ListLossesQuery) {
   const conditions = [eq(losses.companyId, companyId)]
   if (query.search) {
-    const matchingProductIds = db
-      .select({ id: products.id })
-      .from(products)
-      .where(and(eq(products.companyId, companyId), ilike(products.name, `%${query.search}%`)))
-
-    conditions.push(or(ilike(losses.notes, `%${query.search}%`), inArray(losses.productId, matchingProductIds))!)
+    conditions.push(
+      or(ilike(losses.notes, `%${query.search}%`), inArray(losses.productId, matchingProductIds(companyId, query.search)))!,
+    )
   }
   if (query.productId) conditions.push(eq(losses.productId, query.productId))
   if (query.reason) conditions.push(eq(losses.reason, query.reason))

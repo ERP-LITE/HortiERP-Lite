@@ -1,14 +1,13 @@
 import bcrypt from 'bcryptjs'
-import { and, asc, count, eq, ilike, inArray, isNull, or } from 'drizzle-orm'
+import { and, asc, count, eq, ilike, isNull, or } from 'drizzle-orm'
 import { db } from '../../db/client.js'
 import { users } from '../../db/schema/index.js'
 import { AppError } from '../../shared/errors/AppError.js'
 import { assertUniqueField } from '../../shared/db/assertUniqueField.js'
 import { buildPaginatedResult } from '../../shared/db/paginate.js'
+import { softDeleteById, softDeleteByIds } from '../../shared/db/softDelete.js'
 import type { CreateUserInput, ListUsersQuery, UpdateUserInput } from './users.schema.js'
 
-// email is globally unique at the DB level (not scoped by company), so the
-// duplicate check below intentionally ignores deletedAt and companyId too.
 function assertUniqueEmail(email: string, excludeId?: string) {
   return assertUniqueField({
     table: users,
@@ -123,19 +122,9 @@ export async function updateUser(companyId: string, requesterId: string, id: str
 
 export async function deleteUser(companyId: string, requesterId: string, id: string) {
   await getUser(companyId, id)
-
-  await db
-    .update(users)
-    .set({ deletedAt: new Date(), active: false, updatedBy: requesterId, updatedAt: new Date() })
-    .where(and(eq(users.id, id), eq(users.companyId, companyId)))
+  await softDeleteById(users, companyId, requesterId, id, { active: false })
 }
 
 export async function deleteUsers(companyId: string, requesterId: string, ids: string[]) {
-  const deleted = await db
-    .update(users)
-    .set({ deletedAt: new Date(), active: false, updatedBy: requesterId, updatedAt: new Date() })
-    .where(and(eq(users.companyId, companyId), inArray(users.id, ids), isNull(users.deletedAt)))
-    .returning({ id: users.id })
-
-  return { deleted: deleted.length }
+  return softDeleteByIds(users, companyId, requesterId, ids, { active: false })
 }

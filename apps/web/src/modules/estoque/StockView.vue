@@ -19,6 +19,7 @@ import { adjustStock, listCurrentStock } from '@/services/stockService'
 import { listAllCategories } from '@/services/categoriesService'
 import { useAuthStore } from '@/stores/auth'
 import { usePagination } from '@/composables/usePagination'
+import { useFilterModal } from '@/composables/useFilterModal'
 import type { Category, ProductWithRelations } from '@/types'
 
 const auth = useAuthStore()
@@ -32,10 +33,13 @@ const loading = ref(true)
 const errorMessage = ref('')
 
 const search = ref('')
-const emptyFilters = { categoryId: 'todas', lowStockOnly: false }
-const filters = ref({ ...emptyFilters })
-const draftFilters = ref({ ...emptyFilters })
-const filterModalOpen = ref(false)
+const { filters, draftFilters, filterModalOpen, openFilterModal, applyFilters, clearFilters } = useFilterModal(
+  () => ({ categoryId: 'todas', lowStockOnly: false }),
+  () => {
+    page.value = 1
+    loadStock()
+  },
+)
 const activeFilterCount = computed(
   () => Number(filters.value.categoryId !== 'todas') + Number(filters.value.lowStockOnly),
 )
@@ -69,26 +73,6 @@ async function loadCategoryOptions() {
   } catch (error) {
     errorMessage.value = getApiErrorMessage(error)
   }
-}
-
-function openFilterModal() {
-  draftFilters.value = { ...filters.value }
-  filterModalOpen.value = true
-}
-
-function applyFilters() {
-  filters.value = { ...draftFilters.value }
-  filterModalOpen.value = false
-  page.value = 1
-  loadStock()
-}
-
-function clearFilters() {
-  filters.value = { ...emptyFilters }
-  draftFilters.value = { ...emptyFilters }
-  filterModalOpen.value = false
-  page.value = 1
-  loadStock()
 }
 
 const adjustModalOpen = ref(false)
@@ -243,7 +227,14 @@ onMounted(() => {
               Nenhum produto cadastrado.
             </td>
           </tr>
-          <tr v-for="product in products" v-else :key="product.id">
+          <tr
+            v-for="product in products"
+            v-else
+            :key="product.id"
+            :class="canManage ? 'cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/40' : ''"
+            :title="canManage ? 'Duplo clique para ajustar estoque' : ''"
+            @dblclick="canManage && openAdjustModal(product)"
+          >
             <td class="px-4 py-3 text-sm font-medium text-gray-900 dark:text-gray-100 whitespace-nowrap">
               {{ product.name }}
             </td>
@@ -261,7 +252,7 @@ onMounted(() => {
                 Estoque baixo
               </BaseBadge>
             </td>
-            <td v-if="canManage" class="print:hidden px-4 py-3 text-right whitespace-nowrap">
+            <td v-if="canManage" class="print:hidden px-4 py-3 text-right whitespace-nowrap" @dblclick.stop>
               <button
                 class="inline-flex items-center justify-center h-8 w-8 rounded-lg text-primary-600 hover:bg-primary-50 dark:text-primary-400 dark:hover:bg-primary-900/30"
                 title="Ajustar estoque"

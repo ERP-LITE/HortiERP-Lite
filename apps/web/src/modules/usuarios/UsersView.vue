@@ -20,6 +20,7 @@ import { generateRandomPassword } from '@/lib/password'
 import { createUser, deleteUser, deleteUsers, listUsers, updateUser } from '@/services/usersService'
 import { usePagination } from '@/composables/usePagination'
 import { useBulkSelection } from '@/composables/useBulkSelection'
+import { useFilterModal } from '@/composables/useFilterModal'
 import type { User, UserRole } from '@/types'
 
 const roleOptions: { value: UserRole; label: string }[] = [
@@ -45,10 +46,13 @@ const loading = ref(true)
 const errorMessage = ref('')
 
 const search = ref('')
-const emptyFilters = { role: 'todos', active: 'todos' }
-const filters = ref({ ...emptyFilters })
-const draftFilters = ref({ ...emptyFilters })
-const filterModalOpen = ref(false)
+const { filters, draftFilters, filterModalOpen, openFilterModal, applyFilters, clearFilters } = useFilterModal(
+  () => ({ role: 'todos', active: 'todos' }),
+  () => {
+    page.value = 1
+    loadUsers()
+  },
+)
 const activeFilterCount = computed(
   () => Number(filters.value.role !== 'todos') + Number(filters.value.active !== 'todos'),
 )
@@ -79,26 +83,6 @@ async function loadUsers() {
   } finally {
     loading.value = false
   }
-}
-
-function openFilterModal() {
-  draftFilters.value = { ...filters.value }
-  filterModalOpen.value = true
-}
-
-function applyFilters() {
-  filters.value = { ...draftFilters.value }
-  filterModalOpen.value = false
-  page.value = 1
-  loadUsers()
-}
-
-function clearFilters() {
-  filters.value = { ...emptyFilters }
-  draftFilters.value = { ...emptyFilters }
-  filterModalOpen.value = false
-  page.value = 1
-  loadUsers()
 }
 
 function openCreateModal() {

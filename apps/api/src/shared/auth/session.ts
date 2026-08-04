@@ -4,7 +4,7 @@ import { parseDurationToSeconds } from '../utils/duration.js'
 
 export const AUTH_COOKIE_NAME = 'token'
 
-export const AUTH_COOKIE_OPTIONS = {
+const AUTH_COOKIE_OPTIONS = {
   path: '/',
   httpOnly: true,
   secure: env.NODE_ENV === 'production',

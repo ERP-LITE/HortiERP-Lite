@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { after, before, beforeEach, describe, test } from 'node:test'
-import { eq, sql } from 'drizzle-orm'
+import { eq, inArray, sql } from 'drizzle-orm'
 import type { FastifyInstance } from 'fastify'
 import { buildApp } from '../src/app.js'
 import { db, pool } from '../src/db/client.js'
@@ -401,6 +401,78 @@ describe('ajuste manual de estoque', () => {
     })
 
     assert.equal(response.statusCode, 404)
+  })
+})
+
+describe('exclusão lógica (soft delete genérico)', () => {
+  test('exclui categoria individualmente e marca deletedAt/updatedBy', async () => {
+    const tenant = await createTenant('delete-cat')
+
+    const response = await app.inject({
+      method: 'DELETE',
+      url: `/api/categories/${tenant.categoryId}`,
+      headers: { cookie: authCookie(tenant.admin) },
+    })
+    assert.equal(response.statusCode, 204)
+
+    const [category] = await db.select().from(categories).where(eq(categories.id, tenant.categoryId))
+    assert.ok(category.deletedAt)
+    assert.equal(category.updatedBy, tenant.admin.id)
+  })
+
+  test('exclui categorias em lote', async () => {
+    const tenant = await createTenant('delete-cat-bulk')
+    const [extra] = await db
+      .insert(categories)
+      .values({ companyId: tenant.companyId, name: 'Extra delete-cat-bulk', createdBy: tenant.admin.id })
+      .returning({ id: categories.id })
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/categories/bulk-delete',
+      headers: { cookie: authCookie(tenant.admin) },
+      payload: { ids: [tenant.categoryId, extra.id] },
+    })
+    assert.equal(response.statusCode, 200)
+    assert.deepEqual(response.json(), { deleted: 2 })
+  })
+
+  test('exclui usuário individualmente e também desativa (softDelete com extraSet)', async () => {
+    const tenant = await createTenant('delete-user')
+
+    const response = await app.inject({
+      method: 'DELETE',
+      url: `/api/users/${tenant.operator.id}`,
+      headers: { cookie: authCookie(tenant.admin) },
+    })
+    assert.equal(response.statusCode, 204)
+
+    const [user] = await db.select().from(users).where(eq(users.id, tenant.operator.id))
+    assert.ok(user.deletedAt)
+    assert.equal(user.active, false)
+  })
+
+  test('exclui usuários em lote e também desativa (softDelete com extraSet)', async () => {
+    const tenant = await createTenant('delete-user-bulk')
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/users/bulk-delete',
+      headers: { cookie: authCookie(tenant.admin) },
+      payload: { ids: [tenant.operator.id, tenant.manager.id] },
+    })
+    assert.equal(response.statusCode, 200)
+    assert.deepEqual(response.json(), { deleted: 2 })
+
+    const rows = await db
+      .select({ active: users.active, deletedAt: users.deletedAt })
+      .from(users)
+      .where(inArray(users.id, [tenant.operator.id, tenant.manager.id]))
+    assert.equal(rows.length, 2)
+    for (const row of rows) {
+      assert.ok(row.deletedAt)
+      assert.equal(row.active, false)
+    }
   })
 })
 

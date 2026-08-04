@@ -18,6 +18,7 @@ import { toastSuccess } from '@/lib/alerts'
 import { listAllProducts } from '@/services/productsService'
 import { createLoss, listLosses } from '@/services/lossesService'
 import { usePagination } from '@/composables/usePagination'
+import { useFilterModal } from '@/composables/useFilterModal'
 import type { Loss, LossReason, Product } from '@/types'
 
 const reasonOptions: { value: LossReason; label: string }[] = [
@@ -42,9 +43,13 @@ const search = ref('')
 function emptyFilters() {
   return { productId: 'todos', reason: 'todos', period: { preset: 'todos', from: '', to: '' } as PeriodValue }
 }
-const filters = ref(emptyFilters())
-const draftFilters = ref(emptyFilters())
-const filterModalOpen = ref(false)
+const { filters, draftFilters, filterModalOpen, openFilterModal, applyFilters, clearFilters } = useFilterModal(
+  emptyFilters,
+  () => {
+    page.value = 1
+    loadLosses()
+  },
+)
 const activeFilterCount = computed(
   () =>
     Number(filters.value.productId !== 'todos') +
@@ -95,26 +100,6 @@ async function loadProductOptions() {
 
 async function loadAll() {
   await Promise.all([loadLosses(), loadProductOptions()])
-}
-
-function openFilterModal() {
-  draftFilters.value = { ...filters.value }
-  filterModalOpen.value = true
-}
-
-function applyFilters() {
-  filters.value = { ...draftFilters.value }
-  filterModalOpen.value = false
-  page.value = 1
-  loadLosses()
-}
-
-function clearFilters() {
-  filters.value = emptyFilters()
-  draftFilters.value = emptyFilters()
-  filterModalOpen.value = false
-  page.value = 1
-  loadLosses()
 }
 
 function openCreateModal() {
