@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, isNull, lte, sql } from 'drizzle-orm'
+import { and, asc, count, desc, eq, gte, isNull, lte, sql } from 'drizzle-orm'
 import { db } from '../../db/client.js'
 import { categories, losses, products, stockMovements } from '../../db/schema/index.js'
 
@@ -35,32 +35,44 @@ function resolvePeriod(range: { from?: Date; to?: Date }) {
 export async function getDashboardSummary(companyId: string, range: { from?: Date; to?: Date }) {
   const { periodStart, periodEnd } = resolvePeriod(range)
 
-  const activeProducts = await db
-    .select()
-    .from(products)
-    .where(and(eq(products.companyId, companyId), isNull(products.deletedAt), eq(products.active, true)))
-
-  const lowStockProducts = activeProducts.filter(
-    (product) => Number(product.currentStock) <= Number(product.minStock),
+  const activeProductConditions = and(
+    eq(products.companyId, companyId),
+    isNull(products.deletedAt),
+    eq(products.active, true),
+  )
+  const lowStockConditions = and(activeProductConditions, lte(products.currentStock, products.minStock))
+  const lossPeriodConditions = and(
+    eq(losses.companyId, companyId),
+    gte(losses.lossDate, periodStart),
+    lte(losses.lossDate, periodEnd),
   )
 
-  const stockValue = activeProducts.reduce(
-    (sum, product) => sum + Number(product.currentStock) * Number(product.costPrice ?? 0),
-    0,
-  )
-
-  const recentLosses = await db
-    .select()
-    .from(losses)
-    .where(and(eq(losses.companyId, companyId), gte(losses.lossDate, periodStart), lte(losses.lossDate, periodEnd)))
-
-  const lossesQuantity = recentLosses.reduce((sum, loss) => sum + Number(loss.quantity), 0)
-
-  const lossesByReasonMap = new Map<string, number>()
-  for (const loss of recentLosses) {
-    lossesByReasonMap.set(loss.reason, (lossesByReasonMap.get(loss.reason) ?? 0) + Number(loss.quantity))
-  }
-  const lossesByReason = Array.from(lossesByReasonMap, ([reason, quantity]) => ({ reason, quantity }))
+  const [[productSummary], [{ lowStockCount }], lowStockProducts, [lossSummary], lossesByReason] = await Promise.all([
+    db
+      .select({
+        totalProducts: count(),
+        stockValue: sql<number>`coalesce(sum(${products.currentStock} * coalesce(${products.costPrice}, 0)), 0)`.mapWith(Number),
+      })
+      .from(products)
+      .where(activeProductConditions),
+    db.select({ lowStockCount: count() }).from(products).where(lowStockConditions),
+    db.select().from(products).where(lowStockConditions).orderBy(asc(products.currentStock)).limit(10),
+    db
+      .select({
+        lossesCount: count(),
+        lossesQuantity: sql<number>`coalesce(sum(${losses.quantity}), 0)`.mapWith(Number),
+      })
+      .from(losses)
+      .where(lossPeriodConditions),
+    db
+      .select({
+        reason: losses.reason,
+        quantity: sql<number>`coalesce(sum(${losses.quantity}), 0)`.mapWith(Number),
+      })
+      .from(losses)
+      .where(lossPeriodConditions)
+      .groupBy(losses.reason),
+  ])
 
   const recentMovements = await db.query.stockMovements.findMany({
     where: and(
@@ -117,7 +129,7 @@ export async function getDashboardSummary(companyId: string, range: { from?: Dat
       products,
       and(eq(products.categoryId, categories.id), isNull(products.deletedAt), eq(products.active, true)),
     )
-    .where(eq(categories.companyId, companyId))
+    .where(and(eq(categories.companyId, companyId), isNull(categories.deletedAt)))
     .groupBy(categories.id, categories.name)
 
   const stockByCategory = stockByCategoryRows
@@ -125,17 +137,15 @@ export async function getDashboardSummary(companyId: string, range: { from?: Dat
     .sort((a, b) => b.totalStock - a.totalStock)
 
   return {
-    totalProducts: activeProducts.length,
-    lowStockCount: lowStockProducts.length,
-    lowStockProducts: lowStockProducts
-      .sort((a, b) => Number(a.currentStock) - Number(b.currentStock))
-      .slice(0, 10),
-    stockValue,
+    totalProducts: productSummary.totalProducts,
+    lowStockCount,
+    lowStockProducts,
+    stockValue: productSummary.stockValue,
     periodFrom: formatDay(periodStart),
     periodTo: formatDay(periodEnd),
     lossesInPeriod: {
-      lossesCount: recentLosses.length,
-      lossesQuantity,
+      lossesCount: lossSummary.lossesCount,
+      lossesQuantity: lossSummary.lossesQuantity,
     },
     recentMovements,
     movementsTimeline,

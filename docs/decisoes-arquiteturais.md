@@ -68,6 +68,12 @@ Endpoints envolvidos: `POST /companies/:id/impersonate` (super_admin only — en
 
 Padrão único em todo módulo de listagem: `paginationQuerySchema` (Zod, `shared/schemas/pagination.schema.ts`) valida `page`/`pageSize` (máx. 100), e `buildPaginatedResult` (`shared/db/paginate.ts`) monta a resposta `{ data, page, pageSize, total, totalPages }`. Nenhum módulo reimplementa isso na mão.
 
+Os detalhamentos dos relatórios de perdas e entradas também seguem esse contrato. No frontend, listas usadas como opções de formulário percorrem todas as páginas por meio de `services/paginatedOptions.ts`; assim, o limite de 100 por requisição não oculta opções de empresas com cadastros maiores.
+
+## Integridade e índices
+
+Além das validações amigáveis dos services, nomes de categorias, unidades e produtos e abreviações/SKUs possuem índices únicos parciais e case-insensitive por empresa. Os índices consideram apenas registros com `deletedAt` nulo, preservando o comportamento de soft delete. Consultas operacionais frequentes também possuem índices compostos por empresa/data ou empresa/produto.
+
 ## Logs técnicos e auditoria por empresa
 
 Um hook global `onResponse` registra em `system_logs` as requisições da API, sem persistir corpo, senha, cookie ou token. Respostas 2xx/3xx são `info`, 4xx são `warning` e 5xx são `error`; o tratamento centralizado de erros anexa código e mensagem ao contexto antes da persistência.

@@ -1,5 +1,6 @@
 import { api } from './api'
 import type { PaginatedResult, Unit } from '@/types'
+import { fetchAllPages } from './paginatedOptions'
 
 export interface UnitInput {
   name: string
@@ -15,6 +16,10 @@ export interface ListUnitsParams {
 export async function listUnits(params: ListUnitsParams) {
   const { data } = await api.get<PaginatedResult<Unit>>('/units', { params })
   return data
+}
+
+export function listAllUnits(params: Omit<ListUnitsParams, 'page' | 'pageSize'> = {}) {
+  return fetchAllPages((page, pageSize) => listUnits({ ...params, page, pageSize }))
 }
 
 export async function createUnit(payload: UnitInput) {

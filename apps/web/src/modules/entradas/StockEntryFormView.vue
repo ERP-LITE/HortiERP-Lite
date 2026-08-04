@@ -8,7 +8,7 @@ import BaseInput from '@/components/ui/BaseInput.vue'
 import BaseSelect from '@/components/ui/BaseSelect.vue'
 import { getApiErrorMessage } from '@/services/api'
 import { toastSuccess } from '@/lib/alerts'
-import { listProducts } from '@/services/productsService'
+import { listAllProducts } from '@/services/productsService'
 import { createStockEntry } from '@/services/stockEntriesService'
 import type { Product } from '@/types'
 
@@ -44,7 +44,7 @@ function removeItem(index: number) {
 async function loadProducts() {
   loading.value = true
   try {
-    products.value = (await listProducts({ page: 1, pageSize: 100 })).data
+    products.value = await listAllProducts({ active: true })
   } catch (error) {
     errorMessage.value = getApiErrorMessage(error)
   } finally {

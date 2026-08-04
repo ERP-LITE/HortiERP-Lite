@@ -14,7 +14,7 @@ import PrintButton from '@/components/ui/PrintButton.vue'
 import SearchInput from '@/components/ui/SearchInput.vue'
 import { getApiErrorMessage } from '@/services/api'
 import { listCurrentStock } from '@/services/stockService'
-import { listCategories } from '@/services/categoriesService'
+import { listAllCategories } from '@/services/categoriesService'
 import { usePagination } from '@/composables/usePagination'
 import type { Category, ProductWithRelations } from '@/types'
 
@@ -59,7 +59,7 @@ async function loadStock() {
 
 async function loadCategoryOptions() {
   try {
-    categories.value = (await listCategories({ page: 1, pageSize: 100 })).data
+    categories.value = await listAllCategories()
   } catch (error) {
     errorMessage.value = getApiErrorMessage(error)
   }

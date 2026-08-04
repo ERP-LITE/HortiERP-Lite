@@ -16,8 +16,8 @@ import BulkSelectionBar from '@/components/ui/BulkSelectionBar.vue'
 import TableCheckbox from '@/components/ui/TableCheckbox.vue'
 import { getApiErrorMessage, resolveFormError } from '@/services/api'
 import { confirmDelete, toastError, toastSuccess } from '@/lib/alerts'
-import { listCategories } from '@/services/categoriesService'
-import { listUnits } from '@/services/unitsService'
+import { listAllCategories } from '@/services/categoriesService'
+import { listAllUnits } from '@/services/unitsService'
 import { createProduct, deleteProduct, deleteProducts, listProducts, updateProduct } from '@/services/productsService'
 import { useAuthStore } from '@/stores/auth'
 import { usePagination } from '@/composables/usePagination'
@@ -105,12 +105,9 @@ async function loadProducts() {
 
 async function loadFormOptions() {
   try {
-    const [categoriesResult, unitsResult] = await Promise.all([
-      listCategories({ page: 1, pageSize: 100 }),
-      listUnits({ page: 1, pageSize: 100 }),
-    ])
-    categories.value = categoriesResult.data
-    units.value = unitsResult.data
+    const [categoryOptions, unitOptions] = await Promise.all([listAllCategories(), listAllUnits()])
+    categories.value = categoryOptions
+    units.value = unitOptions
   } catch (error) {
     errorMessage.value = getApiErrorMessage(error)
   }

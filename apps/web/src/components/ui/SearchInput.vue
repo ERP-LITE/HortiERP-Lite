@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { onBeforeUnmount, ref, watch } from 'vue'
 import { Search } from '@lucide/vue'
 
 const props = defineProps<{ modelValue: string; placeholder?: string }>()
@@ -19,6 +19,8 @@ watch(local, (value) => {
   clearTimeout(timer)
   timer = setTimeout(() => emit('update:modelValue', value), 400)
 })
+
+onBeforeUnmount(() => clearTimeout(timer))
 </script>
 
 <template>

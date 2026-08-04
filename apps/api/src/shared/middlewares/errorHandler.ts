@@ -25,6 +25,38 @@ export function errorHandler(error: FastifyError | Error, request: FastifyReques
     })
   }
 
+  const databaseError =
+    'code' in error && error.code === '23505'
+      ? error
+      : 'cause' in error && error.cause instanceof Error && 'code' in error.cause && error.cause.code === '23505'
+        ? error.cause
+        : null
+  if (databaseError) {
+    const constraint =
+      'constraint' in databaseError && typeof databaseError.constraint === 'string' ? databaseError.constraint : ''
+    const duplicateByConstraint: Record<string, { field: string; message: string }> = {
+      categories_company_name_active_unique: { field: 'name', message: 'Já existe uma categoria com esse nome' },
+      units_company_name_active_unique: { field: 'name', message: 'Já existe uma unidade com esse nome' },
+      units_company_abbreviation_active_unique: {
+        field: 'abbreviation',
+        message: 'Já existe uma unidade com essa abreviação',
+      },
+      products_company_name_active_unique: { field: 'name', message: 'Já existe um produto com esse nome' },
+      products_company_sku_active_unique: { field: 'sku', message: 'Já existe um produto com esse SKU' },
+      users_email_unique: { field: 'email', message: 'Já existe um usuário com esse e-mail' },
+    }
+    const duplicate = duplicateByConstraint[constraint]
+    const message = duplicate?.message ?? 'Já existe um registro com esses dados'
+    request.technicalError = { code: 'DUPLICATE_ENTRY', message }
+    return reply.status(409).send({
+      error: {
+        code: 'DUPLICATE_ENTRY',
+        message,
+        ...(duplicate ? { issues: { [duplicate.field]: [message] } } : {}),
+      },
+    })
+  }
+
   if ('statusCode' in error && typeof error.statusCode === 'number' && error.statusCode < 500) {
     request.technicalError = { code: error.code ?? 'ERROR', message: error.message }
     return reply.status(error.statusCode).send({

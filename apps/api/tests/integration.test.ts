@@ -9,6 +9,7 @@ import {
   companies,
   losses,
   products,
+  stockEntries,
   stockMovements,
   units,
   users,
@@ -248,6 +249,95 @@ describe('concorrência de estoque', () => {
 
     const persistedLosses = await db.select().from(losses).where(eq(losses.productId, tenant.productId))
     assert.equal(persistedLosses.length, 1)
+  })
+})
+
+describe('buscas, paginação e integridade', () => {
+  test('busca entradas por fornecedor e pelo nome do item', async () => {
+    const tenant = await createTenant('entry-search')
+    await createStockEntry(tenant.companyId, tenant.operator.id, {
+      supplierName: 'Fornecedor Especial',
+      items: [{ productId: tenant.productId, quantity: 2 }],
+    })
+
+    for (const search of ['Especial', 'Produto entry-search']) {
+      const response = await app.inject({
+        method: 'GET',
+        url: `/api/stock-entries?page=1&pageSize=15&search=${encodeURIComponent(search)}`,
+        headers: { cookie: authCookie(tenant.operator) },
+      })
+      assert.equal(response.statusCode, 200)
+      assert.equal(response.json<{ total: number }>().total, 1)
+    }
+  })
+
+  test('produto de outra empresa não pode ser usado em entrada nem perda', async () => {
+    const tenantA = await createTenant('operation-a', '10')
+    const tenantB = await createTenant('operation-b', '10')
+
+    const entryResponse = await app.inject({
+      method: 'POST',
+      url: '/api/stock-entries',
+      headers: { cookie: authCookie(tenantA.operator) },
+      payload: { items: [{ productId: tenantB.productId, quantity: 1 }] },
+    })
+    assert.equal(entryResponse.statusCode, 404)
+
+    const lossResponse = await app.inject({
+      method: 'POST',
+      url: '/api/losses',
+      headers: { cookie: authCookie(tenantA.operator) },
+      payload: { productId: tenantB.productId, quantity: 1, reason: 'avariado' },
+    })
+    assert.equal(lossResponse.statusCode, 404)
+
+    const [{ total }] = await db.select({ total: sql<number>`count(*)` }).from(stockEntries)
+    assert.equal(Number(total), 0)
+  })
+
+  test('índice único impede duplicidade simultânea e retorna conflito amigável', async () => {
+    const tenant = await createTenant('duplicate')
+    const request = (name: string) =>
+      app.inject({
+        method: 'POST',
+        url: '/api/categories',
+        headers: { cookie: authCookie(tenant.admin) },
+        payload: { name },
+      })
+
+    const responses = await Promise.all([request('Nova categoria'), request('NOVA CATEGORIA')])
+    assert.deepEqual(responses.map(({ statusCode }) => statusCode).sort(), [201, 409])
+  })
+
+  test('relatórios são paginados e não exibem categoria excluída', async () => {
+    const tenant = await createTenant('reports')
+    await db.update(categories).set({ deletedAt: new Date() }).where(eq(categories.id, tenant.categoryId))
+
+    const categoryReport = await app.inject({
+      method: 'GET',
+      url: '/api/reports/stock-by-category',
+      headers: { cookie: authCookie(tenant.admin) },
+    })
+    assert.equal(categoryReport.statusCode, 200)
+    assert.deepEqual(categoryReport.json(), [])
+
+    await db.update(categories).set({ deletedAt: null }).where(eq(categories.id, tenant.categoryId))
+    await createStockEntry(tenant.companyId, tenant.operator.id, {
+      items: [{ productId: tenant.productId, quantity: 1 }],
+    })
+    await createStockEntry(tenant.companyId, tenant.operator.id, {
+      items: [{ productId: tenant.productId, quantity: 1 }],
+    })
+    const entriesReport = await app.inject({
+      method: 'GET',
+      url: '/api/reports/stock-entries?page=1&pageSize=1',
+      headers: { cookie: authCookie(tenant.admin) },
+    })
+    const report = entriesReport.json<{ data: unknown[]; total: number; totalPages: number }>()
+    assert.equal(entriesReport.statusCode, 200)
+    assert.equal(report.data.length, 1)
+    assert.equal(report.total, 2)
+    assert.equal(report.totalPages, 2)
   })
 })
 
