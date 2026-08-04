@@ -119,6 +119,7 @@ export interface StockMovement {
   balanceAfter: string
   referenceType: string
   referenceId: string
+  notes: string | null
   createdAt: string
   product: Product
 }

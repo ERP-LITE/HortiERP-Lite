@@ -174,14 +174,21 @@ onMounted(loadCompanies)
               Nenhuma empresa cadastrada.
             </td>
           </tr>
-          <tr v-for="company in companies" v-else :key="company.id" class="hover:bg-gray-50 dark:hover:bg-gray-700/40">
+          <tr
+            v-for="company in companies"
+            v-else
+            :key="company.id"
+            class="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/40"
+            title="Duplo clique para editar"
+            @dblclick="openEditModal(company)"
+          >
             <td class="px-4 py-3 text-sm font-medium text-gray-900 dark:text-gray-100 whitespace-nowrap">
               {{ company.name }}
             </td>
             <td class="px-4 py-3 text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">
               {{ company.document || '—' }}
             </td>
-            <td class="px-4 py-3 whitespace-nowrap">
+            <td class="px-4 py-3 whitespace-nowrap" @dblclick.stop @click.stop>
               <div class="flex items-center gap-2">
                 <BaseBadge :variant="company.active ? 'success' : 'neutral'">
                   {{ company.active ? 'Ativo' : 'Suspenso' }}
@@ -192,7 +199,7 @@ onMounted(loadCompanies)
                 />
               </div>
             </td>
-            <td class="px-4 py-3 text-right whitespace-nowrap">
+            <td class="px-4 py-3 text-right whitespace-nowrap" @dblclick.stop>
               <button
                 class="inline-flex items-center justify-center h-8 w-8 rounded-lg text-primary-600 hover:bg-primary-50 dark:text-primary-400 dark:hover:bg-primary-900/30"
                 title="Editar"

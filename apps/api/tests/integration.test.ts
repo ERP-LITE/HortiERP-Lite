@@ -341,6 +341,69 @@ describe('buscas, paginação e integridade', () => {
   })
 })
 
+describe('ajuste manual de estoque', () => {
+  test('operador não pode ajustar estoque (exige admin ou gerente)', async () => {
+    const tenant = await createTenant('adjust-role', '10')
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/stock/adjust',
+      headers: { cookie: authCookie(tenant.operator) },
+      payload: { productId: tenant.productId, quantity: 7, notes: 'Contagem física' },
+    })
+
+    assert.equal(response.statusCode, 403)
+  })
+
+  test('admin ajusta o estoque, gera movimento tipo ajuste com o motivo e delta corretos', async () => {
+    const tenant = await createTenant('adjust-ok', '10')
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/stock/adjust',
+      headers: { cookie: authCookie(tenant.admin) },
+      payload: { productId: tenant.productId, quantity: 7, notes: 'Contagem física apontou divergência' },
+    })
+
+    assert.equal(response.statusCode, 201)
+    const movement = response.json<{ type: string; quantity: string; balanceAfter: string; notes: string }>()
+    assert.equal(movement.type, 'ajuste')
+    assert.equal(Number(movement.quantity), -3)
+    assert.equal(Number(movement.balanceAfter), 7)
+    assert.equal(movement.notes, 'Contagem física apontou divergência')
+
+    const [product] = await db.select({ currentStock: products.currentStock }).from(products).where(eq(products.id, tenant.productId))
+    assert.equal(Number(product.currentStock), 7)
+  })
+
+  test('rejeita ajuste para a mesma quantidade já registrada', async () => {
+    const tenant = await createTenant('adjust-noop', '10')
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/stock/adjust',
+      headers: { cookie: authCookie(tenant.admin) },
+      payload: { productId: tenant.productId, quantity: 10, notes: 'Sem mudança' },
+    })
+
+    assert.equal(response.statusCode, 422)
+  })
+
+  test('produto de outra empresa retorna 404 no ajuste', async () => {
+    const tenantA = await createTenant('adjust-a', '10')
+    const tenantB = await createTenant('adjust-b', '10')
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/stock/adjust',
+      headers: { cookie: authCookie(tenantA.admin) },
+      payload: { productId: tenantB.productId, quantity: 5, notes: 'Tentativa cross-tenant' },
+    })
+
+    assert.equal(response.statusCode, 404)
+  })
+})
+
 describe('impersonação', () => {
   test('super_admin acessa empresa ativa e perde a sessão quando ela é suspensa', async () => {
     const target = await createTenant('impersonated')
