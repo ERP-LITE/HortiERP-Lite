@@ -1,18 +1,20 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { Boxes, FileDown, Package, ReceiptText, Scale, TriangleAlert } from '@lucide/vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import BaseBadge from '@/components/ui/BaseBadge.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseModal from '@/components/ui/BaseModal.vue'
 import FilterButton from '@/components/ui/FilterButton.vue'
-import PrintButton from '@/components/ui/PrintButton.vue'
 import SearchInput from '@/components/ui/SearchInput.vue'
 import PeriodPicker from '@/components/ui/PeriodPicker.vue'
 import Pagination from '@/components/ui/Pagination.vue'
+import StatCard from '@/components/ui/StatCard.vue'
 import { usePagination } from '@/composables/usePagination'
 import { useFilterModal } from '@/composables/useFilterModal'
 import type { PeriodValue } from '@/lib/period'
 import { getApiErrorMessage } from '@/services/api'
+import { useAuthStore } from '@/stores/auth'
 import {
   fetchLossesReport,
   fetchStockByCategoryReport,
@@ -31,8 +33,12 @@ const tabs = [
 type TabKey = (typeof tabs)[number]['key']
 
 const activeTab = ref<TabKey>('estoque')
+const auth = useAuthStore()
 const { page, pageSize, total, totalPages, applyMeta } = usePagination()
 const loading = ref(false)
+const generatingPdf = ref(false)
+const printing = ref(false)
+const generatedAt = ref('')
 const errorMessage = ref('')
 
 function emptyPeriod(): PeriodValue {
@@ -57,6 +63,8 @@ const to = computed(() => period.value.to)
 const stockByCategory = ref<StockByCategoryRow[]>([])
 const lossesReport = ref<LossesReport | null>(null)
 const stockEntriesReport = ref<StockEntry[]>([])
+const printLossItems = ref<LossesReport['data']>([])
+const printStockEntries = ref<StockEntry[]>([])
 
 const reasonLabels: Record<string, string> = {
   vencido: 'Vencido',
@@ -75,11 +83,41 @@ function matches(text: string | null | undefined) {
 
 const filteredStockByCategory = computed(() => stockByCategory.value.filter((row) => matches(row.categoryName)))
 
-const filteredLossItems = computed(() =>
-  lossesReport.value?.data ?? [],
-)
+const filteredLossItems = computed(() => (printing.value ? printLossItems.value : lossesReport.value?.data ?? []))
 
-const filteredStockEntries = computed(() => stockEntriesReport.value)
+const filteredStockEntries = computed(() => (printing.value ? printStockEntries.value : stockEntriesReport.value))
+
+const stockSummary = computed(() => ({
+  categories: filteredStockByCategory.value.length,
+  products: filteredStockByCategory.value.reduce((sum, row) => sum + row.productCount, 0),
+  quantity: filteredStockByCategory.value.reduce((sum, row) => sum + row.totalStock, 0),
+}))
+
+const lossSummary = computed(() => {
+  const rows = lossesReport.value?.byReason ?? []
+  const occurrences = rows.reduce((sum, row) => sum + row.occurrences, 0)
+  const quantity = rows.reduce((sum, row) => sum + row.quantity, 0)
+  const mainReason = [...rows].sort((a, b) => b.quantity - a.quantity)[0]
+  return { occurrences, quantity, mainReason: mainReason ? reasonLabels[mainReason.reason] ?? mainReason.reason : '—' }
+})
+
+const entriesSummary = computed(() => {
+  const entries = printing.value ? printStockEntries.value : stockEntriesReport.value
+  return {
+    total: total.value,
+    suppliers: new Set(entries.map((entry) => entry.supplierName).filter(Boolean)).size,
+    quantity: entries.reduce(
+      (sum, entry) => sum + entry.items.reduce((itemSum, item) => itemSum + Number(item.quantity), 0),
+      0,
+    ),
+  }
+})
+
+const activeTabLabel = computed(() => tabs.find((tab) => tab.key === activeTab.value)?.label ?? 'Relatório')
+const periodLabel = computed(() => {
+  if (!hasDateFilterTab.value || activeFilterCount.value === 0) return 'Todo o período'
+  return `${from.value ? formatPeriodDate(from.value) : 'início'} até ${to.value ? formatPeriodDate(to.value) : 'hoje'}`
+})
 
 function formatDate(value: string) {
   return new Date(value).toLocaleDateString('pt-BR')
@@ -132,6 +170,79 @@ async function loadActiveTab() {
   }
 }
 
+async function loadAllLossesForPdf() {
+  const first = await fetchLossesReport({
+    from: from.value || undefined,
+    to: to.value || undefined,
+    search: search.value || undefined,
+    page: 1,
+    pageSize: 100,
+  })
+  const data = [...first.data]
+  for (let nextPage = 2; nextPage <= first.totalPages; nextPage += 1) {
+    const result = await fetchLossesReport({
+      from: from.value || undefined,
+      to: to.value || undefined,
+      search: search.value || undefined,
+      page: nextPage,
+      pageSize: 100,
+    })
+    data.push(...result.data)
+  }
+  printLossItems.value = data
+}
+
+async function loadAllEntriesForPdf() {
+  const first = await fetchStockEntriesReport({
+    from: from.value || undefined,
+    to: to.value || undefined,
+    search: search.value || undefined,
+    page: 1,
+    pageSize: 100,
+  })
+  const data = [...first.data]
+  for (let nextPage = 2; nextPage <= first.totalPages; nextPage += 1) {
+    const result = await fetchStockEntriesReport({
+      from: from.value || undefined,
+      to: to.value || undefined,
+      search: search.value || undefined,
+      page: nextPage,
+      pageSize: 100,
+    })
+    data.push(...result.data)
+  }
+  printStockEntries.value = data
+}
+
+async function generatePdf() {
+  generatingPdf.value = true
+  errorMessage.value = ''
+  try {
+    if (activeTab.value === 'perdas') await loadAllLossesForPdf()
+    if (activeTab.value === 'entradas') await loadAllEntriesForPdf()
+    generatedAt.value = new Date().toLocaleString('pt-BR')
+    printing.value = true
+    await nextTick()
+
+    const previousTitle = document.title
+    document.title = `${activeTabLabel.value} - HortiERP Lite`
+    window.addEventListener(
+      'afterprint',
+      () => {
+        document.title = previousTitle
+        printing.value = false
+        generatingPdf.value = false
+      },
+      { once: true },
+    )
+    window.print()
+  } catch (error) {
+    errorMessage.value = getApiErrorMessage(error)
+    generatingPdf.value = false
+    printing.value = false
+  }
+}
+
 watch(activeTab, () => {
   if (page.value !== 1) page.value = 1
   else loadActiveTab()
@@ -148,14 +259,31 @@ onMounted(loadActiveTab)
 </script>
 
 <template>
-  <div>
-    <PageHeader title="Relatórios" subtitle="Consolidados de estoque, perdas e entradas">
+  <div class="reports-page">
+    <PageHeader class="print:hidden" title="Relatórios" subtitle="Consolidados de estoque, perdas e entradas">
       <template #actions>
         <SearchInput v-model="search" placeholder="Buscar..." />
         <FilterButton v-if="hasDateFilterTab" :active="activeFilterCount" @click="openFilterModal" />
-        <PrintButton />
+        <BaseButton :disabled="loading || generatingPdf" title="Gerar PDF" @click="generatePdf">
+          <FileDown :size="17" />
+          <span class="hidden sm:inline">{{ generatingPdf ? 'Preparando...' : 'Gerar PDF' }}</span>
+        </BaseButton>
       </template>
     </PageHeader>
+
+    <section class="report-print-header hidden print:block">
+      <div class="flex items-start justify-between gap-6 border-b border-gray-300 pb-4">
+        <div>
+          <p class="text-sm font-semibold uppercase tracking-wider text-primary-700">HortiERP Lite</p>
+          <h1 class="mt-1 text-2xl font-bold text-gray-900">{{ activeTabLabel }}</h1>
+          <p class="mt-1 text-sm text-gray-600">{{ periodLabel }}</p>
+        </div>
+        <div class="text-right text-xs text-gray-500">
+          <p>Emitido em {{ generatedAt }}</p>
+          <p>Responsável: {{ auth.user?.name || 'Usuário não identificado' }}</p>
+        </div>
+      </div>
+    </section>
 
     <div class="print:hidden border-b border-gray-200 dark:border-gray-700 mb-6">
       <nav class="flex gap-6">
@@ -175,17 +303,23 @@ onMounted(loadActiveTab)
       </nav>
     </div>
 
-    <p v-if="activeFilterCount > 0 && hasDateFilterTab" class="text-sm text-gray-500 dark:text-gray-400 mb-4">
-      Período: {{ from ? formatPeriodDate(from) : 'início' }} até {{ to ? formatPeriodDate(to) : 'hoje' }}
+    <p v-if="hasDateFilterTab" class="print:hidden text-sm text-gray-500 dark:text-gray-400 mb-4">
+      Período: {{ periodLabel }}
     </p>
 
     <p v-if="errorMessage" class="text-sm text-red-600 dark:text-red-400 mb-4">{{ errorMessage }}</p>
     <p v-else-if="loading" class="text-sm text-gray-500 dark:text-gray-400">Carregando...</p>
 
     <template v-else>
+      <div v-if="activeTab === 'estoque'" class="report-summary-grid grid grid-cols-1 gap-4 mb-6 sm:grid-cols-3">
+        <StatCard label="Categorias" :value="String(stockSummary.categories)" :icon="Boxes" />
+        <StatCard label="Produtos cadastrados" :value="String(stockSummary.products)" :icon="Package" />
+        <StatCard label="Quantidade em estoque" :value="stockSummary.quantity.toLocaleString('pt-BR')" :icon="Scale" />
+      </div>
+
       <div
         v-if="activeTab === 'estoque'"
-        class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden"
+        class="report-table bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden"
       >
         <table v-mobile-accordion class="mobile-accordion-table min-w-full divide-y divide-gray-200 dark:divide-gray-700">
           <thead class="bg-gray-50 dark:bg-gray-900/60">
@@ -215,11 +349,24 @@ onMounted(loadActiveTab)
       </div>
 
       <div v-else-if="activeTab === 'perdas' && lossesReport" class="space-y-6">
-        <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+        <div class="report-summary-grid grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <StatCard label="Registros de perda" :value="String(lossSummary.occurrences)" :icon="ReceiptText" tone="danger" />
+          <StatCard label="Quantidade perdida" :value="lossSummary.quantity.toLocaleString('pt-BR')" :icon="TriangleAlert" tone="danger" />
+          <StatCard label="Principal motivo" :value="lossSummary.mainReason" :icon="Scale" tone="warning" />
+        </div>
+
+        <div class="report-table bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
           <div class="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
             <h2 class="text-sm font-semibold text-gray-700 dark:text-gray-300">Perdas por motivo</h2>
           </div>
           <table v-mobile-accordion class="mobile-accordion-table min-w-full divide-y divide-gray-100 dark:divide-gray-700">
+            <thead class="bg-gray-50 dark:bg-gray-900/60">
+              <tr>
+                <th class="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500 dark:text-gray-400">Motivo</th>
+                <th class="px-4 py-3 text-right text-xs font-medium uppercase text-gray-500 dark:text-gray-400">Registros</th>
+                <th class="px-4 py-3 text-right text-xs font-medium uppercase text-gray-500 dark:text-gray-400">Quantidade</th>
+              </tr>
+            </thead>
             <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
               <tr v-if="lossesReport.byReason.length === 0">
                 <td class="px-4 py-4 text-sm text-gray-500 dark:text-gray-400 text-center">
@@ -239,11 +386,20 @@ onMounted(loadActiveTab)
           </table>
         </div>
 
-        <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+        <div class="report-table bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
           <div class="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
             <h2 class="text-sm font-semibold text-gray-700 dark:text-gray-300">Detalhamento</h2>
           </div>
           <table v-mobile-accordion class="mobile-accordion-table min-w-full divide-y divide-gray-100 dark:divide-gray-700">
+            <thead class="bg-gray-50 dark:bg-gray-900/60">
+              <tr>
+                <th class="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500 dark:text-gray-400">Data</th>
+                <th class="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500 dark:text-gray-400">Produto</th>
+                <th class="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500 dark:text-gray-400">Motivo</th>
+                <th class="px-4 py-3 text-right text-xs font-medium uppercase text-gray-500 dark:text-gray-400">Quantidade</th>
+                <th class="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500 dark:text-gray-400">Registrado por</th>
+              </tr>
+            </thead>
             <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
               <tr v-if="filteredLossItems.length === 0">
                 <td class="px-4 py-4 text-sm text-gray-500 dark:text-gray-400 text-center">
@@ -270,6 +426,7 @@ onMounted(loadActiveTab)
             </tbody>
           </table>
           <Pagination
+            v-if="!printing"
             :page="page"
             :page-size="pageSize"
             :total="total"
@@ -280,10 +437,22 @@ onMounted(loadActiveTab)
         </div>
       </div>
 
-      <div
-        v-else-if="activeTab === 'entradas'"
-        class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden"
-      >
+      <div v-else-if="activeTab === 'entradas'" class="space-y-6">
+        <div class="report-summary-grid grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <StatCard label="Entradas registradas" :value="String(entriesSummary.total)" :icon="ReceiptText" />
+          <StatCard
+            :label="printing ? 'Fornecedores no relatório' : 'Fornecedores nesta página'"
+            :value="String(entriesSummary.suppliers)"
+            :icon="Boxes"
+          />
+          <StatCard
+            :label="printing ? 'Quantidade recebida' : 'Quantidade nesta página'"
+            :value="entriesSummary.quantity.toLocaleString('pt-BR')"
+            :icon="Package"
+          />
+        </div>
+
+        <div class="report-table bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
         <table v-mobile-accordion class="mobile-accordion-table min-w-full divide-y divide-gray-200 dark:divide-gray-700">
           <thead class="bg-gray-50 dark:bg-gray-900/60">
             <tr>
@@ -324,6 +493,7 @@ onMounted(loadActiveTab)
           </tbody>
         </table>
         <Pagination
+          v-if="!printing"
           :page="page"
           :page-size="pageSize"
           :total="total"
@@ -331,6 +501,7 @@ onMounted(loadActiveTab)
           @update:page="page = $event"
           @update:page-size="pageSize = $event"
         />
+        </div>
       </div>
     </template>
 

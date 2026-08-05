@@ -45,9 +45,9 @@ export function useIdleLogout() {
     idleTimer = setTimeout(handleTimeout, IDLE_TIMEOUT_MS)
   }
 
-  // Once the warning is showing, only an explicit "continuar conectado" click
-  // (via stayLoggedIn) counts as presence — incidental mouse jiggle shouldn't
-  // silently dismiss it.
+  // Depois que o aviso aparece, somente um clique explícito em "continuar conectado"
+  // (por meio de stayLoggedIn) conta como presença — um movimento incidental do mouse
+  // não deve dispensar o aviso silenciosamente.
   function handleActivity() {
     if (showWarning.value) return
 
