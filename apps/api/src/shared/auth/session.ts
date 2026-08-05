@@ -34,3 +34,7 @@ export async function issueSession(reply: FastifyReply, user: SessionUser) {
     maxAge: parseDurationToSeconds(env.JWT_EXPIRES_IN),
   })
 }
+
+export function clearSessionCookie(reply: FastifyReply) {
+  reply.clearCookie(AUTH_COOKIE_NAME, AUTH_COOKIE_OPTIONS)
+}
