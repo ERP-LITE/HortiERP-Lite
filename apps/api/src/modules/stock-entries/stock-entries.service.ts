@@ -28,7 +28,10 @@ export async function listStockEntries(companyId: string, query: ListStockEntrie
   const [data, [{ total }]] = await Promise.all([
     db.query.stockEntries.findMany({
       where,
-      with: { items: { with: { product: true } } },
+      with: {
+        createdByUser: { columns: { id: true, name: true } },
+        items: { with: { product: true } },
+      },
       orderBy: (entries, { desc: desc_ }) => [desc_(entries.entryDate)],
       limit: query.pageSize,
       offset: (query.page - 1) * query.pageSize,
@@ -42,7 +45,10 @@ export async function listStockEntries(companyId: string, query: ListStockEntrie
 export async function getStockEntry(companyId: string, id: string) {
   const entry = await db.query.stockEntries.findFirst({
     where: and(eq(stockEntries.id, id), eq(stockEntries.companyId, companyId)),
-    with: { items: { with: { product: true } } },
+    with: {
+      createdByUser: { columns: { id: true, name: true } },
+      items: { with: { product: true } },
+    },
   })
 
   if (!entry) throw AppError.notFound('Entrada de mercadoria não encontrada')

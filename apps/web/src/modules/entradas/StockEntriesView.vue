@@ -97,14 +97,17 @@ onMounted(loadEntries)
               Fornecedor
             </th>
             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Itens</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+              Recebido por
+            </th>
           </tr>
         </thead>
         <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
           <tr v-if="loading">
-            <td colspan="3" class="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">Carregando...</td>
+            <td colspan="4" class="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">Carregando...</td>
           </tr>
           <tr v-else-if="entries.length === 0">
-            <td colspan="3" class="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">
+            <td colspan="4" class="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">
               Nenhuma entrada registrada.
             </td>
           </tr>
@@ -116,6 +119,9 @@ onMounted(loadEntries)
               {{ entry.supplierName || '—' }}
             </td>
             <td class="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">{{ itemsSummary(entry) }}</td>
+            <td class="px-4 py-3 text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap">
+              {{ entry.createdByUser?.name || 'Usuário não identificado' }}
+            </td>
           </tr>
         </tbody>
       </table>

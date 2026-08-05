@@ -18,6 +18,7 @@ Uma entrada tem um cabeçalho (`stock_entries`: fornecedor em texto livre, data,
 2. Para cada item: soma a quantidade ao `currentStock` com um `UPDATE` atômico escopado por empresa, valida pelo retorno que o produto existe, insere a linha em `stock_entry_items` e grava um `stock_movements` com `type: 'entrada'`, quantidade positiva e `balanceAfter` = novo saldo retornado pelo banco.
 
 Se qualquer produto do lote não existir, a transação inteira é revertida (nenhum item é gravado, nenhum estoque é alterado).
+O histórico e o relatório de entradas exibem o nome do usuário de `createdBy` como **Recebido por**, mantendo identificável quem recebeu a mercadoria.
 
 ## Registro de perda
 
@@ -29,6 +30,7 @@ Tela `/perdas`. Rota `POST /losses`, service `losses.service.ts::createLoss`. Me
 4. Grava um `stock_movements` com `type: 'perda'`, **quantidade negativa** e `balanceAfter` = novo saldo retornado pelo banco.
 
 Tudo em uma transação — perda só é registrada se o estoque puder de fato ser decrementado.
+O histórico e o relatório de perdas exibem o nome do usuário de `createdBy` como **Registrado por**.
 
 ## Consulta de estoque
 

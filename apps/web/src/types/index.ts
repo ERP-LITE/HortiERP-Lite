@@ -93,6 +93,7 @@ export interface StockEntry {
   entryDate: string
   notes: string | null
   createdAt: string
+  createdByUser: { id: string; name: string } | null
   items: StockEntryItem[]
 }
 
@@ -106,6 +107,7 @@ export interface Loss {
   notes: string | null
   lossDate: string
   createdAt: string
+  createdByUser: { id: string; name: string } | null
   product: Product
 }
 

@@ -66,6 +66,37 @@ describe('concorrência de estoque', () => {
 })
 
 describe('entradas e perdas: busca e integridade multiempresa', () => {
+  test('listagens identificam pelo nome o usuário que registrou cada operação', async () => {
+    const tenant = await createTenant('operation-author', '10')
+
+    await createStockEntry(tenant.companyId, tenant.operator.id, {
+      items: [{ productId: tenant.productId, quantity: 2 }],
+    })
+    await createLoss(tenant.companyId, tenant.admin.id, {
+      productId: tenant.productId,
+      quantity: 1,
+      reason: 'avariado',
+    })
+
+    const entriesResponse = await ctx.app.inject({
+      method: 'GET',
+      url: '/api/stock-entries?page=1&pageSize=15',
+      headers: { cookie: authCookie(ctx.app, tenant.operator) },
+    })
+    assert.equal(entriesResponse.statusCode, 200)
+    const [entry] = entriesResponse.json<{ data: { createdByUser: { id: string; name: string } | null }[] }>().data
+    assert.deepEqual(entry.createdByUser, { id: tenant.operator.id, name: tenant.operator.name })
+
+    const lossesResponse = await ctx.app.inject({
+      method: 'GET',
+      url: '/api/losses?page=1&pageSize=15',
+      headers: { cookie: authCookie(ctx.app, tenant.operator) },
+    })
+    assert.equal(lossesResponse.statusCode, 200)
+    const [loss] = lossesResponse.json<{ data: { createdByUser: { id: string; name: string } | null }[] }>().data
+    assert.deepEqual(loss.createdByUser, { id: tenant.admin.id, name: tenant.admin.name })
+  })
+
   test('busca entradas por fornecedor e pelo nome do item', async () => {
     const tenant = await createTenant('entry-search')
     await createStockEntry(tenant.companyId, tenant.operator.id, {
