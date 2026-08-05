@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify'
 import { authenticate } from '../../shared/middlewares/auth.js'
-import { AUTH_COOKIE_NAME, issueSession } from '../../shared/auth/session.js'
+import { clearSessionCookie, issueSession } from '../../shared/auth/session.js'
 import { AppError } from '../../shared/errors/AppError.js'
 import { verifyTurnstileToken } from '../../shared/security/verifyTurnstile.js'
 import { getCompany } from '../companies/companies.service.js'
@@ -34,8 +34,8 @@ export async function authRoutes(app: FastifyInstance) {
     },
   )
 
-  app.post('/auth/logout', { preHandler: [authenticate] }, async (_request, reply) => {
-    reply.clearCookie(AUTH_COOKIE_NAME, { path: '/' })
+  app.post('/auth/logout', async (_request, reply) => {
+    clearSessionCookie(reply)
     return { success: true }
   })
 

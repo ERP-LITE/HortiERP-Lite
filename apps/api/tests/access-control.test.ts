@@ -52,6 +52,21 @@ describe('isolamento multiempresa e permissões', () => {
 })
 
 describe('invalidação imediata de sessão', () => {
+  test('logout remove o cookie mesmo quando o token está ausente ou inválido', async () => {
+    for (const cookie of [undefined, 'token=token-invalido']) {
+      const response = await ctx.app.inject({
+        method: 'POST',
+        url: '/api/auth/logout',
+        headers: cookie ? { cookie } : undefined,
+      })
+
+      assert.equal(response.statusCode, 200)
+      const clearedCookie = response.cookies.find(({ name }) => name === 'token')
+      assert.ok(clearedCookie)
+      assert.equal(clearedCookie.value, '')
+    }
+  })
+
   test('usuário desativado recebe 401 com JWT ainda válido', async () => {
     const tenant = await createTenant('disabled-user')
     const cookie = authCookie(ctx.app, tenant.admin)

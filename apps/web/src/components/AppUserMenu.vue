@@ -34,8 +34,11 @@ function handleClickOutside(event: MouseEvent) {
 }
 
 async function handleLogout() {
-  await auth.logout()
-  window.location.href = '/login'
+  try {
+    await auth.logout()
+  } finally {
+    window.location.replace('/login')
+  }
 }
 
 onMounted(() => document.addEventListener('click', handleClickOutside))

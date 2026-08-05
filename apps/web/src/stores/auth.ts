@@ -9,6 +9,8 @@ import {
 import { impersonateCompany } from '@/services/companiesService'
 import type { AuthUser, SessionResponse } from '@/types'
 
+const LOGOUT_MARKER_KEY = 'hortierp_logout_requested'
+
 export const useAuthStore = defineStore('auth', () => {
   const user = ref<AuthUser | null>(null)
   const impersonating = ref(false)
@@ -30,11 +32,18 @@ export const useAuthStore = defineStore('auth', () => {
 
   async function login(email: string, password: string, turnstileToken: string) {
     const response = await loginRequest(email, password, turnstileToken)
+    localStorage.removeItem(LOGOUT_MARKER_KEY)
     applySession(response)
     initialized.value = true
   }
 
   function restoreSession() {
+    if (localStorage.getItem(LOGOUT_MARKER_KEY)) {
+      clearSession()
+      initialized.value = true
+      return Promise.resolve()
+    }
+
     if (!sessionPromise) {
       sessionPromise = fetchMe()
         .then((session) => applySession(session))
@@ -60,6 +69,7 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   async function logout() {
+    localStorage.setItem(LOGOUT_MARKER_KEY, new Date().toISOString())
     try {
       await logoutRequest()
     } finally {
