@@ -263,6 +263,9 @@ onMounted(loadActiveTab)
                 <td class="px-4 py-3 text-sm text-gray-700 dark:text-gray-300 text-right">
                   {{ Number(loss.quantity) }}
                 </td>
+                <td class="px-4 py-3 text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">
+                  {{ loss.createdByUser?.name || 'Usuário não identificado' }}
+                </td>
               </tr>
             </tbody>
           </table>
@@ -293,11 +296,14 @@ onMounted(loadActiveTab)
               <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
                 Itens
               </th>
+              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                Recebido por
+              </th>
             </tr>
           </thead>
           <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
             <tr v-if="filteredStockEntries.length === 0">
-              <td colspan="3" class="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">
+              <td colspan="4" class="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">
                 Sem entradas no período.
               </td>
             </tr>
@@ -310,6 +316,9 @@ onMounted(loadActiveTab)
               </td>
               <td class="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
                 {{ entry.items.map((item) => `${item.product.name} (${Number(item.quantity)})`).join(', ') }}
+              </td>
+              <td class="px-4 py-3 text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">
+                {{ entry.createdByUser?.name || 'Usuário não identificado' }}
               </td>
             </tr>
           </tbody>

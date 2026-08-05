@@ -58,6 +58,7 @@ export const productsRelations = relations(products, ({ one, many }) => ({
 
 export const stockEntriesRelations = relations(stockEntries, ({ one, many }) => ({
   company: one(companies, { fields: [stockEntries.companyId], references: [companies.id] }),
+  createdByUser: one(users, { fields: [stockEntries.createdBy], references: [users.id] }),
   items: many(stockEntryItems),
 }))
 
@@ -69,6 +70,7 @@ export const stockEntryItemsRelations = relations(stockEntryItems, ({ one }) => 
 export const lossesRelations = relations(losses, ({ one }) => ({
   company: one(companies, { fields: [losses.companyId], references: [companies.id] }),
   product: one(products, { fields: [losses.productId], references: [products.id] }),
+  createdByUser: one(users, { fields: [losses.createdBy], references: [users.id] }),
 }))
 
 export const stockMovementsRelations = relations(stockMovements, ({ one }) => ({

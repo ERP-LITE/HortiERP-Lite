@@ -10,6 +10,7 @@ export type Role = 'admin' | 'gerente' | 'operador' | 'super_admin'
 export interface FixtureUser {
   id: string
   companyId: string
+  name: string
   role: Role
 }
 
@@ -43,7 +44,7 @@ export async function createUser(companyId: string, role: Role, suffix: string):
       passwordHash: 'not-used-by-integration-tests',
       role,
     })
-    .returning({ id: users.id, companyId: users.companyId, role: users.role })
+    .returning({ id: users.id, companyId: users.companyId, name: users.name, role: users.role })
 
   return user
 }

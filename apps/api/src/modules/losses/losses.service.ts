@@ -22,7 +22,10 @@ export async function listLosses(companyId: string, query: ListLossesQuery) {
   const [data, [{ total }]] = await Promise.all([
     db.query.losses.findMany({
       where,
-      with: { product: true },
+      with: {
+        createdByUser: { columns: { id: true, name: true } },
+        product: true,
+      },
       orderBy: desc(losses.lossDate),
       limit: query.pageSize,
       offset: (query.page - 1) * query.pageSize,
@@ -36,7 +39,10 @@ export async function listLosses(companyId: string, query: ListLossesQuery) {
 export async function getLoss(companyId: string, id: string) {
   const loss = await db.query.losses.findFirst({
     where: and(eq(losses.id, id), eq(losses.companyId, companyId)),
-    with: { product: true },
+    with: {
+      createdByUser: { columns: { id: true, name: true } },
+      product: true,
+    },
   })
 
   if (!loss) throw AppError.notFound('Registro de perda não encontrado')
