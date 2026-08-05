@@ -64,6 +64,8 @@ Contagens, somas e agrupamentos são calculados no PostgreSQL; produtos e perdas
 
 Os detalhamentos de perdas e entradas são paginados e pesquisados no backend, mantendo os agregados por motivo sobre todo o período selecionado. Isso evita respostas sem limite conforme o histórico da empresa cresce.
 
+A tela apresenta indicadores-resumo antes dos detalhamentos e permite gerar cada relatório em PDF pelo diálogo de impressão do navegador. Para perdas e entradas, a geração busca todas as páginas do período e da pesquisa aplicados antes de montar o documento; a paginação permanece apenas na visualização normal da tela. O documento inclui título, período, data de emissão e usuário responsável pela emissão.
+
 ## Logs
 
 - Tela `/logs/atividades`: somente o `admin` consulta ações de escrita realizadas dentro da própria empresa. O `companyId` não é aceito da interface; é obtido obrigatoriamente da sessão.

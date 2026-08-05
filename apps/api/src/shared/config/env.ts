@@ -19,8 +19,9 @@ const envSchema = z
       .enum(['true', 'false'])
       .default('false')
       .transform((value) => value === 'true'),
-    // Default is Cloudflare's "always passes" test secret key, so local dev works
-    // out of the box. Production is explicitly rejected below when it uses a test key.
+    // O valor padrão é a chave secreta de teste da Cloudflare que "sempre passa",
+    // permitindo o desenvolvimento local sem configuração adicional. Abaixo, o uso
+    // de uma chave de teste é rejeitado explicitamente em produção.
     TURNSTILE_SECRET_KEY: z.string().default('1x0000000000000000000000000000000AA'),
   })
   .superRefine((value, context) => {

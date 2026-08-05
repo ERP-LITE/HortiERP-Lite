@@ -18,9 +18,9 @@ export interface PaginationMeta {
 }
 
 /**
- * pageSize is persisted in localStorage so it acts as a single global
- * default shared by every paginated table, while each table keeps its
- * own page/total state independently.
+ * O pageSize é persistido no localStorage para funcionar como um único padrão
+ * global compartilhado por todas as tabelas paginadas, enquanto cada tabela
+ * mantém seu próprio estado de página e total de forma independente.
  */
 export function usePagination() {
   const page = ref(1)
