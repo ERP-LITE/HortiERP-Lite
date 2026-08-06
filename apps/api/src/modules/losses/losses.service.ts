@@ -1,6 +1,6 @@
-import { and, count, desc, eq, gte, ilike, inArray, lte, or } from 'drizzle-orm'
+import { and, count, desc, eq, gte, ilike, inArray, isNull, lte, or } from 'drizzle-orm'
 import { db } from '../../db/client.js'
-import { losses } from '../../db/schema/index.js'
+import { losses, products } from '../../db/schema/index.js'
 import { AppError } from '../../shared/errors/AppError.js'
 import { applyStockMovement } from '../../shared/db/applyStockMovement.js'
 import { buildPaginatedResult } from '../../shared/db/paginate.js'
@@ -60,12 +60,20 @@ export async function getLoss(companyId: string, id: string) {
 
 export async function createLoss(companyId: string, userId: string, data: CreateLossInput) {
   return db.transaction(async (tx) => {
+    const [product] = await tx
+      .select({ costPrice: products.costPrice })
+      .from(products)
+      .where(and(eq(products.id, data.productId), eq(products.companyId, companyId), isNull(products.deletedAt)))
+
+    if (!product) throw AppError.notFound(`Produto não encontrado: ${data.productId}`)
+
     const [loss] = await tx
       .insert(losses)
       .values({
         companyId,
         productId: data.productId,
         quantity: data.quantity.toString(),
+        unitCost: product.costPrice,
         reason: data.reason,
         notes: data.notes,
         lossDate: data.lossDate ?? new Date(),

@@ -20,6 +20,32 @@ describe('saúde operacional', () => {
   })
 })
 
+describe('indicadores financeiros do dashboard', () => {
+  test('valor da perda usa o custo registrado no momento da ocorrência', async () => {
+    const tenant = await createTenant('dashboard-loss-value', '10')
+    await db.update(products).set({ costPrice: '12.50' }).where(eq(products.id, tenant.productId))
+
+    await createLoss(tenant.companyId, tenant.operator.id, {
+      productId: tenant.productId,
+      quantity: 2,
+      reason: 'avariado',
+    })
+
+    await db.update(products).set({ costPrice: '99.00' }).where(eq(products.id, tenant.productId))
+
+    const response = await ctx.app.inject({
+      method: 'GET',
+      url: '/api/dashboard/summary',
+      headers: { cookie: authCookie(ctx.app, tenant.admin) },
+    })
+
+    assert.equal(response.statusCode, 200)
+    const summary = response.json<{ lossesInPeriod: { lossesCount: number; lossValue: number } }>()
+    assert.equal(summary.lossesInPeriod.lossesCount, 1)
+    assert.equal(summary.lossesInPeriod.lossValue, 25)
+  })
+})
+
 describe('concorrência de estoque', () => {
   test('entradas simultâneas acumulam todas as quantidades sem perder atualização', async () => {
     const tenant = await createTenant('entries', '0')

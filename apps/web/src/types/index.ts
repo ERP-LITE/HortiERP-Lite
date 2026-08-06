@@ -155,12 +155,49 @@ export interface DashboardSummary {
   periodTo: string
   lossesInPeriod: {
     lossesCount: number
-    lossesQuantity: number
+    lossValue: number
+    totalsByUnit: DashboardQuantityByUnit[]
   }
   recentMovements: StockMovement[]
-  movementsTimeline: { date: string; entrada: number; perda: number }[]
-  stockByCategory: { categoryId: string; categoryName: string; totalStock: number }[]
-  lossesByReason: { reason: LossReason; quantity: number }[]
+  movementsTimeline: {
+    date: string
+    entradaCount: number
+    perdaCount: number
+    ajusteCount: number
+    entradaByUnit: DashboardQuantityByUnit[]
+    perdaByUnit: DashboardQuantityByUnit[]
+    ajusteByUnit: DashboardQuantityByUnit[]
+    entradaProducts: DashboardProductQuantity[]
+    perdaProducts: DashboardProductQuantity[]
+    ajusteProducts: DashboardProductQuantity[]
+  }[]
+  stockByCategory: {
+    categoryId: string
+    categoryName: string
+    productCount: number
+    totalsByUnit: DashboardQuantityByUnit[]
+    products: DashboardProductQuantity[]
+  }[]
+  lossesByReason: {
+    reason: LossReason
+    lossesCount: number
+    totalsByUnit: DashboardQuantityByUnit[]
+    products: DashboardProductQuantity[]
+  }[]
+}
+
+export interface DashboardQuantityByUnit {
+  unitId: string
+  unitName: string
+  unitAbbreviation: string
+  quantity: number
+}
+
+export interface DashboardProductQuantity {
+  productId: string
+  productName: string
+  quantity: number
+  unitAbbreviation: string
 }
 
 export type SystemLogLevel = 'info' | 'warning' | 'error'

@@ -2,6 +2,12 @@
 
 PostgreSQL + [Drizzle ORM](https://orm.drizzle.team/). Schema em `apps/api/src/db/schema/`, um arquivo por tabela, agregado em `schema/index.ts` junto com as `relations`. Migrations geradas por `drizzle-kit` em `apps/api/src/db/migrations/`.
 
+Cada migration SQL, seu snapshot em `migrations/meta/` e o `_journal.json` fazem parte do histórico versionado e
+devem ser enviados juntos ao repositório. Antes do primeiro lançamento, enquanto nenhum banco real depender desse
+histórico, ele pode ser consolidado em uma migration inicial e validado contra um banco vazio. Depois da entrada em
+produção, migrations aplicadas nunca devem ser apagadas, renomeadas ou reescritas; toda mudança passa a ser
+incremental.
+
 ## Convenções usadas em (quase) toda tabela
 
 - **`companyId` obrigatório** (`uuid` com FK para `companies.id`) — é o que garante o isolamento entre empresas-cliente (ver [decisões arquiteturais](./decisoes-arquiteturais.md)). Toda query de toda tabela de negócio filtra por esse campo.

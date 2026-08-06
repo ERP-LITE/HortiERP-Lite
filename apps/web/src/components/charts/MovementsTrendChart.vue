@@ -1,9 +1,22 @@
 <script setup lang="ts">
-import { computed } from 'vue'
-import { STATUS_CRITICAL, STATUS_GOOD, useChartInk } from './palette'
+import { computed, ref } from 'vue'
+import { STATUS_CRITICAL, STATUS_GOOD, STATUS_NEUTRAL, useChartInk } from './palette'
+import ChartTooltip from './ChartTooltip.vue'
+import type { DashboardProductQuantity, DashboardQuantityByUnit } from '@/types'
 
 const props = defineProps<{
-  data: { date: string; entrada: number; perda: number }[]
+  data: {
+    date: string
+    entradaCount: number
+    perdaCount: number
+    ajusteCount: number
+    entradaByUnit: DashboardQuantityByUnit[]
+    perdaByUnit: DashboardQuantityByUnit[]
+    ajusteByUnit: DashboardQuantityByUnit[]
+    entradaProducts: DashboardProductQuantity[]
+    perdaProducts: DashboardProductQuantity[]
+    ajusteProducts: DashboardProductQuantity[]
+  }[]
 }>()
 
 const ink = useChartInk()
@@ -15,7 +28,7 @@ const CHART_WIDTH = WIDTH - MARGIN.left - MARGIN.right
 const CHART_HEIGHT = HEIGHT - MARGIN.top - MARGIN.bottom
 
 const maxValue = computed(() => {
-  const values = props.data.flatMap((d) => [d.entrada, d.perda])
+  const values = props.data.flatMap((d) => [d.entradaCount, d.perdaCount, d.ajusteCount])
   const max = Math.max(1, ...values)
   return Math.ceil(max / 5) * 5
 })
@@ -24,25 +37,38 @@ const ticks = computed(() => [0, maxValue.value / 2, maxValue.value])
 
 const slotWidth = computed(() => CHART_WIDTH / Math.max(props.data.length, 1))
 const labelStep = computed(() => Math.max(1, Math.ceil(props.data.length / 12)))
+const chartContainer = ref<HTMLElement | null>(null)
+const tooltip = ref({ visible: false, x: 0, y: 0, title: '', label: '', value: '', color: '', details: [] as string[] })
 
 const bars = computed(() => {
   const gap = Math.min(3, slotWidth.value * 0.15)
   return props.data.map((day, index) => {
     const slotX = MARGIN.left + index * slotWidth.value
-    const barWidth = (slotWidth.value - gap * 3) / 2
-    const entradaHeight = (day.entrada / maxValue.value) * CHART_HEIGHT
-    const perdaHeight = (day.perda / maxValue.value) * CHART_HEIGHT
+    const barWidth = (slotWidth.value - gap * 4) / 3
+    const entradaHeight = (day.entradaCount / maxValue.value) * CHART_HEIGHT
+    const perdaHeight = (day.perdaCount / maxValue.value) * CHART_HEIGHT
+    const ajusteHeight = (day.ajusteCount / maxValue.value) * CHART_HEIGHT
     return {
       date: day.date,
-      entrada: day.entrada,
-      perda: day.perda,
+      entradaCount: day.entradaCount,
+      perdaCount: day.perdaCount,
+      ajusteCount: day.ajusteCount,
+      entradaByUnit: day.entradaByUnit,
+      perdaByUnit: day.perdaByUnit,
+      ajusteByUnit: day.ajusteByUnit,
+      entradaProducts: day.entradaProducts,
+      perdaProducts: day.perdaProducts,
+      ajusteProducts: day.ajusteProducts,
       entradaX: slotX + gap,
       perdaX: slotX + gap * 2 + barWidth,
+      ajusteX: slotX + gap * 3 + barWidth * 2,
       barWidth,
       entradaY: MARGIN.top + CHART_HEIGHT - entradaHeight,
       entradaHeight,
       perdaY: MARGIN.top + CHART_HEIGHT - perdaHeight,
       perdaHeight,
+      ajusteY: MARGIN.top + CHART_HEIGHT - ajusteHeight,
+      ajusteHeight,
       labelX: slotX + slotWidth.value / 2,
       showLabel: index % labelStep.value === 0,
     }
@@ -57,16 +83,56 @@ function formatDayLabel(date: string) {
 function formatNumber(value: number) {
   return value.toLocaleString('pt-BR', { maximumFractionDigits: 1 })
 }
+
+function showTooltip(
+  event: MouseEvent | FocusEvent,
+  date: string,
+  type: 'Entrada' | 'Perda' | 'Ajuste',
+  count: number,
+  quantities: DashboardQuantityByUnit[],
+  products: DashboardProductQuantity[],
+) {
+  const bounds = chartContainer.value?.getBoundingClientRect()
+  if (!bounds) return
+  const pointer = event instanceof MouseEvent
+  tooltip.value = {
+    visible: true,
+    x: pointer ? Math.min(Math.max(event.clientX, 140), window.innerWidth - 140) : bounds.left + bounds.width / 2,
+    y: pointer ? event.clientY : bounds.top + 100,
+    title: formatDayLabel(date),
+    label: type,
+    value: `${count} ${count === 1 ? 'movimentação' : 'movimentações'}`,
+    color: type === 'Entrada' ? STATUS_GOOD : type === 'Perda' ? STATUS_CRITICAL : STATUS_NEUTRAL,
+    details: buildDetails(quantities, products),
+  }
+}
+
+function buildDetails(quantities: DashboardQuantityByUnit[], products: DashboardProductQuantity[]) {
+  const totals = quantities.map((item) => `Total: ${formatNumber(item.quantity)} ${item.unitAbbreviation}`)
+  const visibleProducts = [...products].sort((a, b) => a.productName.localeCompare(b.productName, 'pt-BR')).slice(0, 4)
+  const productLines = visibleProducts.map(
+    (item) => `${item.productName}: ${formatNumber(item.quantity)} ${item.unitAbbreviation}`,
+  )
+  if (products.length > visibleProducts.length) productLines.push(`+ ${products.length - visibleProducts.length} outros produtos`)
+  return totals.length ? [...totals, ...productLines] : ['Nenhuma quantidade registrada']
+}
+
+function hideTooltip() {
+  tooltip.value.visible = false
+}
 </script>
 
 <template>
-  <div>
+  <div ref="chartContainer" class="relative">
     <div class="flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400 mb-2">
       <span class="flex items-center gap-1.5">
         <span class="h-2.5 w-2.5 rounded-full" :style="{ backgroundColor: STATUS_GOOD }" /> Entradas
       </span>
       <span class="flex items-center gap-1.5">
         <span class="h-2.5 w-2.5 rounded-full" :style="{ backgroundColor: STATUS_CRITICAL }" /> Perdas
+      </span>
+      <span class="flex items-center gap-1.5">
+        <span class="h-2.5 w-2.5 rounded-full" :style="{ backgroundColor: STATUS_NEUTRAL }" /> Ajustes
       </span>
     </div>
 
@@ -100,9 +166,33 @@ function formatNumber(value: number) {
           :height="Math.max(bar.entradaHeight, 0)"
           :fill="STATUS_GOOD"
           rx="2"
-        >
-          <title>{{ formatDayLabel(bar.date) }} — Entradas: {{ formatNumber(bar.entrada) }}</title>
-        </rect>
+          class="cursor-pointer transition-opacity hover:opacity-80 focus:opacity-80 focus:outline-none"
+          tabindex="0"
+          role="img"
+          :aria-label="`${formatDayLabel(bar.date)}, ${bar.entradaCount} movimentações de entrada`"
+          @mouseenter="showTooltip($event, bar.date, 'Entrada', bar.entradaCount, bar.entradaByUnit, bar.entradaProducts)"
+          @mousemove="showTooltip($event, bar.date, 'Entrada', bar.entradaCount, bar.entradaByUnit, bar.entradaProducts)"
+          @mouseleave="hideTooltip"
+          @focus="showTooltip($event, bar.date, 'Entrada', bar.entradaCount, bar.entradaByUnit, bar.entradaProducts)"
+          @blur="hideTooltip"
+        />
+        <rect
+          :x="bar.ajusteX"
+          :y="bar.ajusteY"
+          :width="bar.barWidth"
+          :height="Math.max(bar.ajusteHeight, 0)"
+          :fill="STATUS_NEUTRAL"
+          rx="2"
+          class="cursor-pointer transition-opacity hover:opacity-80 focus:opacity-80 focus:outline-none"
+          tabindex="0"
+          role="img"
+          :aria-label="`${formatDayLabel(bar.date)}, ${bar.ajusteCount} ajustes de estoque`"
+          @mouseenter="showTooltip($event, bar.date, 'Ajuste', bar.ajusteCount, bar.ajusteByUnit, bar.ajusteProducts)"
+          @mousemove="showTooltip($event, bar.date, 'Ajuste', bar.ajusteCount, bar.ajusteByUnit, bar.ajusteProducts)"
+          @mouseleave="hideTooltip"
+          @focus="showTooltip($event, bar.date, 'Ajuste', bar.ajusteCount, bar.ajusteByUnit, bar.ajusteProducts)"
+          @blur="hideTooltip"
+        />
         <rect
           :x="bar.perdaX"
           :y="bar.perdaY"
@@ -110,9 +200,16 @@ function formatNumber(value: number) {
           :height="Math.max(bar.perdaHeight, 0)"
           :fill="STATUS_CRITICAL"
           rx="2"
-        >
-          <title>{{ formatDayLabel(bar.date) }} — Perdas: {{ formatNumber(bar.perda) }}</title>
-        </rect>
+          class="cursor-pointer transition-opacity hover:opacity-80 focus:opacity-80 focus:outline-none"
+          tabindex="0"
+          role="img"
+          :aria-label="`${formatDayLabel(bar.date)}, ${bar.perdaCount} movimentações de perda`"
+          @mouseenter="showTooltip($event, bar.date, 'Perda', bar.perdaCount, bar.perdaByUnit, bar.perdaProducts)"
+          @mousemove="showTooltip($event, bar.date, 'Perda', bar.perdaCount, bar.perdaByUnit, bar.perdaProducts)"
+          @mouseleave="hideTooltip"
+          @focus="showTooltip($event, bar.date, 'Perda', bar.perdaCount, bar.perdaByUnit, bar.perdaProducts)"
+          @blur="hideTooltip"
+        />
         <text
           v-if="bar.showLabel"
           :x="bar.labelX"
@@ -125,5 +222,6 @@ function formatNumber(value: number) {
         </text>
       </g>
     </svg>
+    <ChartTooltip v-bind="tooltip" />
   </div>
 </template>

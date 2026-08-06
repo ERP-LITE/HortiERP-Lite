@@ -36,6 +36,28 @@ Evite caracteres reservados de URL na senha do PostgreSQL porque o Compose monta
 
 ## Primeiro deploy e atualizações
 
+### Preparação do primeiro lançamento definitivo
+
+Antes do **primeiro deploy que receberá dados reais**, faça uma revisão única do banco e das migrations:
+
+1. Confirme que nenhum ambiente que precise ser preservado já aplicou as migrations atuais.
+2. Se o produto ainda não entrou em produção, consolide o histórico de desenvolvimento (`0000`, `0001`, etc.) em
+   uma migration inicial limpa, gerada a partir do schema final. Inclua no Git o SQL, o snapshot em `meta/` e o
+   `_journal.json` resultantes.
+3. Valide essa migration partindo de um PostgreSQL vazio e execute toda a suíte de testes. Não basta concatenar ou
+   renomear os arquivos SQL existentes.
+4. Zere somente o banco destinado ao primeiro lançamento, antes de cadastrar clientes ou importar dados, e deixe o
+   deploy aplicar a migration inicial consolidada.
+5. Não execute o seed de desenvolvimento (`db:seed`) em produção, pois ele cria empresas, usuários e dados de teste.
+6. Execute apenas o bootstrap `db:seed:platform` descrito em
+   [Primeiro super administrador](#primeiro-super-administrador), criando a empresa Plataforma e exatamente um
+   usuário `super_admin` inicial.
+
+> **Limite de segurança:** consolidação de migrations e reset do banco são procedimentos exclusivos do primeiro
+> lançamento sem dados reais. Depois que qualquer produção estiver em uso, preserve todo o histórico, nunca apague
+> o volume do PostgreSQL e publique apenas migrations incrementais. Um `docker compose down -v` remove dados,
+> anexos e backups e não faz parte de uma atualização normal.
+
 ```bash
 sh deploy/deploy.sh
 ```
@@ -141,6 +163,21 @@ docker compose --env-file .env.production -f docker-compose.production.yml exec 
   -e PLATFORM_ADMIN_EMAIL -e PLATFORM_ADMIN_PASSWORD api node dist/db/seedPlatform.js
 unset PLATFORM_ADMIN_EMAIL PLATFORM_ADMIN_PASSWORD
 ```
+
+Esse bootstrap deve ser executado **uma única vez** e é idempotente: se a empresa Plataforma já existir, ele não cria
+outro usuário. No primeiro lançamento, não cadastre outros administradores da plataforma até concluir a validação.
+Empresas-cliente e seus primeiros administradores devem ser criados depois pela interface autenticada.
+
+Confirme que existe somente um `super_admin` inicial:
+
+```bash
+docker compose --env-file .env.production -f docker-compose.production.yml exec postgres \
+  sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c \
+  "SELECT role, count(*) FROM users WHERE deleted_at IS NULL GROUP BY role ORDER BY role;"'
+```
+
+O resultado esperado nesse momento é uma única linha, com papel `super_admin` e contagem `1`. Não coloque
+`PLATFORM_ADMIN_PASSWORD` permanentemente no arquivo de ambiente e não deixe a senha no histórico do shell.
 
 ## Rollback
 
