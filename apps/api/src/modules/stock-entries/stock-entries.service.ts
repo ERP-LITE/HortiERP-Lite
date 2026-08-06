@@ -1,11 +1,24 @@
 import { and, count, eq, gte, ilike, inArray, lte, or } from 'drizzle-orm'
 import { db } from '../../db/client.js'
-import { stockEntries, stockEntryItems } from '../../db/schema/index.js'
+import { stockEntries, stockEntryAttachments, stockEntryItems } from '../../db/schema/index.js'
 import { AppError } from '../../shared/errors/AppError.js'
 import { applyStockMovement } from '../../shared/db/applyStockMovement.js'
 import { buildPaginatedResult } from '../../shared/db/paginate.js'
 import { matchingProductIds } from '../../shared/db/matchingProductIds.js'
-import type { CreateStockEntryInput, ListStockEntriesQuery } from './stock-entries.schema.js'
+import type {
+  CreateStockEntryInput,
+  ListStockEntriesQuery,
+  UpdateStockEntryDetailsInput,
+} from './stock-entries.schema.js'
+
+const publicAttachmentColumns = {
+  id: true,
+  stockEntryId: true,
+  originalName: true,
+  mimeType: true,
+  size: true,
+  createdAt: true,
+} as const
 
 export async function listStockEntries(companyId: string, query: ListStockEntriesQuery) {
   const conditions = [eq(stockEntries.companyId, companyId)]
@@ -18,6 +31,8 @@ export async function listStockEntries(companyId: string, query: ListStockEntrie
     conditions.push(
       or(
         ilike(stockEntries.supplierName, `%${query.search}%`),
+        ilike(stockEntries.invoiceNumber, `%${query.search}%`),
+        ilike(stockEntries.invoiceAccessKey, `%${query.search}%`),
         inArray(stockEntries.id, matchingEntryIds),
       )!,
     )
@@ -31,7 +46,8 @@ export async function listStockEntries(companyId: string, query: ListStockEntrie
       where,
       with: {
         createdByUser: { columns: { id: true, name: true } },
-        items: { with: { product: true } },
+        items: { with: { product: { with: { unit: true } } } },
+        attachments: { columns: { id: true } },
       },
       orderBy: (entries, { desc: desc_ }) => [desc_(entries.entryDate)],
       limit: query.pageSize,
@@ -48,7 +64,8 @@ export async function getStockEntry(companyId: string, id: string) {
     where: and(eq(stockEntries.id, id), eq(stockEntries.companyId, companyId)),
     with: {
       createdByUser: { columns: { id: true, name: true } },
-      items: { with: { product: true } },
+      items: { with: { product: { with: { unit: true } } } },
+      attachments: { columns: publicAttachmentColumns },
     },
   })
 
@@ -66,6 +83,11 @@ export async function createStockEntry(companyId: string, userId: string, data: 
         supplierName: data.supplierName,
         entryDate: data.entryDate ?? new Date(),
         notes: data.notes,
+        invoiceNumber: data.invoiceNumber,
+        invoiceSeries: data.invoiceSeries,
+        invoiceAccessKey: data.invoiceAccessKey,
+        invoiceIssuedAt: data.invoiceIssuedAt,
+        invoiceTotal: data.invoiceTotal?.toString(),
         createdBy: userId,
       })
       .returning()
@@ -91,4 +113,54 @@ export async function createStockEntry(companyId: string, userId: string, data: 
 
     return entry
   })
+}
+
+export async function updateStockEntryDetails(
+  companyId: string,
+  userId: string,
+  id: string,
+  data: UpdateStockEntryDetailsInput,
+) {
+  const [entry] = await db
+    .update(stockEntries)
+    .set({
+      ...data,
+      invoiceTotal: data.invoiceTotal === undefined ? undefined : data.invoiceTotal?.toString() ?? null,
+      updatedBy: userId,
+      updatedAt: new Date(),
+    })
+    .where(and(eq(stockEntries.id, id), eq(stockEntries.companyId, companyId)))
+    .returning({ id: stockEntries.id })
+
+  if (!entry) throw AppError.notFound('Entrada de mercadoria não encontrada')
+  return getStockEntry(companyId, id)
+}
+
+export async function getStockEntryAttachment(companyId: string, entryId: string, attachmentId: string) {
+  const attachment = await db.query.stockEntryAttachments.findFirst({
+    where: and(
+      eq(stockEntryAttachments.id, attachmentId),
+      eq(stockEntryAttachments.stockEntryId, entryId),
+      eq(stockEntryAttachments.companyId, companyId),
+    ),
+  })
+
+  if (!attachment) throw AppError.notFound('Anexo da nota fiscal não encontrado')
+  return attachment
+}
+
+export async function deleteStockEntryAttachment(companyId: string, entryId: string, attachmentId: string) {
+  const [attachment] = await db
+    .delete(stockEntryAttachments)
+    .where(
+      and(
+        eq(stockEntryAttachments.id, attachmentId),
+        eq(stockEntryAttachments.stockEntryId, entryId),
+        eq(stockEntryAttachments.companyId, companyId),
+      ),
+    )
+    .returning({ storedName: stockEntryAttachments.storedName })
+
+  if (!attachment) throw AppError.notFound('Anexo da nota fiscal não encontrado')
+  return attachment
 }

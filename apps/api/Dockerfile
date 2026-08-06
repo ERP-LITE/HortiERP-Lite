@@ -23,6 +23,7 @@ FROM node:22-alpine AS production
 ENV NODE_ENV=production
 WORKDIR /app
 RUN addgroup -S nodejs && adduser -S hortierp -G nodejs
+RUN mkdir -p /app/storage/invoices && chown -R hortierp:nodejs /app/storage
 COPY --from=build --chown=hortierp:nodejs /app/node_modules ./node_modules
 COPY --from=build --chown=hortierp:nodejs /app/apps/api/package.json ./apps/api/package.json
 COPY --from=build --chown=hortierp:nodejs /app/apps/api/dist ./apps/api/dist

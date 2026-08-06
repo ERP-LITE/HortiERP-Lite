@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
-import { Plus } from '@lucide/vue'
+import { Eye, FileText, Plus } from '@lucide/vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseModal from '@/components/ui/BaseModal.vue'
@@ -11,17 +11,18 @@ import PrintButton from '@/components/ui/PrintButton.vue'
 import SearchInput from '@/components/ui/SearchInput.vue'
 import PeriodPicker from '@/components/ui/PeriodPicker.vue'
 import ExpandableText from '@/components/ui/ExpandableText.vue'
+import BaseBadge from '@/components/ui/BaseBadge.vue'
 import type { PeriodValue } from '@/lib/period'
 import { formatDate } from '@/lib/format'
 import { getApiErrorMessage } from '@/services/api'
 import { listStockEntries } from '@/services/stockEntriesService'
 import { usePagination } from '@/composables/usePagination'
 import { useFilterModal } from '@/composables/useFilterModal'
-import type { StockEntry } from '@/types'
+import type { StockEntrySummary } from '@/types'
 
 const { page, pageSize, total, totalPages, applyMeta, watchSearch } = usePagination()
 
-const entries = ref<StockEntry[]>([])
+const entries = ref<StockEntrySummary[]>([])
 const loading = ref(true)
 const errorMessage = ref('')
 
@@ -38,8 +39,14 @@ const { filters, draftFilters, filterModalOpen, openFilterModal, applyFilters, c
 )
 const activeFilterCount = computed(() => Number(filters.value.period.preset !== 'todos'))
 
-function itemsSummary(entry: StockEntry) {
-  return entry.items.map((item) => `${item.product.name} (${Number(item.quantity)})`).join(', ')
+function itemsSummary(entry: StockEntrySummary) {
+  return entry.items
+    .map((item) => `${item.product.name} (${Number(item.quantity)} ${item.product.unit.abbreviation})`)
+    .join(', ')
+}
+
+function hasInvoice(entry: StockEntrySummary) {
+  return Boolean(entry.invoiceNumber || entry.invoiceAccessKey || entry.attachments?.length)
 }
 
 async function loadEntries() {
@@ -69,7 +76,7 @@ onMounted(loadEntries)
   <div>
     <PageHeader title="Entradas de mercadoria" subtitle="Histórico de recebimentos de estoque">
       <template #actions>
-        <SearchInput v-model="search" placeholder="Buscar por fornecedor ou item..." />
+        <SearchInput v-model="search" placeholder="Buscar fornecedor, item ou nota..." />
         <FilterButton :active="activeFilterCount" @click="openFilterModal" />
         <PrintButton />
         <RouterLink :to="{ name: 'entradas-nova' }">
@@ -94,14 +101,18 @@ onMounted(loadEntries)
             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
               Recebido por
             </th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+              Nota fiscal
+            </th>
+            <th class="print:hidden px-4 py-3" />
           </tr>
         </thead>
         <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
           <tr v-if="loading">
-            <td colspan="4" class="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">Carregando...</td>
+            <td colspan="6" class="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">Carregando...</td>
           </tr>
           <tr v-else-if="entries.length === 0">
-            <td colspan="4" class="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">
+            <td colspan="6" class="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">
               Nenhuma entrada registrada.
             </td>
           </tr>
@@ -117,6 +128,21 @@ onMounted(loadEntries)
             </td>
             <td class="max-w-64 px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
               <ExpandableText :text="entry.createdByUser?.name" :max-length="40" empty-text="Usuário não identificado" />
+            </td>
+            <td class="px-4 py-3 whitespace-nowrap">
+              <BaseBadge :variant="hasInvoice(entry) ? 'success' : 'neutral'">
+                <FileText :size="13" /> {{ hasInvoice(entry) ? 'Com nota' : 'Sem nota' }}
+              </BaseBadge>
+            </td>
+            <td class="print:hidden px-4 py-3 text-right">
+              <RouterLink
+                :to="{ name: 'entradas-detalhes', params: { id: entry.id } }"
+                class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-primary-600 hover:bg-primary-50 dark:text-primary-400 dark:hover:bg-primary-900/30"
+                title="Ver detalhes da entrada"
+                aria-label="Ver detalhes da entrada"
+              >
+                <Eye :size="16" />
+              </RouterLink>
             </td>
           </tr>
         </tbody>

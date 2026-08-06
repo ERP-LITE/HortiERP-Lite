@@ -23,6 +23,8 @@ const envSchema = z
     // permitindo o desenvolvimento local sem configuração adicional. Abaixo, o uso
     // de uma chave de teste é rejeitado explicitamente em produção.
     TURNSTILE_SECRET_KEY: z.string().default('1x0000000000000000000000000000000AA'),
+    INVOICE_STORAGE_PATH: z.string().min(1).default('./storage/invoices'),
+    INVOICE_MAX_FILE_SIZE: z.coerce.number().int().positive().default(10 * 1024 * 1024),
   })
   .superRefine((value, context) => {
     if (value.NODE_ENV !== 'production') return

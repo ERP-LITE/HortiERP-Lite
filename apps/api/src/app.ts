@@ -3,6 +3,7 @@ import cookie from '@fastify/cookie'
 import cors from '@fastify/cors'
 import jwt from '@fastify/jwt'
 import rateLimit from '@fastify/rate-limit'
+import multipart from '@fastify/multipart'
 import { env } from './shared/config/env.js'
 import { errorHandler } from './shared/middlewares/errorHandler.js'
 import { authRoutes } from './modules/auth/auth.routes.js'
@@ -43,6 +44,13 @@ export function buildApp(options: { systemLogs?: boolean } = {}) {
   })
 
   app.register(cookie)
+
+  app.register(multipart, {
+    limits: {
+      files: 1,
+      fileSize: env.INVOICE_MAX_FILE_SIZE,
+    },
+  })
 
   app.register(jwt, {
     secret: env.JWT_SECRET,

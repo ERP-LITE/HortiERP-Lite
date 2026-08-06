@@ -27,6 +27,8 @@ services:
       TURNSTILE_SECRET_KEY: ${TURNSTILE_SECRET_KEY:?Defina TURNSTILE_SECRET_KEY}
       CORS_ORIGIN: https://${APP_DOMAIN:?Defina APP_DOMAIN}
       TRUST_PROXY: "true"
+      INVOICE_STORAGE_PATH: /app/storage/invoices
+      INVOICE_MAX_FILE_SIZE: ${INVOICE_MAX_FILE_SIZE:-10485760}
     command: ["node", "dist/db/migrate.js"]
     restart: "no"
     depends_on:
@@ -43,6 +45,8 @@ services:
       target: production
     restart: unless-stopped
     environment: *api_environment
+    volumes:
+      - invoice_files:/app/storage/invoices
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -117,6 +121,7 @@ services:
       RCLONE_CONFIG_STORAGE_ACL: private
     volumes:
       - backup_data:/backups
+      - invoice_files:/invoice-files:ro
     depends_on:
       postgres:
         condition: service_healthy
@@ -140,6 +145,7 @@ services:
     command: ["/usr/local/bin/restore-test.sh"]
     volumes:
       - backup_data:/backups:ro
+      - invoice_files:/invoice-files:ro
     depends_on:
       postgres:
         condition: service_healthy
@@ -151,6 +157,7 @@ volumes:
   caddy_data:
   caddy_config:
   backup_data:
+  invoice_files:
 
 networks:
   backend:

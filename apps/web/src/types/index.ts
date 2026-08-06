@@ -84,7 +84,7 @@ export interface StockEntryItem {
   productId: string
   quantity: string
   unitCost: string | null
-  product: Product
+  product: ProductWithRelations
 }
 
 export interface StockEntry {
@@ -92,9 +92,28 @@ export interface StockEntry {
   supplierName: string | null
   entryDate: string
   notes: string | null
+  invoiceNumber: string | null
+  invoiceSeries: string | null
+  invoiceAccessKey: string | null
+  invoiceIssuedAt: string | null
+  invoiceTotal: string | null
   createdAt: string
   createdByUser: { id: string; name: string } | null
   items: StockEntryItem[]
+  attachments: StockEntryAttachment[]
+}
+
+export interface StockEntrySummary extends Omit<StockEntry, 'attachments'> {
+  attachments: Pick<StockEntryAttachment, 'id'>[]
+}
+
+export interface StockEntryAttachment {
+  id: string
+  stockEntryId: string
+  originalName: string
+  mimeType: string
+  size: number
+  createdAt: string
 }
 
 export type LossReason = 'vencido' | 'avariado' | 'roubo_furto' | 'erro_operacional' | 'outro'

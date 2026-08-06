@@ -41,6 +41,11 @@ const router = createRouter({
       component: () => import('@/modules/entradas/StockEntryFormView.vue'),
     },
     {
+      path: '/entradas/:id',
+      name: 'entradas-detalhes',
+      component: () => import('@/modules/entradas/StockEntryDetailsView.vue'),
+    },
+    {
       path: '/estoque',
       name: 'estoque',
       component: () => import('@/modules/estoque/StockView.vue'),

@@ -4,7 +4,7 @@ import { users } from './users.js'
 import { categories } from './categories.js'
 import { units } from './units.js'
 import { products } from './products.js'
-import { stockEntries, stockEntryItems } from './stockEntries.js'
+import { stockEntries, stockEntryAttachments, stockEntryItems } from './stockEntries.js'
 import { losses } from './losses.js'
 import { stockMovements } from './stockMovements.js'
 import { systemLogs } from './systemLogs.js'
@@ -60,6 +60,13 @@ export const stockEntriesRelations = relations(stockEntries, ({ one, many }) => 
   company: one(companies, { fields: [stockEntries.companyId], references: [companies.id] }),
   createdByUser: one(users, { fields: [stockEntries.createdBy], references: [users.id] }),
   items: many(stockEntryItems),
+  attachments: many(stockEntryAttachments),
+}))
+
+export const stockEntryAttachmentsRelations = relations(stockEntryAttachments, ({ one }) => ({
+  company: one(companies, { fields: [stockEntryAttachments.companyId], references: [companies.id] }),
+  stockEntry: one(stockEntries, { fields: [stockEntryAttachments.stockEntryId], references: [stockEntries.id] }),
+  createdByUser: one(users, { fields: [stockEntryAttachments.createdBy], references: [users.id] }),
 }))
 
 export const stockEntryItemsRelations = relations(stockEntryItems, ({ one }) => ({

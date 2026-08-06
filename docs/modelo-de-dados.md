@@ -78,8 +78,12 @@ Unidade de medida (ex: kg, un, dz). `id`, `companyId`, `name`, `abbreviation`, t
 ### `stock_entries` + `stock_entry_items`
 Entrada de mercadoria (cabeçalho + itens), ver [fluxo de entrada](./fluxos-de-negocio.md#entrada-de-mercadoria).
 
-- `stock_entries`: `id`, `companyId`, `supplierName?` (texto livre — **não existe entidade Fornecedor cadastrável**), `entryDate`, `notes?`, timestamps, auditBy.
+- `stock_entries`: `id`, `companyId`, `supplierName?` (texto livre — **não existe entidade Fornecedor cadastrável**), `entryDate`, `notes?`, `invoiceNumber?`, `invoiceSeries?`, `invoiceAccessKey?`, `invoiceIssuedAt?`, `invoiceTotal?`, timestamps, auditBy.
 - `stock_entry_items`: `id`, `stockEntryId` (FK), `productId` (FK), `quantity` numeric(12,3), `unitCost?` numeric(12,2), `createdAt`. Sem `companyId` próprio — o escopo por empresa vem sempre via join com `stockEntries.companyId`.
+
+### `stock_entry_attachments`
+
+Metadados dos arquivos privados associados à nota fiscal. Cada registro contém `id`, `companyId`, `stockEntryId`, `originalName`, `storedName` único e aleatório, `mimeType`, `size`, `createdAt` e `createdBy`. O arquivo binário não fica no PostgreSQL: é armazenado no volume persistente da API, e `storedName` faz a ligação com o disco. `companyId` é duplicado intencionalmente para permitir que download, pré-visualização e exclusão validem isolamento multiempresa sem depender apenas da rota pai. Campos internos como `storedName` e `companyId` não são expostos nas respostas públicas de anexos.
 
 ### `losses`
 Registro de perda de estoque. `id`, `companyId`, `productId` (FK), `quantity` numeric(12,3), `reason` (enum `loss_reason`: `vencido` \| `avariado` \| `roubo_furto` \| `erro_operacional` \| `outro`), `notes?`, `lossDate`, timestamps, auditBy.

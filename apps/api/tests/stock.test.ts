@@ -84,8 +84,14 @@ describe('entradas e perdas: busca e integridade multiempresa', () => {
       headers: { cookie: authCookie(ctx.app, tenant.operator) },
     })
     assert.equal(entriesResponse.statusCode, 200)
-    const [entry] = entriesResponse.json<{ data: { createdByUser: { id: string; name: string } | null }[] }>().data
+    const [entry] = entriesResponse.json<{
+      data: {
+        createdByUser: { id: string; name: string } | null
+        items: { product: { unit: { abbreviation: string } } }[]
+      }[]
+    }>().data
     assert.deepEqual(entry.createdByUser, { id: tenant.operator.id, name: tenant.operator.name })
+    assert.equal(entry.items[0]?.product.unit.abbreviation, 'uoperation-author')
 
     const lossesResponse = await ctx.app.inject({
       method: 'GET',
@@ -117,6 +123,214 @@ describe('entradas e perdas: busca e integridade multiempresa', () => {
       .json<{ data: { createdByUser: { id: string; name: string } | null }[] }>()
       .data
     assert.deepEqual(movement.createdByUser, { id: tenant.operator.id, name: tenant.operator.name })
+  })
+
+  test('entrada armazena dados fiscais e protege anexos por empresa', async () => {
+    const tenant = await createTenant('invoice-owner')
+    const outsider = await createTenant('invoice-outsider')
+    const entry = await createStockEntry(tenant.companyId, tenant.operator.id, {
+      supplierName: 'Fornecedor fiscal',
+      invoiceNumber: '1234',
+      invoiceSeries: '1',
+      invoiceAccessKey: '1'.repeat(44),
+      invoiceIssuedAt: new Date('2026-08-06T12:00:00.000Z'),
+      invoiceTotal: 159.9,
+      items: [{ productId: tenant.productId, quantity: 2 }],
+    })
+
+    const boundary = '----hortierp-test-boundary'
+    const pngHeader = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
+    const multipartBody = Buffer.concat([
+      Buffer.from(
+        `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="danfe.png"\r\nContent-Type: image/png\r\n\r\n`,
+      ),
+      pngHeader,
+      Buffer.from(`\r\n--${boundary}--\r\n`),
+    ])
+    const uploadResponse = await ctx.app.inject({
+      method: 'POST',
+      url: `/api/stock-entries/${entry.id}/attachments`,
+      headers: {
+        cookie: authCookie(ctx.app, tenant.operator),
+        'content-type': `multipart/form-data; boundary=${boundary}`,
+      },
+      payload: multipartBody,
+    })
+    assert.equal(uploadResponse.statusCode, 201)
+    const attachment = uploadResponse.json<Record<string, unknown> & { id: string; originalName: string }>()
+    assert.equal(attachment.originalName, 'danfe.png')
+    assert.equal('storedName' in attachment, false)
+    assert.equal('companyId' in attachment, false)
+    assert.equal('createdBy' in attachment, false)
+
+    const detailsResponse = await ctx.app.inject({
+      method: 'GET',
+      url: `/api/stock-entries/${entry.id}`,
+      headers: { cookie: authCookie(ctx.app, tenant.operator) },
+    })
+    assert.equal(detailsResponse.statusCode, 200)
+    const details = detailsResponse.json<{
+      invoiceNumber: string
+      invoiceAccessKey: string
+      invoiceTotal: string
+      attachments: (Record<string, unknown> & { id: string })[]
+    }>()
+    assert.equal(details.invoiceNumber, '1234')
+    assert.equal(details.invoiceAccessKey, '1'.repeat(44))
+    assert.equal(details.invoiceTotal, '159.90')
+    assert.equal(details.attachments.length, 1)
+    assert.equal('storedName' in details.attachments[0]!, false)
+    assert.equal('companyId' in details.attachments[0]!, false)
+
+    const previewResponse = await ctx.app.inject({
+      method: 'GET',
+      url: `/api/stock-entries/${entry.id}/attachments/${attachment.id}?preview=true`,
+      headers: { cookie: authCookie(ctx.app, tenant.operator) },
+    })
+    assert.equal(previewResponse.statusCode, 200)
+    assert.equal(previewResponse.headers['content-disposition']?.startsWith('inline;'), true)
+    assert.deepEqual(previewResponse.rawPayload, pngHeader)
+
+    const forbiddenResponse = await ctx.app.inject({
+      method: 'GET',
+      url: `/api/stock-entries/${entry.id}/attachments/${attachment.id}`,
+      headers: { cookie: authCookie(ctx.app, outsider.operator) },
+    })
+    assert.equal(forbiddenResponse.statusCode, 404)
+
+    const forbiddenDeleteResponse = await ctx.app.inject({
+      method: 'DELETE',
+      url: `/api/stock-entries/${entry.id}/attachments/${attachment.id}`,
+      headers: { cookie: authCookie(ctx.app, outsider.manager) },
+    })
+    assert.equal(forbiddenDeleteResponse.statusCode, 404)
+
+    const operatorDeleteResponse = await ctx.app.inject({
+      method: 'DELETE',
+      url: `/api/stock-entries/${entry.id}/attachments/${attachment.id}`,
+      headers: { cookie: authCookie(ctx.app, tenant.operator) },
+    })
+    assert.equal(operatorDeleteResponse.statusCode, 403)
+
+    const deleteResponse = await ctx.app.inject({
+      method: 'DELETE',
+      url: `/api/stock-entries/${entry.id}/attachments/${attachment.id}`,
+      headers: { cookie: authCookie(ctx.app, tenant.manager) },
+    })
+    assert.equal(deleteResponse.statusCode, 204)
+
+    const deletedAttachmentResponse = await ctx.app.inject({
+      method: 'GET',
+      url: `/api/stock-entries/${entry.id}/attachments/${attachment.id}`,
+      headers: { cookie: authCookie(ctx.app, tenant.operator) },
+    })
+    assert.equal(deletedAttachmentResponse.statusCode, 404)
+  })
+
+  test('uploads simultâneos respeitam o limite de três anexos por entrada', async () => {
+    const tenant = await createTenant('invoice-concurrency')
+    const entry = await createStockEntry(tenant.companyId, tenant.operator.id, {
+      items: [{ productId: tenant.productId, quantity: 1 }],
+    })
+    const pngHeader = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
+
+    const responses = await Promise.all(
+      Array.from({ length: 4 }, (_, index) => {
+        const boundary = `----hortierp-concurrency-${index}`
+        const body = Buffer.concat([
+          Buffer.from(
+            `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="danfe-${index}.png"\r\nContent-Type: image/png\r\n\r\n`,
+          ),
+          pngHeader,
+          Buffer.from(`\r\n--${boundary}--\r\n`),
+        ])
+        return ctx.app.inject({
+          method: 'POST',
+          url: `/api/stock-entries/${entry.id}/attachments`,
+          headers: {
+            cookie: authCookie(ctx.app, tenant.operator),
+            'content-type': `multipart/form-data; boundary=${boundary}`,
+          },
+          payload: body,
+        })
+      }),
+    )
+
+    assert.equal(responses.filter(({ statusCode }) => statusCode === 201).length, 3)
+    assert.equal(responses.filter(({ statusCode }) => statusCode === 422).length, 1)
+
+    const detailsResponse = await ctx.app.inject({
+      method: 'GET',
+      url: `/api/stock-entries/${entry.id}`,
+      headers: { cookie: authCookie(ctx.app, tenant.operator) },
+    })
+    assert.equal(detailsResponse.statusCode, 200)
+    assert.equal(detailsResponse.json<{ attachments: unknown[] }>().attachments.length, 3)
+  })
+
+  test('admin e gerente editam somente os dados cadastrais e fiscais da entrada', async () => {
+    const tenant = await createTenant('entry-edit')
+    const outsider = await createTenant('entry-edit-outsider')
+    const entry = await createStockEntry(tenant.companyId, tenant.operator.id, {
+      supplierName: 'Fornecedor antigo',
+      items: [{ productId: tenant.productId, quantity: 2, unitCost: 5 }],
+    })
+
+    const operatorResponse = await ctx.app.inject({
+      method: 'PATCH',
+      url: `/api/stock-entries/${entry.id}`,
+      headers: { cookie: authCookie(ctx.app, tenant.operator) },
+      payload: { supplierName: 'Tentativa sem permissão' },
+    })
+    assert.equal(operatorResponse.statusCode, 403)
+
+    const outsiderResponse = await ctx.app.inject({
+      method: 'PATCH',
+      url: `/api/stock-entries/${entry.id}`,
+      headers: { cookie: authCookie(ctx.app, outsider.manager) },
+      payload: { supplierName: 'Outra empresa' },
+    })
+    assert.equal(outsiderResponse.statusCode, 404)
+
+    const invalidKeyResponse = await ctx.app.inject({
+      method: 'PATCH',
+      url: `/api/stock-entries/${entry.id}`,
+      headers: { cookie: authCookie(ctx.app, tenant.manager) },
+      payload: { invoiceAccessKey: '123' },
+    })
+    assert.equal(invalidKeyResponse.statusCode, 422)
+
+    const updateResponse = await ctx.app.inject({
+      method: 'PATCH',
+      url: `/api/stock-entries/${entry.id}`,
+      headers: { cookie: authCookie(ctx.app, tenant.manager) },
+      payload: {
+        supplierName: 'Fornecedor corrigido',
+        notes: 'Documento conferido',
+        invoiceNumber: '9876',
+        invoiceSeries: '2',
+        invoiceAccessKey: '9'.repeat(44),
+        invoiceIssuedAt: '2026-08-05T12:00:00.000Z',
+        invoiceTotal: 250.75,
+      },
+    })
+    assert.equal(updateResponse.statusCode, 200)
+    const updated = updateResponse.json<{
+      supplierName: string
+      invoiceNumber: string
+      invoiceTotal: string
+      items: { productId: string; quantity: string; unitCost: string }[]
+    }>()
+    assert.equal(updated.supplierName, 'Fornecedor corrigido')
+    assert.equal(updated.invoiceNumber, '9876')
+    assert.equal(updated.invoiceTotal, '250.75')
+    assert.deepEqual(updated.items.map(({ productId, quantity, unitCost }) => ({
+      productId,
+      quantity: Number(quantity),
+      unitCost: Number(unitCost),
+    })), [
+      { productId: tenant.productId, quantity: 2, unitCost: 5 },
+    ])
   })
 
   test('busca entradas por fornecedor e pelo nome do item', async () => {
