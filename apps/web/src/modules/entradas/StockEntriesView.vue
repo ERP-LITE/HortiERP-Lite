@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import { Plus } from '@lucide/vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
@@ -11,13 +11,14 @@ import PrintButton from '@/components/ui/PrintButton.vue'
 import SearchInput from '@/components/ui/SearchInput.vue'
 import PeriodPicker from '@/components/ui/PeriodPicker.vue'
 import type { PeriodValue } from '@/lib/period'
+import { formatDate } from '@/lib/format'
 import { getApiErrorMessage } from '@/services/api'
 import { listStockEntries } from '@/services/stockEntriesService'
 import { usePagination } from '@/composables/usePagination'
 import { useFilterModal } from '@/composables/useFilterModal'
 import type { StockEntry } from '@/types'
 
-const { page, pageSize, total, totalPages, applyMeta } = usePagination()
+const { page, pageSize, total, totalPages, applyMeta, watchSearch } = usePagination()
 
 const entries = ref<StockEntry[]>([])
 const loading = ref(true)
@@ -40,10 +41,6 @@ function itemsSummary(entry: StockEntry) {
   return entry.items.map((item) => `${item.product.name} (${Number(item.quantity)})`).join(', ')
 }
 
-function formatDate(value: string) {
-  return new Date(value).toLocaleDateString('pt-BR')
-}
-
 async function loadEntries() {
   loading.value = true
   try {
@@ -63,11 +60,7 @@ async function loadEntries() {
   }
 }
 
-watch(search, () => {
-  if (page.value !== 1) page.value = 1
-  else loadEntries()
-})
-watch([page, pageSize], loadEntries)
+watchSearch(search, loadEntries)
 onMounted(loadEntries)
 </script>
 

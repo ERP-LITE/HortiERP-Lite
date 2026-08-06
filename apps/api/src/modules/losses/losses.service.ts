@@ -1,12 +1,16 @@
-import { and, count, desc, eq, gte, ilike, inArray, lte, or, sql } from 'drizzle-orm'
+import { and, count, desc, eq, gte, ilike, inArray, lte, or } from 'drizzle-orm'
 import { db } from '../../db/client.js'
-import { losses, products, stockMovements } from '../../db/schema/index.js'
+import { losses } from '../../db/schema/index.js'
 import { AppError } from '../../shared/errors/AppError.js'
+import { applyStockMovement } from '../../shared/db/applyStockMovement.js'
 import { buildPaginatedResult } from '../../shared/db/paginate.js'
 import { matchingProductIds } from '../../shared/db/matchingProductIds.js'
 import type { CreateLossInput, ListLossesQuery } from './losses.schema.js'
 
-export async function listLosses(companyId: string, query: ListLossesQuery) {
+export function buildLossesConditions(
+  companyId: string,
+  query: Pick<ListLossesQuery, 'search' | 'productId' | 'reason' | 'from' | 'to'>,
+) {
   const conditions = [eq(losses.companyId, companyId)]
   if (query.search) {
     conditions.push(
@@ -17,7 +21,11 @@ export async function listLosses(companyId: string, query: ListLossesQuery) {
   if (query.reason) conditions.push(eq(losses.reason, query.reason))
   if (query.from) conditions.push(gte(losses.lossDate, query.from))
   if (query.to) conditions.push(lte(losses.lossDate, query.to))
-  const where = and(...conditions)
+  return conditions
+}
+
+export async function listLosses(companyId: string, query: ListLossesQuery) {
+  const where = and(...buildLossesConditions(companyId, query))
 
   const [data, [{ total }]] = await Promise.all([
     db.query.losses.findMany({
@@ -52,38 +60,6 @@ export async function getLoss(companyId: string, id: string) {
 
 export async function createLoss(companyId: string, userId: string, data: CreateLossInput) {
   return db.transaction(async (tx) => {
-    const quantity = data.quantity.toString()
-    const [updatedProduct] = await tx
-      .update(products)
-      .set({
-        currentStock: sql`${products.currentStock} - ${quantity}`,
-        updatedAt: new Date(),
-        updatedBy: userId,
-      })
-      .where(
-        and(
-          eq(products.id, data.productId),
-          eq(products.companyId, companyId),
-          gte(products.currentStock, quantity),
-        ),
-      )
-      .returning({ currentStock: products.currentStock })
-
-    if (!updatedProduct) {
-      const [product] = await tx
-        .select({ currentStock: products.currentStock })
-        .from(products)
-        .where(and(eq(products.id, data.productId), eq(products.companyId, companyId)))
-
-      if (!product) throw AppError.notFound('Produto não encontrado')
-
-      throw new AppError(
-        `Quantidade de perda (${data.quantity}) maior que o estoque disponível (${product.currentStock})`,
-        422,
-        'INSUFFICIENT_STOCK',
-      )
-    }
-
     const [loss] = await tx
       .insert(losses)
       .values({
@@ -97,15 +73,15 @@ export async function createLoss(companyId: string, userId: string, data: Create
       })
       .returning()
 
-    await tx.insert(stockMovements).values({
+    await applyStockMovement(tx, {
       companyId,
+      userId,
       productId: data.productId,
+      delta: -data.quantity,
       type: 'perda',
-      quantity: (-data.quantity).toString(),
-      balanceAfter: updatedProduct.currentStock,
       referenceType: 'loss',
       referenceId: loss.id,
-      createdBy: userId,
+      requireSufficientStock: true,
     })
 
     return loss

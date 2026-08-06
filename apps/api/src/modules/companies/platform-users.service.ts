@@ -2,8 +2,8 @@ import bcrypt from 'bcryptjs'
 import { and, asc, count, eq, ilike, isNull, or } from 'drizzle-orm'
 import { db } from '../../db/client.js'
 import { users } from '../../db/schema/index.js'
-import { assertUniqueField } from '../../shared/db/assertUniqueField.js'
 import { buildPaginatedResult } from '../../shared/db/paginate.js'
+import { assertUniqueUserEmail, userPublicColumns } from '../../shared/db/userPublicColumns.js'
 import { AppError } from '../../shared/errors/AppError.js'
 import type {
   CreatePlatformUserInput,
@@ -11,35 +11,9 @@ import type {
   UpdatePlatformUserInput,
 } from './platform-users.schema.js'
 
-const publicColumns = {
-  id: users.id,
-  name: users.name,
-  email: users.email,
-  role: users.role,
-  active: users.active,
-  createdAt: users.createdAt,
-  updatedAt: users.updatedAt,
-}
-
-function assertUniqueEmail(email: string, excludeId?: string) {
-  return assertUniqueField({
-    table: users,
-    idColumn: users.id,
-    valueColumn: users.email,
-    value: email,
-    excludeId,
-    field: 'email',
-    message: 'Já existe um usuário com esse e-mail',
-  })
-}
-
-function isUniqueViolation(error: unknown): boolean {
-  return typeof error === 'object' && error !== null && 'code' in error && (error as { code: unknown }).code === '23505'
-}
-
 async function getPlatformUser(companyId: string, id: string) {
   const [user] = await db
-    .select(publicColumns)
+    .select(userPublicColumns)
     .from(users)
     .where(
       and(eq(users.id, id), eq(users.companyId, companyId), eq(users.role, 'super_admin'), isNull(users.deletedAt)),
@@ -56,7 +30,7 @@ export async function listPlatformUsers(companyId: string, query: ListPlatformUs
 
   const [data, [{ total }]] = await Promise.all([
     db
-      .select(publicColumns)
+      .select(userPublicColumns)
       .from(users)
       .where(where)
       .orderBy(asc(users.name))
@@ -69,27 +43,22 @@ export async function listPlatformUsers(companyId: string, query: ListPlatformUs
 }
 
 export async function createPlatformUser(companyId: string, requesterId: string, data: CreatePlatformUserInput) {
-  await assertUniqueEmail(data.email)
+  await assertUniqueUserEmail(data.email)
   const passwordHash = await bcrypt.hash(data.password, 10)
 
-  try {
-    const [user] = await db
-      .insert(users)
-      .values({
-        companyId,
-        name: data.name,
-        email: data.email,
-        passwordHash,
-        role: 'super_admin',
-        createdBy: requesterId,
-      })
-      .returning(publicColumns)
+  const [user] = await db
+    .insert(users)
+    .values({
+      companyId,
+      name: data.name,
+      email: data.email,
+      passwordHash,
+      role: 'super_admin',
+      createdBy: requesterId,
+    })
+    .returning(userPublicColumns)
 
-    return user
-  } catch (error) {
-    if (isUniqueViolation(error)) throw AppError.duplicate('email', 'Já existe um usuário com esse e-mail')
-    throw error
-  }
+  return user
 }
 
 export async function updatePlatformUser(
@@ -99,27 +68,22 @@ export async function updatePlatformUser(
   data: UpdatePlatformUserInput,
 ) {
   await getPlatformUser(companyId, id)
-  if (data.email) await assertUniqueEmail(data.email, id)
+  if (data.email) await assertUniqueUserEmail(data.email, id)
   const passwordHash = data.password ? await bcrypt.hash(data.password, 10) : undefined
 
-  try {
-    const [user] = await db
-      .update(users)
-      .set({
-        ...(data.name && { name: data.name }),
-        ...(data.email && { email: data.email }),
-        ...(passwordHash && { passwordHash }),
-        updatedBy: requesterId,
-        updatedAt: new Date(),
-      })
-      .where(and(eq(users.id, id), eq(users.companyId, companyId), eq(users.role, 'super_admin')))
-      .returning(publicColumns)
+  const [user] = await db
+    .update(users)
+    .set({
+      ...(data.name && { name: data.name }),
+      ...(data.email && { email: data.email }),
+      ...(passwordHash && { passwordHash }),
+      updatedBy: requesterId,
+      updatedAt: new Date(),
+    })
+    .where(and(eq(users.id, id), eq(users.companyId, companyId), eq(users.role, 'super_admin')))
+    .returning(userPublicColumns)
 
-    return user
-  } catch (error) {
-    if (isUniqueViolation(error)) throw AppError.duplicate('email', 'Já existe um usuário com esse e-mail')
-    throw error
-  }
+  return user
 }
 
 export async function deletePlatformUser(companyId: string, requesterId: string, id: string) {

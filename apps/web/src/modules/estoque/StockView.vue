@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import { AlertTriangle, History, ListChecks, Pencil, Plus, Trash2 } from '@lucide/vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
@@ -26,7 +26,7 @@ import type { Category, Product, ProductWithRelations } from '@/types'
 const auth = useAuthStore()
 const canManage = computed(() => auth.user?.role === 'admin' || auth.user?.role === 'gerente')
 
-const { page, pageSize, total, totalPages, applyMeta } = usePagination()
+const { page, pageSize, total, totalPages, applyMeta, watchSearch } = usePagination()
 
 const products = ref<ProductWithRelations[]>([])
 const categories = ref<Category[]>([])
@@ -207,11 +207,7 @@ async function handleBulkAdjustSubmit() {
   }
 }
 
-watch(search, () => {
-  if (page.value !== 1) page.value = 1
-  else loadStock()
-})
-watch([page, pageSize], loadStock)
+watchSearch(search, loadStock)
 onMounted(() => {
   loadStock()
   loadCategoryOptions()

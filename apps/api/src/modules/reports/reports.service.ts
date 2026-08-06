@@ -1,10 +1,9 @@
-import { and, eq, gte, ilike, inArray, isNull, lte, or, sql } from 'drizzle-orm'
+import { and, eq, isNull, sql } from 'drizzle-orm'
 import { db } from '../../db/client.js'
 import { categories, losses, products } from '../../db/schema/index.js'
 import type { DateRangeQuery } from './reports.schema.js'
-import { listLosses } from '../losses/losses.service.js'
+import { buildLossesConditions, listLosses } from '../losses/losses.service.js'
 import { listStockEntries } from '../stock-entries/stock-entries.service.js'
-import { matchingProductIds } from '../../shared/db/matchingProductIds.js'
 
 export async function getStockByCategoryReport(companyId: string) {
   return db
@@ -22,18 +21,7 @@ export async function getStockByCategoryReport(companyId: string) {
 }
 
 export async function getLossesReport(companyId: string, range: DateRangeQuery) {
-  const conditions = [eq(losses.companyId, companyId)]
-
-  if (range.from) conditions.push(gte(losses.lossDate, range.from))
-  if (range.to) conditions.push(lte(losses.lossDate, range.to))
-  if (range.search) {
-    conditions.push(
-      or(
-        ilike(losses.notes, `%${range.search}%`),
-        inArray(losses.productId, matchingProductIds(companyId, range.search)),
-      )!,
-    )
-  }
+  const conditions = buildLossesConditions(companyId, range)
 
   const items = await listLosses(companyId, range)
 

@@ -13,6 +13,7 @@ import StatCard from '@/components/ui/StatCard.vue'
 import { usePagination } from '@/composables/usePagination'
 import { useFilterModal } from '@/composables/useFilterModal'
 import type { PeriodValue } from '@/lib/period'
+import { formatDate, formatDateOnly } from '@/lib/format'
 import { getApiErrorMessage } from '@/services/api'
 import { useAuthStore } from '@/stores/auth'
 import {
@@ -116,17 +117,8 @@ const entriesSummary = computed(() => {
 const activeTabLabel = computed(() => tabs.find((tab) => tab.key === activeTab.value)?.label ?? 'Relatório')
 const periodLabel = computed(() => {
   if (!hasDateFilterTab.value || activeFilterCount.value === 0) return 'Todo o período'
-  return `${from.value ? formatPeriodDate(from.value) : 'início'} até ${to.value ? formatPeriodDate(to.value) : 'hoje'}`
+  return `${from.value ? formatDateOnly(from.value) : 'início'} até ${to.value ? formatDateOnly(to.value) : 'hoje'}`
 })
-
-function formatDate(value: string) {
-  return new Date(value).toLocaleDateString('pt-BR')
-}
-
-function formatPeriodDate(value: string) {
-  const [year, month, day] = value.split('-')
-  return `${day}/${month}/${year}`
-}
 
 async function loadStockByCategory() {
   stockByCategory.value = await fetchStockByCategoryReport()

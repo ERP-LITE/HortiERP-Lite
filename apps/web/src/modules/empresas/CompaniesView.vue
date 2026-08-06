@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref, watch } from 'vue'
+import { onMounted, ref } from 'vue'
 import { Pencil, Plus, Wand2 } from '@lucide/vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
@@ -24,7 +24,7 @@ import { usePagination } from '@/composables/usePagination'
 import type { Company } from '@/types'
 import PlatformUsersPanel from './PlatformUsersPanel.vue'
 
-const { page, pageSize, total, totalPages, applyMeta } = usePagination()
+const { page, pageSize, total, totalPages, applyMeta, watchSearch } = usePagination()
 
 const companies = ref<Company[]>([])
 const loading = ref(true)
@@ -132,11 +132,7 @@ async function handleToggleActive(company: Company, active: boolean) {
   }
 }
 
-watch(search, () => {
-  if (page.value !== 1) page.value = 1
-  else loadCompanies()
-})
-watch([page, pageSize], loadCompanies)
+watchSearch(search, loadCompanies)
 onMounted(loadCompanies)
 </script>
 
