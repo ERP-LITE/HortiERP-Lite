@@ -9,6 +9,7 @@ export const listLossesQuerySchema = paginationQuerySchema.extend({
   reason: z.enum(lossReasons).optional(),
   from: z.coerce.date().optional(),
   to: z.coerce.date().optional(),
+  sortBy: z.enum(['lossDate', 'reason', 'quantity']).optional(),
 })
 
 export type ListLossesQuery = z.infer<typeof listLossesQuerySchema>

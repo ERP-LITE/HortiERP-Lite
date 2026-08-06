@@ -1,5 +1,5 @@
 import bcrypt from 'bcryptjs'
-import { and, asc, count, eq, ilike, isNull, notInArray, or } from 'drizzle-orm'
+import { and, asc, count, desc, eq, ilike, isNull, notInArray, or } from 'drizzle-orm'
 import { db } from '../../db/client.js'
 import { companies, users } from '../../db/schema/index.js'
 import { AppError } from '../../shared/errors/AppError.js'
@@ -42,13 +42,15 @@ export async function listCompanies(query: ListCompaniesQuery) {
     conditions.push(or(ilike(companies.name, `%${query.search}%`), ilike(companies.document, `%${query.search}%`))!)
   }
   const where = and(...conditions)
+  const sortColumn = query.sortBy ? companies[query.sortBy] : companies.name
+  const orderBy = query.sortOrder === 'desc' ? desc(sortColumn) : asc(sortColumn)
 
   const [data, [{ total }]] = await Promise.all([
     db
       .select()
       .from(companies)
       .where(where)
-      .orderBy(asc(companies.name))
+      .orderBy(orderBy, asc(companies.name))
       .limit(query.pageSize)
       .offset((query.page - 1) * query.pageSize),
     db.select({ total: count() }).from(companies).where(where),

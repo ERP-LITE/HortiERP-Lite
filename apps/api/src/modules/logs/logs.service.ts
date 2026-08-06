@@ -1,4 +1,4 @@
-import { and, count, desc, eq, gte, ilike, lte, ne, or } from 'drizzle-orm'
+import { and, asc, count, desc, eq, gte, ilike, lte, ne, or } from 'drizzle-orm'
 import { db } from '../../db/client.js'
 import { companies, systemLogs, users } from '../../db/schema/index.js'
 import { buildPaginatedResult } from '../../shared/db/paginate.js'
@@ -59,6 +59,15 @@ async function queryLogs(conditions: ReturnType<typeof eq>[], query: ListLogsQue
   if (query.level) conditions.push(eq(systemLogs.level, query.level))
   conditions.push(...periodConditions(query))
   const where = and(...conditions)
+  const sortColumns = {
+    createdAt: systemLogs.createdAt,
+    companyName: companies.name,
+    actorName: users.name,
+    level: systemLogs.level,
+    statusCode: systemLogs.statusCode,
+  }
+  const sortColumn = query.sortBy ? sortColumns[query.sortBy] : systemLogs.createdAt
+  const orderBy = query.sortOrder === 'asc' ? asc(sortColumn) : desc(sortColumn)
 
   const baseQuery = db
     .select(logColumns)
@@ -75,7 +84,7 @@ async function queryLogs(conditions: ReturnType<typeof eq>[], query: ListLogsQue
   const [data, [{ total }]] = await Promise.all([
     baseQuery
       .where(where)
-      .orderBy(desc(systemLogs.createdAt))
+      .orderBy(orderBy, desc(systemLogs.createdAt))
       .limit(query.pageSize)
       .offset((query.page - 1) * query.pageSize),
     countQuery.where(where),

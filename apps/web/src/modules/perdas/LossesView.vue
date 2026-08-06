@@ -13,6 +13,7 @@ import PrintButton from '@/components/ui/PrintButton.vue'
 import SearchInput from '@/components/ui/SearchInput.vue'
 import PeriodPicker from '@/components/ui/PeriodPicker.vue'
 import ExpandableText from '@/components/ui/ExpandableText.vue'
+import SortableTableHeader from '@/components/ui/SortableTableHeader.vue'
 import type { PeriodValue } from '@/lib/period'
 import { formatDate } from '@/lib/format'
 import { getApiErrorMessage, resolveFormError } from '@/services/api'
@@ -21,6 +22,7 @@ import { listAllProducts } from '@/services/productsService'
 import { createLoss, listLosses } from '@/services/lossesService'
 import { usePagination } from '@/composables/usePagination'
 import { useFilterModal } from '@/composables/useFilterModal'
+import { useTableSort } from '@/composables/useTableSort'
 import type { Loss, LossReason, Product } from '@/types'
 
 const reasonOptions: { value: LossReason; label: string }[] = [
@@ -35,6 +37,7 @@ const reasonFilterOptions = [{ value: 'todos', label: 'Todos os motivos' }, ...r
 const reasonLabels = Object.fromEntries(reasonOptions.map((r) => [r.value, r.label])) as Record<LossReason, string>
 
 const { page, pageSize, total, totalPages, applyMeta, watchSearch } = usePagination()
+const { sortBy, sortOrder, toggleSort } = useTableSort(() => { page.value = 1; return loadLosses() }, 'lossDate', 'desc')
 
 const losses = ref<Loss[]>([])
 const products = ref<Product[]>([])
@@ -78,6 +81,8 @@ async function loadLosses() {
       reason: filters.value.reason !== 'todos' ? (filters.value.reason as LossReason) : undefined,
       from: filters.value.period.from || undefined,
       to: filters.value.period.to || undefined,
+      sortBy: sortBy.value,
+      sortOrder: sortOrder.value,
     })
     losses.value = result.data
     applyMeta(result)
@@ -163,16 +168,12 @@ onMounted(loadAll)
       <table v-mobile-accordion class="mobile-accordion-table min-w-full divide-y divide-gray-200 dark:divide-gray-700">
         <thead class="bg-gray-50 dark:bg-gray-900/60">
           <tr>
-            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Data</th>
+            <SortableTableHeader field="lossDate" :active-field="sortBy" :order="sortOrder" @sort="toggleSort">Data</SortableTableHeader>
             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
               Produto
             </th>
-            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-              Quantidade
-            </th>
-            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-              Motivo
-            </th>
+            <SortableTableHeader field="quantity" :active-field="sortBy" :order="sortOrder" @sort="toggleSort">Quantidade</SortableTableHeader>
+            <SortableTableHeader field="reason" :active-field="sortBy" :order="sortOrder" @sort="toggleSort">Motivo</SortableTableHeader>
             <th
               class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase hidden sm:table-cell"
             >

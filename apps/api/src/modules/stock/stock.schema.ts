@@ -5,6 +5,7 @@ export const listStockQuerySchema = paginationQuerySchema.extend({
   search: z.string().trim().min(1).optional(),
   categoryId: z.string().uuid().optional(),
   lowStockOnly: booleanQueryParam,
+  sortBy: z.enum(['name', 'currentStock', 'minStock']).optional(),
 })
 
 export type ListStockQuery = z.infer<typeof listStockQuerySchema>
@@ -15,6 +16,7 @@ export const listStockMovementsQuerySchema = paginationQuerySchema.extend({
   type: z.enum(['entrada', 'perda', 'ajuste']).optional(),
   from: z.coerce.date().optional(),
   to: z.coerce.date().optional(),
+  sortBy: z.enum(['createdAt', 'type', 'quantity', 'balanceAfter']).optional(),
 })
 
 export type ListStockMovementsQuery = z.infer<typeof listStockMovementsQuerySchema>

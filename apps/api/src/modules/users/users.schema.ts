@@ -5,6 +5,7 @@ export const listUsersQuerySchema = paginationQuerySchema.extend({
   search: z.string().trim().min(1).optional(),
   role: z.enum(['admin', 'gerente', 'operador']).optional(),
   active: booleanQueryParam,
+  sortBy: z.enum(['name', 'email', 'role', 'active']).optional(),
 })
 
 export type ListUsersQuery = z.infer<typeof listUsersQuerySchema>

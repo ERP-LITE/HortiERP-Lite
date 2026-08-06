@@ -5,6 +5,7 @@ export const listProductsQuerySchema = paginationQuerySchema.extend({
   search: z.string().trim().min(1).optional(),
   categoryId: z.string().uuid().optional(),
   active: booleanQueryParam,
+  sortBy: z.enum(['name', 'sku', 'costPrice', 'currentStock', 'active']).optional(),
 })
 
 export type ListProductsQuery = z.infer<typeof listProductsQuerySchema>

@@ -11,6 +11,7 @@ export const listLogsQuerySchema = paginationQuerySchema.extend({
   companyId: z.string().uuid().optional(),
   from: z.coerce.date().optional(),
   to: z.coerce.date().optional(),
+  sortBy: z.enum(['createdAt', 'companyName', 'actorName', 'level', 'statusCode']).optional(),
 })
 
 export type ListLogsQuery = z.infer<typeof listLogsQuerySchema>

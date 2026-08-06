@@ -11,6 +11,8 @@ export interface ListUnitsParams {
   page: number
   pageSize: number
   search?: string
+  sortBy?: string
+  sortOrder?: 'asc' | 'desc'
 }
 
 export async function listUnits(params: ListUnitsParams) {

@@ -15,6 +15,7 @@ import PrintButton from '@/components/ui/PrintButton.vue'
 import SearchInput from '@/components/ui/SearchInput.vue'
 import BulkSelectionBar from '@/components/ui/BulkSelectionBar.vue'
 import TableCheckbox from '@/components/ui/TableCheckbox.vue'
+import SortableTableHeader from '@/components/ui/SortableTableHeader.vue'
 import { getApiErrorMessage, resolveFormError } from '@/services/api'
 import { confirmDelete, toastError, toastSuccess } from '@/lib/alerts'
 import { generateRandomPassword } from '@/lib/password'
@@ -22,6 +23,7 @@ import { createUser, deleteUser, deleteUsers, listUsers, updateUser } from '@/se
 import { usePagination } from '@/composables/usePagination'
 import { useBulkSelection } from '@/composables/useBulkSelection'
 import { useFilterModal } from '@/composables/useFilterModal'
+import { useTableSort } from '@/composables/useTableSort'
 import type { User, UserRole } from '@/types'
 
 const roleOptions: { value: UserRole; label: string }[] = [
@@ -37,6 +39,7 @@ const statusFilterOptions = [
 ]
 
 const { page, pageSize, total, totalPages, applyMeta, watchSearch } = usePagination()
+const { sortBy, sortOrder, toggleSort } = useTableSort(() => { page.value = 1; return loadUsers() }, 'name')
 
 const users = ref<User[]>([])
 const { selectedIds, allVisibleSelected, toggleOne, toggleAllVisible, clearSelection } = useBulkSelection(() =>
@@ -75,6 +78,8 @@ async function loadUsers() {
       search: search.value || undefined,
       role: filters.value.role !== 'todos' ? (filters.value.role as UserRole) : undefined,
       active: filters.value.active === 'todos' ? undefined : filters.value.active === 'true',
+      sortBy: sortBy.value,
+      sortOrder: sortOrder.value,
     })
     users.value = result.data
     clearSelection()
@@ -217,16 +222,10 @@ onMounted(loadUsers)
                 @toggle="toggleAllVisible"
               />
             </th>
-            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Nome</th>
-            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-              E-mail
-            </th>
-            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-              Perfil
-            </th>
-            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-              Status
-            </th>
+            <SortableTableHeader field="name" :active-field="sortBy" :order="sortOrder" @sort="toggleSort">Nome</SortableTableHeader>
+            <SortableTableHeader field="email" :active-field="sortBy" :order="sortOrder" @sort="toggleSort">E-mail</SortableTableHeader>
+            <SortableTableHeader field="role" :active-field="sortBy" :order="sortOrder" @sort="toggleSort">Perfil</SortableTableHeader>
+            <SortableTableHeader field="active" :active-field="sortBy" :order="sortOrder" @sort="toggleSort">Status</SortableTableHeader>
             <th class="print:hidden px-4 py-3" />
           </tr>
         </thead>

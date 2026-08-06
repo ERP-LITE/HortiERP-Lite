@@ -11,6 +11,8 @@ export interface ListCategoriesParams {
   page: number
   pageSize: number
   search?: string
+  sortBy?: string
+  sortOrder?: 'asc' | 'desc'
 }
 
 export async function listCategories(params: ListCategoriesParams) {

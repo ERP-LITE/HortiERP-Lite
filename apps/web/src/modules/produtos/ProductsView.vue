@@ -15,6 +15,7 @@ import PrintButton from '@/components/ui/PrintButton.vue'
 import SearchInput from '@/components/ui/SearchInput.vue'
 import BulkSelectionBar from '@/components/ui/BulkSelectionBar.vue'
 import TableCheckbox from '@/components/ui/TableCheckbox.vue'
+import SortableTableHeader from '@/components/ui/SortableTableHeader.vue'
 import { getApiErrorMessage, resolveFormError } from '@/services/api'
 import { confirmDelete, toastError, toastSuccess } from '@/lib/alerts'
 import { listAllCategories } from '@/services/categoriesService'
@@ -24,12 +25,14 @@ import { useAuthStore } from '@/stores/auth'
 import { usePagination } from '@/composables/usePagination'
 import { useBulkSelection } from '@/composables/useBulkSelection'
 import { useFilterModal } from '@/composables/useFilterModal'
+import { useTableSort } from '@/composables/useTableSort'
 import type { Category, Product, Unit } from '@/types'
 
 const auth = useAuthStore()
 const canManage = computed(() => auth.user?.role === 'admin' || auth.user?.role === 'gerente')
 
 const { page, pageSize, total, totalPages, applyMeta, watchSearch } = usePagination()
+const { sortBy, sortOrder, toggleSort } = useTableSort(() => { page.value = 1; return loadProducts() }, 'name')
 
 const products = ref<Product[]>([])
 const { selectedIds, allVisibleSelected, toggleOne, toggleAllVisible, clearSelection } = useBulkSelection(() =>
@@ -97,6 +100,8 @@ async function loadProducts() {
       search: search.value || undefined,
       categoryId: filters.value.categoryId !== 'todas' ? filters.value.categoryId : undefined,
       active: filters.value.active === 'todos' ? undefined : filters.value.active === 'true',
+      sortBy: sortBy.value,
+      sortOrder: sortOrder.value,
     })
     products.value = result.data
     clearSelection()
@@ -263,16 +268,12 @@ onMounted(loadAll)
                 @toggle="toggleAllVisible"
               />
             </th>
-            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-              Produto
-            </th>
+            <SortableTableHeader field="name" :active-field="sortBy" :order="sortOrder" @sort="toggleSort">Produto</SortableTableHeader>
             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
               Categoria
             </th>
-            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-              Estoque
-            </th>
-            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Status</th>
+            <SortableTableHeader field="currentStock" :active-field="sortBy" :order="sortOrder" @sort="toggleSort">Estoque</SortableTableHeader>
+            <SortableTableHeader field="active" :active-field="sortBy" :order="sortOrder" @sort="toggleSort">Status</SortableTableHeader>
             <th class="print:hidden px-4 py-3" />
           </tr>
         </thead>

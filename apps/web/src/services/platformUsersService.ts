@@ -7,7 +7,13 @@ export interface PlatformUserInput {
   password?: string
 }
 
-export async function listPlatformUsers(params: { page: number; pageSize: number; search?: string }) {
+export async function listPlatformUsers(params: {
+  page: number
+  pageSize: number
+  search?: string
+  sortBy?: string
+  sortOrder?: 'asc' | 'desc'
+}) {
   const { data } = await api.get<PaginatedResult<User>>('/platform-users', { params })
   return data
 }

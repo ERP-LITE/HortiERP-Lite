@@ -11,8 +11,10 @@ import PeriodPicker from '@/components/ui/PeriodPicker.vue'
 import Pagination from '@/components/ui/Pagination.vue'
 import StatCard from '@/components/ui/StatCard.vue'
 import ExpandableText from '@/components/ui/ExpandableText.vue'
+import SortableTableHeader from '@/components/ui/SortableTableHeader.vue'
 import { usePagination } from '@/composables/usePagination'
 import { useFilterModal } from '@/composables/useFilterModal'
+import { useLocalTableSort } from '@/composables/useTableSort'
 import type { PeriodValue } from '@/lib/period'
 import { formatDate, formatDateOnly } from '@/lib/format'
 import { getApiErrorMessage } from '@/services/api'
@@ -88,6 +90,31 @@ const filteredStockByCategory = computed(() => stockByCategory.value.filter((row
 const filteredLossItems = computed(() => (printing.value ? printLossItems.value : lossesReport.value?.data ?? []))
 
 const filteredStockEntries = computed(() => (printing.value ? printStockEntries.value : stockEntriesReport.value))
+const lossReasonRows = computed(() => lossesReport.value?.byReason ?? [])
+
+const stockSort = useLocalTableSort(filteredStockByCategory, {
+  category: (row) => row.categoryName,
+  products: (row) => row.productCount,
+  stock: (row) => row.totalStock,
+}, 'category')
+const reasonSort = useLocalTableSort(lossReasonRows, {
+  reason: (row) => reasonLabels[row.reason] ?? row.reason,
+  occurrences: (row) => row.occurrences,
+  quantity: (row) => row.quantity,
+}, 'reason')
+const lossSort = useLocalTableSort(filteredLossItems, {
+  date: (row) => new Date(row.lossDate).getTime(),
+  product: (row) => row.product?.name ?? '',
+  reason: (row) => reasonLabels[row.reason] ?? row.reason,
+  quantity: (row) => Number(row.quantity),
+  user: (row) => row.createdByUser?.name ?? '',
+}, 'date')
+const entrySort = useLocalTableSort(filteredStockEntries, {
+  date: (row) => new Date(row.entryDate).getTime(),
+  supplier: (row) => row.supplierName ?? '',
+  items: (row) => row.items.length,
+  user: (row) => row.createdByUser?.name ?? '',
+}, 'date')
 
 const stockSummary = computed(() => ({
   categories: filteredStockByCategory.value.length,
@@ -317,22 +344,16 @@ onMounted(loadActiveTab)
         <table v-mobile-accordion class="mobile-accordion-table min-w-full divide-y divide-gray-200 dark:divide-gray-700">
           <thead class="bg-gray-50 dark:bg-gray-900/60">
             <tr>
-              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                Categoria
-              </th>
-              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                Produtos
-              </th>
-              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                Estoque total
-              </th>
+              <SortableTableHeader field="category" :active-field="stockSort.sortBy.value" :order="stockSort.sortOrder.value" @sort="stockSort.toggleSort">Categoria</SortableTableHeader>
+              <SortableTableHeader field="products" :active-field="stockSort.sortBy.value" :order="stockSort.sortOrder.value" @sort="stockSort.toggleSort">Produtos</SortableTableHeader>
+              <SortableTableHeader field="stock" :active-field="stockSort.sortBy.value" :order="stockSort.sortOrder.value" @sort="stockSort.toggleSort">Estoque total</SortableTableHeader>
             </tr>
           </thead>
           <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
             <tr v-if="filteredStockByCategory.length === 0">
               <td colspan="3" class="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">Sem dados.</td>
             </tr>
-            <tr v-for="row in filteredStockByCategory" v-else :key="row.categoryId">
+            <tr v-for="row in stockSort.sortedItems.value" v-else :key="row.categoryId">
               <td class="max-w-72 px-4 py-3 text-sm font-medium text-gray-900 dark:text-gray-100">
                 <ExpandableText :text="row.categoryName" :max-length="45" />
               </td>
@@ -357,9 +378,9 @@ onMounted(loadActiveTab)
           <table v-mobile-accordion class="mobile-accordion-table min-w-full divide-y divide-gray-100 dark:divide-gray-700">
             <thead class="bg-gray-50 dark:bg-gray-900/60">
               <tr>
-                <th class="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500 dark:text-gray-400">Motivo</th>
-                <th class="px-4 py-3 text-right text-xs font-medium uppercase text-gray-500 dark:text-gray-400">Registros</th>
-                <th class="px-4 py-3 text-right text-xs font-medium uppercase text-gray-500 dark:text-gray-400">Quantidade</th>
+                <SortableTableHeader field="reason" :active-field="reasonSort.sortBy.value" :order="reasonSort.sortOrder.value" @sort="reasonSort.toggleSort">Motivo</SortableTableHeader>
+                <SortableTableHeader field="occurrences" :active-field="reasonSort.sortBy.value" :order="reasonSort.sortOrder.value" align="right" @sort="reasonSort.toggleSort">Registros</SortableTableHeader>
+                <SortableTableHeader field="quantity" :active-field="reasonSort.sortBy.value" :order="reasonSort.sortOrder.value" align="right" @sort="reasonSort.toggleSort">Quantidade</SortableTableHeader>
               </tr>
             </thead>
             <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
@@ -368,7 +389,7 @@ onMounted(loadActiveTab)
                   Sem perdas no período.
                 </td>
               </tr>
-              <tr v-for="row in lossesReport.byReason" v-else :key="row.reason">
+              <tr v-for="row in reasonSort.sortedItems.value" v-else :key="row.reason">
                 <td class="px-4 py-3 text-sm text-gray-900 dark:text-gray-100">
                   {{ reasonLabels[row.reason] ?? row.reason }}
                 </td>
@@ -388,11 +409,11 @@ onMounted(loadActiveTab)
           <table v-mobile-accordion class="mobile-accordion-table min-w-full divide-y divide-gray-100 dark:divide-gray-700">
             <thead class="bg-gray-50 dark:bg-gray-900/60">
               <tr>
-                <th class="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500 dark:text-gray-400">Data</th>
-                <th class="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500 dark:text-gray-400">Produto</th>
-                <th class="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500 dark:text-gray-400">Motivo</th>
-                <th class="px-4 py-3 text-right text-xs font-medium uppercase text-gray-500 dark:text-gray-400">Quantidade</th>
-                <th class="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500 dark:text-gray-400">Registrado por</th>
+                <SortableTableHeader field="date" :active-field="lossSort.sortBy.value" :order="lossSort.sortOrder.value" @sort="lossSort.toggleSort">Data</SortableTableHeader>
+                <SortableTableHeader field="product" :active-field="lossSort.sortBy.value" :order="lossSort.sortOrder.value" @sort="lossSort.toggleSort">Produto</SortableTableHeader>
+                <SortableTableHeader field="reason" :active-field="lossSort.sortBy.value" :order="lossSort.sortOrder.value" @sort="lossSort.toggleSort">Motivo</SortableTableHeader>
+                <SortableTableHeader field="quantity" :active-field="lossSort.sortBy.value" :order="lossSort.sortOrder.value" align="right" @sort="lossSort.toggleSort">Quantidade</SortableTableHeader>
+                <SortableTableHeader field="user" :active-field="lossSort.sortBy.value" :order="lossSort.sortOrder.value" @sort="lossSort.toggleSort">Registrado por</SortableTableHeader>
               </tr>
             </thead>
             <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
@@ -401,7 +422,7 @@ onMounted(loadActiveTab)
                   Sem perdas no período.
                 </td>
               </tr>
-              <tr v-for="loss in filteredLossItems" v-else :key="loss.id">
+              <tr v-for="loss in lossSort.sortedItems.value" v-else :key="loss.id">
                 <td class="px-4 py-3 text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">
                   {{ formatDate(loss.lossDate) }}
                 </td>
@@ -455,18 +476,10 @@ onMounted(loadActiveTab)
         <table v-mobile-accordion class="mobile-accordion-table min-w-full divide-y divide-gray-200 dark:divide-gray-700">
           <thead class="bg-gray-50 dark:bg-gray-900/60">
             <tr>
-              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                Data
-              </th>
-              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                Fornecedor
-              </th>
-              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                Itens
-              </th>
-              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                Recebido por
-              </th>
+              <SortableTableHeader field="date" :active-field="entrySort.sortBy.value" :order="entrySort.sortOrder.value" @sort="entrySort.toggleSort">Data</SortableTableHeader>
+              <SortableTableHeader field="supplier" :active-field="entrySort.sortBy.value" :order="entrySort.sortOrder.value" @sort="entrySort.toggleSort">Fornecedor</SortableTableHeader>
+              <SortableTableHeader field="items" :active-field="entrySort.sortBy.value" :order="entrySort.sortOrder.value" @sort="entrySort.toggleSort">Itens</SortableTableHeader>
+              <SortableTableHeader field="user" :active-field="entrySort.sortBy.value" :order="entrySort.sortOrder.value" @sort="entrySort.toggleSort">Recebido por</SortableTableHeader>
             </tr>
           </thead>
           <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
@@ -475,7 +488,7 @@ onMounted(loadActiveTab)
                 Sem entradas no período.
               </td>
             </tr>
-            <tr v-for="entry in filteredStockEntries" v-else :key="entry.id">
+            <tr v-for="entry in entrySort.sortedItems.value" v-else :key="entry.id">
               <td class="px-4 py-3 text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">
                 {{ formatDate(entry.entryDate) }}
               </td>

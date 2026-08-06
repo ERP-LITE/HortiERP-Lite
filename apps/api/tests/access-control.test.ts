@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { describe, test } from 'node:test'
 import { eq } from 'drizzle-orm'
 import { db } from '../src/db/client.js'
-import { companies, users } from '../src/db/schema/index.js'
+import { categories, companies, users } from '../src/db/schema/index.js'
 import { authCookie, createTenant, setupTestApp } from './helpers.js'
 
 const ctx = setupTestApp()
@@ -48,6 +48,25 @@ describe('isolamento multiempresa e permissões', () => {
       payload: { name: 'Permitida' },
     })
     assert.equal(allowed.statusCode, 201)
+  })
+
+  test('ordenação é aplicada ao conjunto completo antes da paginação', async () => {
+    const tenant = await createTenant('sorting')
+    await db.insert(categories).values([
+      { companyId: tenant.companyId, name: 'Abacate', createdBy: tenant.admin.id },
+      { companyId: tenant.companyId, name: 'Zimbro', createdBy: tenant.admin.id },
+    ])
+
+    const response = await ctx.app.inject({
+      method: 'GET',
+      url: '/api/categories?page=1&pageSize=2&sortBy=name&sortOrder=desc',
+      headers: { cookie: authCookie(ctx.app, tenant.admin) },
+    })
+
+    assert.equal(response.statusCode, 200)
+    const result = response.json<{ data: Array<{ name: string }>; total: number }>()
+    assert.equal(result.total, 3)
+    assert.deepEqual(result.data.map(({ name }) => name), ['Zimbro', 'Categoria sorting'])
   })
 })
 

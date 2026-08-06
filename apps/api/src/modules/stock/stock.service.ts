@@ -13,12 +13,14 @@ export async function listCurrentStock(companyId: string, query: ListStockQuery)
   if (query.categoryId) conditions.push(eq(products.categoryId, query.categoryId))
   if (query.lowStockOnly) conditions.push(lte(products.currentStock, products.minStock))
   const where = and(...conditions)
+  const stockSortColumn = query.sortBy ? products[query.sortBy] : products.name
+  const stockOrderBy = query.sortOrder === 'desc' ? desc(stockSortColumn) : asc(stockSortColumn)
 
   const [data, [{ total }]] = await Promise.all([
     db.query.products.findMany({
       where,
       with: { category: true, unit: true },
-      orderBy: asc(products.name),
+      orderBy: [stockOrderBy, asc(products.name)],
       limit: query.pageSize,
       offset: (query.page - 1) * query.pageSize,
     }),
@@ -38,6 +40,8 @@ export async function listStockMovements(companyId: string, query: ListStockMove
   if (query.from) conditions.push(gte(stockMovements.createdAt, query.from))
   if (query.to) conditions.push(lte(stockMovements.createdAt, query.to))
   const where = and(...conditions)
+  const movementSortColumn = query.sortBy ? stockMovements[query.sortBy] : stockMovements.createdAt
+  const movementOrderBy = query.sortOrder === 'asc' ? asc(movementSortColumn) : desc(movementSortColumn)
 
   const [data, [{ total }]] = await Promise.all([
     db.query.stockMovements.findMany({
@@ -46,7 +50,7 @@ export async function listStockMovements(companyId: string, query: ListStockMove
         product: true,
         createdByUser: { columns: { id: true, name: true } },
       },
-      orderBy: desc(stockMovements.createdAt),
+      orderBy: [movementOrderBy, desc(stockMovements.createdAt)],
       limit: query.pageSize,
       offset: (query.page - 1) * query.pageSize,
     }),
