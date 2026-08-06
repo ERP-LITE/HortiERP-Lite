@@ -73,6 +73,8 @@ Padrão único em todo módulo de listagem: `paginationQuerySchema` (Zod, `share
 
 Os detalhamentos dos relatórios de perdas e entradas também seguem esse contrato. No frontend, listas usadas como opções de formulário percorrem todas as páginas por meio de `services/paginatedOptions.ts`; assim, o limite de 100 por requisição não oculta opções de empresas com cadastros maiores.
 
+Campos textuais potencialmente extensos nas tabelas usam o componente compartilhado `ExpandableText`: a célula mantém largura limitada, exibe uma prévia e permite expandir pelo chevron sem provocar overflow horizontal. O componente força a quebra de sequências sem espaços e libera o conteúdo completo para impressão. Esse comportamento é independente do `v-mobile-accordion`, responsável por transformar linhas de tabela em cartões expansíveis em telas pequenas.
+
 ## Integridade e índices
 
 Além das validações amigáveis dos services, nomes de categorias, unidades e produtos e abreviações/SKUs possuem índices únicos parciais e case-insensitive por empresa. Os índices consideram apenas registros com `deletedAt` nulo, preservando o comportamento de soft delete. Consultas operacionais frequentes também possuem índices compostos por empresa/data ou empresa/produto.

@@ -69,7 +69,7 @@ Unidade de medida (ex: kg, un, dz). `id`, `companyId`, `name`, `abbreviation`, t
 | `sku`, `barcode` | text | opcionais, `sku` único por empresa quando informado |
 | `costPrice`, `salePrice` | numeric(12,2) | opcionais |
 | `minStock` | numeric(12,3) | default `0` — limite pra alerta de "estoque baixo" |
-| `currentStock` | numeric(12,3) | default `0` — **atualizado só pelos fluxos de entrada/perda**, nunca editado direto |
+| `currentStock` | numeric(12,3) | default `0` — atualizado pelos fluxos de entrada, perda e ajuste manual; nunca editado direto no cadastro do produto |
 | `active` | boolean | default `true` |
 | timestamps, auditBy | | |
 
@@ -85,7 +85,7 @@ Entrada de mercadoria (cabeçalho + itens), ver [fluxo de entrada](./fluxos-de-n
 Registro de perda de estoque. `id`, `companyId`, `productId` (FK), `quantity` numeric(12,3), `reason` (enum `loss_reason`: `vencido` \| `avariado` \| `roubo_furto` \| `erro_operacional` \| `outro`), `notes?`, `lossDate`, timestamps, auditBy.
 
 ### `stock_movements`
-Histórico append-only de toda variação de estoque — nunca é editado ou apagado, só inserido pelos fluxos de entrada/perda.
+Histórico append-only de toda variação de estoque — nunca é editado ou apagado, só inserido pelos fluxos de entrada, perda e ajuste manual por meio de `applyStockMovement`.
 
 | Coluna | Tipo | Observação |
 |---|---|---|
@@ -96,7 +96,9 @@ Histórico append-only de toda variação de estoque — nunca é editado ou apa
 | `balanceAfter` | numeric(12,3) | saldo do produto após o movimento (snapshot, não recalculado) |
 | `referenceType`, `referenceId` | text/uuid | em `entrada`/`perda`, aponta pra `stock_entry`/`loss` que originou o movimento; em `ajuste`, não existe entidade própria, então `referenceType: 'adjustment'` e `referenceId` é o próprio `productId` |
 | `notes` | text | nulável; só preenchido em `ajuste`, com o motivo digitado pelo usuário (ver [fluxo de ajuste manual](./fluxos-de-negocio.md#ajuste-manual-de-estoque)) |
-| `createdAt`, `createdBy` | | sem `updatedBy`/`deletedAt` — registro imutável |
+| `createdAt`, `createdBy` | timestamp/uuid | sem `updatedBy`/`deletedAt` — registro imutável; `createdBy` identifica o usuário responsável quando informado |
+
+A relação Drizzle `createdByUser` resolve somente as colunas públicas `id` e `name` para o histórico e o resumo do dashboard. Como os campos de auditoria não possuem FK, a relação pode ser nula em registros antigos; a interface apresenta nesses casos “Usuário não identificado”.
 
 ### `system_logs`
 Registro append-only das requisições processadas pela API, usado para diagnóstico técnico da plataforma e auditoria de atividades por empresa.
