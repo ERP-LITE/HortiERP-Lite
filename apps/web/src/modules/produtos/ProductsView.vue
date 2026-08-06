@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { Pencil, Plus, Trash2 } from '@lucide/vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
@@ -28,7 +28,7 @@ import type { Category, Product, Unit } from '@/types'
 const auth = useAuthStore()
 const canManage = computed(() => auth.user?.role === 'admin' || auth.user?.role === 'gerente')
 
-const { page, pageSize, total, totalPages, applyMeta } = usePagination()
+const { page, pageSize, total, totalPages, applyMeta, watchSearch } = usePagination()
 
 const products = ref<Product[]>([])
 const { selectedIds, allVisibleSelected, toggleOne, toggleAllVisible, clearSelection } = useBulkSelection(() =>
@@ -224,11 +224,7 @@ async function handleBulkDelete() {
   }
 }
 
-watch(search, () => {
-  if (page.value !== 1) page.value = 1
-  else loadProducts()
-})
-watch([page, pageSize], loadProducts)
+watchSearch(search, loadProducts)
 onMounted(loadAll)
 </script>
 

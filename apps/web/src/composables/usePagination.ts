@@ -1,4 +1,4 @@
-import { ref, watch } from 'vue'
+import { ref, watch, type Ref } from 'vue'
 
 const PAGE_SIZE_STORAGE_KEY = 'hortierp_page_size'
 const DEFAULT_PAGE_SIZE = 15
@@ -38,5 +38,17 @@ export function usePagination() {
     totalPages.value = meta.totalPages
   }
 
-  return { page, pageSize, total, totalPages, applyMeta }
+  /**
+   * Liga uma busca reativa à paginação: ao digitar, volta pra página 1 (ou
+   * recarrega direto se já estiver nela); ao trocar de página/tamanho, recarrega.
+   */
+  function watchSearch(search: Ref<string>, load: () => void) {
+    watch(search, () => {
+      if (page.value !== 1) page.value = 1
+      else load()
+    })
+    watch([page, pageSize], load)
+  }
+
+  return { page, pageSize, total, totalPages, applyMeta, watchSearch }
 }

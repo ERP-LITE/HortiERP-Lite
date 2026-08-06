@@ -125,10 +125,7 @@ export async function getDashboardSummary(companyId: string, range: { from?: Dat
       totalStock: sql<number>`coalesce(sum(${products.currentStock}), 0)`.mapWith(Number),
     })
     .from(categories)
-    .leftJoin(
-      products,
-      and(eq(products.categoryId, categories.id), isNull(products.deletedAt), eq(products.active, true)),
-    )
+    .leftJoin(products, and(eq(products.categoryId, categories.id), isNull(products.deletedAt)))
     .where(and(eq(categories.companyId, companyId), isNull(categories.deletedAt)))
     .groupBy(categories.id, categories.name)
 

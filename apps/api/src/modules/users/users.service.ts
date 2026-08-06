@@ -3,36 +3,10 @@ import { and, asc, count, eq, ilike, isNull, or } from 'drizzle-orm'
 import { db } from '../../db/client.js'
 import { users } from '../../db/schema/index.js'
 import { AppError } from '../../shared/errors/AppError.js'
-import { assertUniqueField } from '../../shared/db/assertUniqueField.js'
 import { buildPaginatedResult } from '../../shared/db/paginate.js'
 import { softDeleteById, softDeleteByIds } from '../../shared/db/softDelete.js'
+import { assertUniqueUserEmail, userPublicColumns } from '../../shared/db/userPublicColumns.js'
 import type { CreateUserInput, ListUsersQuery, UpdateUserInput } from './users.schema.js'
-
-function assertUniqueEmail(email: string, excludeId?: string) {
-  return assertUniqueField({
-    table: users,
-    idColumn: users.id,
-    valueColumn: users.email,
-    value: email,
-    excludeId,
-    field: 'email',
-    message: 'Já existe um usuário com esse e-mail',
-  })
-}
-
-function isUniqueViolation(error: unknown): boolean {
-  return typeof error === 'object' && error !== null && 'code' in error && (error as { code: unknown }).code === '23505'
-}
-
-const publicColumns = {
-  id: users.id,
-  name: users.name,
-  email: users.email,
-  role: users.role,
-  active: users.active,
-  createdAt: users.createdAt,
-  updatedAt: users.updatedAt,
-}
 
 export async function listUsers(companyId: string, query: ListUsersQuery) {
   const conditions = [eq(users.companyId, companyId), isNull(users.deletedAt)]
@@ -43,7 +17,7 @@ export async function listUsers(companyId: string, query: ListUsersQuery) {
 
   const [data, [{ total }]] = await Promise.all([
     db
-      .select(publicColumns)
+      .select(userPublicColumns)
       .from(users)
       .where(where)
       .orderBy(asc(users.name))
@@ -57,7 +31,7 @@ export async function listUsers(companyId: string, query: ListUsersQuery) {
 
 export async function getUser(companyId: string, id: string) {
   const [user] = await db
-    .select(publicColumns)
+    .select(userPublicColumns)
     .from(users)
     .where(and(eq(users.id, id), eq(users.companyId, companyId), isNull(users.deletedAt)))
 
@@ -67,64 +41,56 @@ export async function getUser(companyId: string, id: string) {
 }
 
 export async function createUser(companyId: string, requesterId: string, data: CreateUserInput) {
-  await assertUniqueEmail(data.email)
+  await assertUniqueUserEmail(data.email)
 
   const passwordHash = await bcrypt.hash(data.password, 10)
 
-  try {
-    const [user] = await db
-      .insert(users)
-      .values({
-        companyId,
-        name: data.name,
-        email: data.email,
-        passwordHash,
-        role: data.role,
-        active: data.active,
-        createdBy: requesterId,
-      })
-      .returning(publicColumns)
+  const [user] = await db
+    .insert(users)
+    .values({
+      companyId,
+      name: data.name,
+      email: data.email,
+      passwordHash,
+      role: data.role,
+      active: data.active,
+      createdBy: requesterId,
+    })
+    .returning(userPublicColumns)
 
-    return user
-  } catch (error) {
-    if (isUniqueViolation(error)) throw AppError.duplicate('email', 'Já existe um usuário com esse e-mail')
-    throw error
-  }
+  return user
 }
 
 export async function updateUser(companyId: string, requesterId: string, id: string, data: UpdateUserInput) {
   await getUser(companyId, id)
-  if (data.email) await assertUniqueEmail(data.email, id)
+  if (data.email) await assertUniqueUserEmail(data.email, id)
 
   const passwordHash = data.password ? await bcrypt.hash(data.password, 10) : undefined
 
-  try {
-    const [user] = await db
-      .update(users)
-      .set({
-        ...(data.name && { name: data.name }),
-        ...(data.email && { email: data.email }),
-        ...(passwordHash && { passwordHash }),
-        ...(data.role && { role: data.role }),
-        ...(data.active !== undefined && { active: data.active }),
-        updatedBy: requesterId,
-        updatedAt: new Date(),
-      })
-      .where(and(eq(users.id, id), eq(users.companyId, companyId)))
-      .returning(publicColumns)
+  const [user] = await db
+    .update(users)
+    .set({
+      ...(data.name && { name: data.name }),
+      ...(data.email && { email: data.email }),
+      ...(passwordHash && { passwordHash }),
+      ...(data.role && { role: data.role }),
+      ...(data.active !== undefined && { active: data.active }),
+      updatedBy: requesterId,
+      updatedAt: new Date(),
+    })
+    .where(and(eq(users.id, id), eq(users.companyId, companyId)))
+    .returning(userPublicColumns)
 
-    return user
-  } catch (error) {
-    if (isUniqueViolation(error)) throw AppError.duplicate('email', 'Já existe um usuário com esse e-mail')
-    throw error
-  }
+  return user
 }
 
 export async function deleteUser(companyId: string, requesterId: string, id: string) {
+  if (id === requesterId) throw AppError.conflict('Você não pode excluir a própria conta')
   await getUser(companyId, id)
   await softDeleteById(users, companyId, requesterId, id, { active: false })
 }
 
 export async function deleteUsers(companyId: string, requesterId: string, ids: string[]) {
-  return softDeleteByIds(users, companyId, requesterId, ids, { active: false })
+  const filteredIds = ids.filter((id) => id !== requesterId)
+  return softDeleteByIds(users, companyId, requesterId, filteredIds, { active: false })
 }

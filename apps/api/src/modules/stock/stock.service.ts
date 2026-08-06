@@ -2,6 +2,7 @@ import { and, asc, count, desc, eq, gte, ilike, inArray, isNull, lte } from 'dri
 import { db } from '../../db/client.js'
 import { products, stockMovements } from '../../db/schema/index.js'
 import { AppError } from '../../shared/errors/AppError.js'
+import { applyStockMovement } from '../../shared/db/applyStockMovement.js'
 import { buildPaginatedResult } from '../../shared/db/paginate.js'
 import { matchingProductIds } from '../../shared/db/matchingProductIds.js'
 import type { CreateStockAdjustmentInput, ListStockMovementsQuery, ListStockQuery } from './stock.schema.js'
@@ -69,27 +70,16 @@ export async function createStockAdjustment(companyId: string, userId: string, d
       const delta = item.quantity - previousStock
       if (delta === 0) continue
 
-      const newStock = item.quantity.toString()
-
-      await tx
-        .update(products)
-        .set({ currentStock: newStock, updatedAt: new Date(), updatedBy: userId })
-        .where(and(eq(products.id, item.productId), eq(products.companyId, companyId)))
-
-      const [movement] = await tx
-        .insert(stockMovements)
-        .values({
-          companyId,
-          productId: item.productId,
-          type: 'ajuste',
-          quantity: delta.toString(),
-          balanceAfter: newStock,
-          referenceType: 'adjustment',
-          referenceId: item.productId,
-          notes: data.notes,
-          createdBy: userId,
-        })
-        .returning()
+      const movement = await applyStockMovement(tx, {
+        companyId,
+        userId,
+        productId: item.productId,
+        delta,
+        type: 'ajuste',
+        referenceType: 'adjustment',
+        referenceId: item.productId,
+        notes: data.notes,
+      })
 
       movements.push(movement)
     }

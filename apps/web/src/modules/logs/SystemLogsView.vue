@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { Eye } from '@lucide/vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import BaseBadge from '@/components/ui/BaseBadge.vue'
@@ -16,11 +16,12 @@ import { getApiErrorMessage } from '@/services/api'
 import { listAllCompanies } from '@/services/companiesService'
 import { listActivityLogs, listTechnicalLogs } from '@/services/logsService'
 import type { PeriodValue } from '@/lib/period'
+import { formatDateTime } from '@/lib/format'
 import type { Company, SystemLog, SystemLogLevel, SystemLogMethod } from '@/types'
 
 const props = defineProps<{ mode: 'technical' | 'activity' }>()
 const isTechnical = computed(() => props.mode === 'technical')
-const { page, pageSize, total, totalPages, applyMeta } = usePagination()
+const { page, pageSize, total, totalPages, applyMeta, watchSearch } = usePagination()
 
 const logs = ref<SystemLog[]>([])
 const companies = ref<Company[]>([])
@@ -77,10 +78,6 @@ const levelVariants: Record<SystemLogLevel, 'success' | 'warning' | 'danger'> = 
   info: 'success',
   warning: 'warning',
   error: 'danger',
-}
-
-function formatDateTime(value: string) {
-  return new Date(value).toLocaleString('pt-BR')
 }
 
 function resourceLabel(path: string) {
@@ -175,11 +172,7 @@ function clearFilters() {
   loadLogs()
 }
 
-watch(search, () => {
-  if (page.value !== 1) page.value = 1
-  else loadLogs()
-})
-watch([page, pageSize], loadLogs)
+watchSearch(search, loadLogs)
 onMounted(() => {
   loadLogs()
   loadCompanies()

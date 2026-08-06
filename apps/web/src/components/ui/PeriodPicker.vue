@@ -3,6 +3,7 @@ import { computed, ref } from 'vue'
 import { CalendarDays, Check, ChevronDown } from '@lucide/vue'
 import DateInput from './DateInput.vue'
 import { rangeForPreset, type PeriodPreset, type PeriodValue } from '@/lib/period'
+import { formatDateOnly } from '@/lib/format'
 
 const props = withDefaults(defineProps<{ modelValue: PeriodValue; includeAllTime?: boolean }>(), {
   includeAllTime: true,
@@ -25,18 +26,12 @@ const selectedOptionLabel = computed(
   () => allOptions.find((option) => option.value === props.modelValue.preset)?.label ?? 'Selecionar período',
 )
 
-function formatDate(value: string) {
-  if (!value) return ''
-  const [year, month, day] = value.split('-')
-  return `${day}/${month}/${year}`
-}
-
 const selectedPeriodLabel = computed(() => {
   if (props.modelValue.preset !== 'personalizado') return selectedOptionLabel.value
   if (!props.modelValue.from && !props.modelValue.to) return 'Período personalizado'
 
-  const from = formatDate(props.modelValue.from)
-  const to = formatDate(props.modelValue.to)
+  const from = formatDateOnly(props.modelValue.from)
+  const to = formatDateOnly(props.modelValue.to)
   if (from && to) return `${from} até ${to}`
   if (from) return `A partir de ${from}`
   return `Até ${to}`

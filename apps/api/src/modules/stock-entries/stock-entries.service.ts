@@ -1,7 +1,8 @@
-import { and, count, eq, gte, ilike, inArray, lte, or, sql } from 'drizzle-orm'
+import { and, count, eq, gte, ilike, inArray, lte, or } from 'drizzle-orm'
 import { db } from '../../db/client.js'
-import { products, stockEntries, stockMovements, stockEntryItems } from '../../db/schema/index.js'
+import { stockEntries, stockEntryItems } from '../../db/schema/index.js'
 import { AppError } from '../../shared/errors/AppError.js'
+import { applyStockMovement } from '../../shared/db/applyStockMovement.js'
 import { buildPaginatedResult } from '../../shared/db/paginate.js'
 import { matchingProductIds } from '../../shared/db/matchingProductIds.js'
 import type { CreateStockEntryInput, ListStockEntriesQuery } from './stock-entries.schema.js'
@@ -70,36 +71,21 @@ export async function createStockEntry(companyId: string, userId: string, data: 
       .returning()
 
     for (const item of data.items) {
-      const [updatedProduct] = await tx
-        .update(products)
-        .set({
-          currentStock: sql`${products.currentStock} + ${item.quantity.toString()}`,
-          updatedAt: new Date(),
-          updatedBy: userId,
-        })
-        .where(and(eq(products.id, item.productId), eq(products.companyId, companyId)))
-        .returning({ currentStock: products.currentStock })
-
-      if (!updatedProduct) {
-        throw AppError.notFound(`Produto não encontrado: ${item.productId}`)
-      }
+      await applyStockMovement(tx, {
+        companyId,
+        userId,
+        productId: item.productId,
+        delta: item.quantity,
+        type: 'entrada',
+        referenceType: 'stock_entry',
+        referenceId: entry.id,
+      })
 
       await tx.insert(stockEntryItems).values({
         stockEntryId: entry.id,
         productId: item.productId,
         quantity: item.quantity.toString(),
         unitCost: item.unitCost?.toString(),
-      })
-
-      await tx.insert(stockMovements).values({
-        companyId,
-        productId: item.productId,
-        type: 'entrada',
-        quantity: item.quantity.toString(),
-        balanceAfter: updatedProduct.currentStock,
-        referenceType: 'stock_entry',
-        referenceId: entry.id,
-        createdBy: userId,
       })
     }
 

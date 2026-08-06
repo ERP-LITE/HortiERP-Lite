@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref, watch } from 'vue'
+import { onMounted, ref } from 'vue'
 import { Pencil, Plus, Trash2, Wand2 } from '@lucide/vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
@@ -20,7 +20,7 @@ import { useAuthStore } from '@/stores/auth'
 import type { User } from '@/types'
 
 const auth = useAuthStore()
-const { page, pageSize, total, totalPages, applyMeta } = usePagination()
+const { page, pageSize, total, totalPages, applyMeta, watchSearch } = usePagination()
 const users = ref<User[]>([])
 const search = ref('')
 const loading = ref(true)
@@ -129,11 +129,7 @@ async function handleDelete(user: User) {
   }
 }
 
-watch(search, () => {
-  if (page.value !== 1) page.value = 1
-  else loadUsers()
-})
-watch([page, pageSize], loadUsers)
+watchSearch(search, loadUsers)
 onMounted(loadUsers)
 </script>
 

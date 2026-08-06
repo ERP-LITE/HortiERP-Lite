@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { Plus } from '@lucide/vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
@@ -13,6 +13,7 @@ import PrintButton from '@/components/ui/PrintButton.vue'
 import SearchInput from '@/components/ui/SearchInput.vue'
 import PeriodPicker from '@/components/ui/PeriodPicker.vue'
 import type { PeriodValue } from '@/lib/period'
+import { formatDate } from '@/lib/format'
 import { getApiErrorMessage, resolveFormError } from '@/services/api'
 import { toastSuccess } from '@/lib/alerts'
 import { listAllProducts } from '@/services/productsService'
@@ -32,7 +33,7 @@ const reasonFilterOptions = [{ value: 'todos', label: 'Todos os motivos' }, ...r
 
 const reasonLabels = Object.fromEntries(reasonOptions.map((r) => [r.value, r.label])) as Record<LossReason, string>
 
-const { page, pageSize, total, totalPages, applyMeta } = usePagination()
+const { page, pageSize, total, totalPages, applyMeta, watchSearch } = usePagination()
 
 const losses = ref<Loss[]>([])
 const products = ref<Product[]>([])
@@ -64,10 +65,6 @@ const fieldErrors = ref<Record<string, string>>({})
 
 const productOptions = computed(() => products.value.map((p) => ({ value: p.id, label: p.name })))
 const productFilterOptions = computed(() => [{ value: 'todos', label: 'Todos os produtos' }, ...productOptions.value])
-
-function formatDate(value: string) {
-  return new Date(value).toLocaleDateString('pt-BR')
-}
 
 async function loadLosses() {
   loading.value = true
@@ -142,11 +139,7 @@ async function handleSubmit() {
   }
 }
 
-watch(search, () => {
-  if (page.value !== 1) page.value = 1
-  else loadLosses()
-})
-watch([page, pageSize], loadLosses)
+watchSearch(search, loadLosses)
 onMounted(loadAll)
 </script>
 

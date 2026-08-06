@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { Pencil, Plus, Trash2, Wand2 } from '@lucide/vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
@@ -35,7 +35,7 @@ const statusFilterOptions = [
   { value: 'false', label: 'Inativo' },
 ]
 
-const { page, pageSize, total, totalPages, applyMeta } = usePagination()
+const { page, pageSize, total, totalPages, applyMeta, watchSearch } = usePagination()
 
 const users = ref<User[]>([])
 const { selectedIds, allVisibleSelected, toggleOne, toggleAllVisible, clearSelection } = useBulkSelection(() =>
@@ -179,11 +179,7 @@ async function handleBulkDelete() {
   }
 }
 
-watch(search, () => {
-  if (page.value !== 1) page.value = 1
-  else loadUsers()
-})
-watch([page, pageSize], loadUsers)
+watchSearch(search, loadUsers)
 onMounted(loadUsers)
 </script>
 

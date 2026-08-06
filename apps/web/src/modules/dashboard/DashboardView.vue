@@ -10,6 +10,7 @@ import FilterButton from '@/components/ui/FilterButton.vue'
 import PrintButton from '@/components/ui/PrintButton.vue'
 import PeriodPicker from '@/components/ui/PeriodPicker.vue'
 import { rangeForPreset, type PeriodValue } from '@/lib/period'
+import { formatDate, formatDateOnly } from '@/lib/format'
 import { useFilterModal } from '@/composables/useFilterModal'
 import DonutChart from '@/components/charts/DonutChart.vue'
 import MovementsTrendChart from '@/components/charts/MovementsTrendChart.vue'
@@ -36,11 +37,6 @@ const summary = ref<DashboardSummary | null>(null)
 const loading = ref(true)
 const errorMessage = ref('')
 
-function formatDate(value: string) {
-  const [year, month, day] = value.split('-')
-  return `${day}/${month}/${year}`
-}
-
 const typeLabels: Record<MovementType, string> = {
   entrada: 'Entrada',
   perda: 'Perda',
@@ -55,10 +51,6 @@ const typeVariant: Record<MovementType, 'success' | 'danger' | 'neutral'> = {
 
 function formatCurrency(value: number) {
   return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
-}
-
-function formatMovementDate(value: string) {
-  return new Date(value).toLocaleDateString('pt-BR')
 }
 
 function formatMovementTime(value: string) {
@@ -89,7 +81,7 @@ onMounted(loadSummary)
     </PageHeader>
 
     <p v-if="summary" class="text-sm text-gray-500 dark:text-gray-400 mb-4">
-      Período: {{ formatDate(summary.periodFrom) }} até {{ formatDate(summary.periodTo) }}
+      Período: {{ formatDateOnly(summary.periodFrom) }} até {{ formatDateOnly(summary.periodTo) }}
     </p>
 
     <p v-if="errorMessage" class="text-sm text-red-600 dark:text-red-400 mb-4">{{ errorMessage }}</p>
@@ -176,7 +168,7 @@ onMounted(loadSummary)
           <div class="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
             <h2 class="text-sm font-semibold text-gray-700 dark:text-gray-300">Movimentações no período</h2>
             <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
-              {{ formatDate(summary.periodFrom) }} até {{ formatDate(summary.periodTo) }}
+              {{ formatDateOnly(summary.periodFrom) }} até {{ formatDateOnly(summary.periodTo) }}
             </p>
           </div>
           <p
@@ -203,7 +195,7 @@ onMounted(loadSummary)
                 :datetime="movement.createdAt"
                 class="shrink-0 text-right text-xs leading-5 text-gray-500 dark:text-gray-400"
               >
-                <span class="block">{{ formatMovementDate(movement.createdAt) }}</span>
+                <span class="block">{{ formatDate(movement.createdAt) }}</span>
                 <span class="block">{{ formatMovementTime(movement.createdAt) }}</span>
               </time>
             </li>

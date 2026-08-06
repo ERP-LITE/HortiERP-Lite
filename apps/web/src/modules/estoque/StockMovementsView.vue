@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import BaseBadge from '@/components/ui/BaseBadge.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
@@ -11,6 +11,7 @@ import PrintButton from '@/components/ui/PrintButton.vue'
 import SearchInput from '@/components/ui/SearchInput.vue'
 import PeriodPicker from '@/components/ui/PeriodPicker.vue'
 import type { PeriodValue } from '@/lib/period'
+import { formatDateTime } from '@/lib/format'
 import { getApiErrorMessage } from '@/services/api'
 import { listStockMovements } from '@/services/stockService'
 import { listAllProducts } from '@/services/productsService'
@@ -18,7 +19,7 @@ import { usePagination } from '@/composables/usePagination'
 import { useFilterModal } from '@/composables/useFilterModal'
 import type { MovementType, Product, StockMovement } from '@/types'
 
-const { page, pageSize, total, totalPages, applyMeta } = usePagination()
+const { page, pageSize, total, totalPages, applyMeta, watchSearch } = usePagination()
 
 const movements = ref<StockMovement[]>([])
 const products = ref<Product[]>([])
@@ -66,10 +67,6 @@ const productFilterOptions = computed(() => [
   ...products.value.map((p) => ({ value: p.id, label: p.name })),
 ])
 
-function formatDateTime(value: string) {
-  return new Date(value).toLocaleString('pt-BR')
-}
-
 async function loadMovements() {
   loading.value = true
   try {
@@ -99,11 +96,7 @@ async function loadProductOptions() {
   }
 }
 
-watch(search, () => {
-  if (page.value !== 1) page.value = 1
-  else loadMovements()
-})
-watch([page, pageSize], loadMovements)
+watchSearch(search, loadMovements)
 onMounted(() => {
   loadMovements()
   loadProductOptions()
