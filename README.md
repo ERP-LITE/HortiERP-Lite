@@ -79,7 +79,7 @@ ERP-LITE/
 
 ## Status
 
-Projeto em desenvolvimento inicial (MVP). Consulte o `CLAUDE.md` para escopo e roadmap.
+Projeto em desenvolvimento inicial (MVP). Consulte o `claude.md` para escopo e roadmap.
 
 ## Produção
 
@@ -90,8 +90,8 @@ checks, migrations obrigatórias e backups criptografados com teste seguro de re
 ## Testes
 
 A suíte de integração usa um PostgreSQL temporário e isolado na porta `5434`. Ela cobre isolamento multiempresa,
-permissões, invalidação de sessão, concorrência de estoque, busca/paginação, integridade de dados (índices únicos)
-e impersonação.
+permissões, invalidação de sessão, concorrência de estoque, busca/paginação, integridade de dados (índices únicos),
+identificação do usuário responsável pelas operações e impersonação.
 
 Com Docker disponível, execute na raiz:
 

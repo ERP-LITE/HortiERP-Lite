@@ -4,7 +4,7 @@ Todos os fluxos abaixo são escopados por `companyId` (ver [decisões arquitetur
 
 ## Cadastro básico
 
-Pré-requisito dos fluxos de estoque: **categoria** e **unidade de medida** existem independentes de produto (telas `/categorias` e `/unidades`); um **produto** exige uma categoria e uma unidade já cadastradas (`categoryId`/`unitId` validados como pertencentes à mesma empresa na criação/edição — `assertCategoryAndUnitBelongToCompany`). `currentStock` do produto nasce em `0` e só é alterado pelos fluxos de entrada/perda abaixo — nunca é editado diretamente pela tela de produto.
+Pré-requisito dos fluxos de estoque: **categoria** e **unidade de medida** existem independentes de produto (telas `/categorias` e `/unidades`); um **produto** exige uma categoria e uma unidade já cadastradas (`categoryId`/`unitId` validados como pertencentes à mesma empresa na criação/edição — `assertCategoryAndUnitBelongToCompany`). `currentStock` do produto nasce em `0` e só é alterado pelos fluxos de entrada, perda e ajuste manual abaixo — nunca é editado diretamente pela tela de produto.
 
 As listagens de categorias, unidades, produtos e usuários permitem selecionar os registros visíveis por checkbox e excluí-los em lote. A exclusão é lógica e auditada; está disponível para `admin` e `gerente` nos cadastros gerais e somente para `admin` em usuários. Históricos operacionais (entradas, perdas e movimentações) não oferecem exclusão.
 
@@ -15,7 +15,7 @@ Tela `/entradas` → `/entradas/nova`. Rota `POST /stock-entries`, service `stoc
 Uma entrada tem um cabeçalho (`stock_entries`: fornecedor em texto livre, data, observações) e uma lista de itens (`stock_entry_items`: produto + quantidade + custo unitário opcional). Tudo roda numa única transação:
 
 1. Cria a linha em `stock_entries`.
-2. Para cada item: soma a quantidade ao `currentStock` com um `UPDATE` atômico escopado por empresa, valida pelo retorno que o produto existe, insere a linha em `stock_entry_items` e grava um `stock_movements` com `type: 'entrada'`, quantidade positiva e `balanceAfter` = novo saldo retornado pelo banco.
+2. Para cada item: chama o helper compartilhado `applyStockMovement`, que soma a quantidade ao `currentStock` com um `UPDATE` atômico escopado por empresa, valida pelo retorno que o produto existe e grava um `stock_movements` com `type: 'entrada'`, quantidade positiva e `balanceAfter` = novo saldo retornado pelo banco; em seguida insere a linha em `stock_entry_items`.
 
 Se qualquer produto do lote não existir, a transação inteira é revertida (nenhum item é gravado, nenhum estoque é alterado).
 O histórico e o relatório de entradas exibem o nome do usuário de `createdBy` como **Recebido por**, mantendo identificável quem recebeu a mercadoria.
@@ -24,7 +24,7 @@ O histórico e o relatório de entradas exibem o nome do usuário de `createdBy`
 
 Tela `/perdas`. Rota `POST /losses`, service `losses.service.ts::createLoss`. Mesma liberação de papel que entradas.
 
-1. **Subtrai e valida o saldo numa única atualização atômica** (`currentStock >= quantidade`). A condição é reavaliada pelo PostgreSQL mesmo quando existem perdas simultâneas.
+1. Pelo helper compartilhado `applyStockMovement`, **subtrai e valida o saldo numa única atualização atômica** (`currentStock >= quantidade`). A condição é reavaliada pelo PostgreSQL mesmo quando existem perdas simultâneas.
 2. Se o produto não existir, rejeita com `404`; se existir mas não houver saldo suficiente, rejeita com `422 INSUFFICIENT_STOCK`.
 3. Insere a linha em `losses` (motivo: `vencido` / `avariado` / `roubo_furto` / `erro_operacional` / `outro`).
 4. Grava um `stock_movements` com `type: 'perda'`, **quantidade negativa** e `balanceAfter` = novo saldo retornado pelo banco.
@@ -34,7 +34,7 @@ O histórico e o relatório de perdas exibem o nome do usuário de `createdBy` c
 
 ## Consulta de estoque
 
-Tela `/estoque` (`GET /stock`): lista produtos ativos com estoque atual, com filtro "só estoque baixo" (`currentStock <= minStock`, comparação feita no banco). Tela `/estoque/movimentacoes` (`GET /stock/movements`): histórico completo e imutável de todo `stock_movements` gerado pelos três fluxos abaixo, filtrável por produto/tipo/período.
+Tela `/estoque` (`GET /stock`): lista produtos não excluídos, ativos ou inativos, com estoque atual e filtro "só estoque baixo" (`currentStock <= minStock`, comparação feita no banco). Tela `/estoque/movimentacoes` (`GET /stock/movements`): histórico completo e imutável de todo `stock_movements` gerado pelos três fluxos abaixo, filtrável por produto/tipo/período. Cada movimento inclui o nome público do usuário de `createdBy`; a interface o exibe na coluna **Usuário** e usa “Usuário não identificado” para registros antigos sem autor.
 
 ## Ajuste manual de estoque
 
@@ -51,12 +51,12 @@ O payload sempre é `{ notes, items: [{ productId, quantity }] }` — a correç�
 
 1. Para cada item, lê o `currentStock` atual do produto com lock de linha (`SELECT ... FOR UPDATE`); se o produto não existe (ou é de outra empresa), rejeita o lote inteiro com `404`.
 2. Itens cuja quantidade informada é igual à atual são **pulados silenciosamente** (sem gerar movimento) — numa contagem de vários produtos é normal que alguns já estejam certos, e isso não deveria travar o resto do lote.
-3. Para cada item com diferença real, atualiza `products.currentStock` e grava um `stock_movements` com `type: 'ajuste'`, `quantity` = diferença (novo − antigo, pode ser positiva ou negativa) e `balanceAfter` = novo saldo. O motivo informado é salvo na coluna `notes` do movimento (mesmo texto em todos os movimentos do lote) e aparece no histórico de movimentações.
+3. Para cada item com diferença real, chama `applyStockMovement`, que atualiza `products.currentStock` e grava um `stock_movements` com `type: 'ajuste'`, `quantity` = diferença (novo − antigo, pode ser positiva ou negativa) e `balanceAfter` = novo saldo. O motivo informado é salvo na coluna `notes` do movimento (mesmo texto em todos os movimentos do lote) e aparece no histórico de movimentações junto do usuário responsável.
 4. Se **nenhum** item do lote tinha diferença (todos pulados), rejeita com `422` — o lote inteiro não fez sentido, não só um item.
 
 ## Dashboard
 
-`GET /dashboard/summary` agrega, para o período selecionado: total de produtos ativos, quantidade com estoque baixo, valor de estoque (soma de `currentStock * costPrice`), contagem/quantidade de perdas no período, timeline diária de entradas × perdas, distribuição de estoque por categoria e de perdas por motivo, e as 10 movimentações mais recentes dentro do mesmo período. O card de movimentações exibe explicitamente o intervalo aplicado.
+`GET /dashboard/summary` agrega, para o período selecionado: total de produtos ativos, quantidade com estoque baixo, valor de estoque (soma de `currentStock * costPrice`), contagem/quantidade de perdas no período, timeline diária de entradas × perdas, distribuição do estoque **ativo** por categoria e de perdas por motivo, e as 10 movimentações mais recentes dentro do mesmo período. O card de movimentações exibe explicitamente o intervalo aplicado. Produtos inativos não entram nos totais nem na distribuição por categoria.
 
 Contagens, somas e agrupamentos são calculados no PostgreSQL; produtos e perdas completos não são carregados em memória apenas para produzir os totais. Categorias excluídas logicamente não participam dos agrupamentos.
 
@@ -65,6 +65,12 @@ Contagens, somas e agrupamentos são calculados no PostgreSQL; produtos e perdas
 Os detalhamentos de perdas e entradas são paginados e pesquisados no backend, mantendo os agregados por motivo sobre todo o período selecionado. Isso evita respostas sem limite conforme o histórico da empresa cresce.
 
 A tela apresenta indicadores-resumo antes dos detalhamentos e permite gerar cada relatório em PDF pelo diálogo de impressão do navegador. Para perdas e entradas, a geração busca todas as páginas do período e da pesquisa aplicados antes de montar o documento; a paginação permanece apenas na visualização normal da tela. O documento inclui título, período, data de emissão e usuário responsável pela emissão.
+
+## Apresentação de textos extensos
+
+Nas tabelas e cartões, campos variáveis que podem receber conteúdo extenso — nomes, e-mails, descrições, observações, motivos, fornecedores, itens e contexto técnico de logs — usam o componente compartilhado `ExpandableText`. Textos curtos são exibidos normalmente; textos acima do limite mostram uma prévia truncada e um pequeno chevron para expandir/recolher o conteúdo dentro da própria célula. Sequências sem espaços usam quebra forçada para não alargar a tabela. Na impressão, o conteúdo completo é exibido.
+
+Datas, números, status, perfis, badges e ações não usam esse comportamento porque possuem tamanho previsível. No mobile, esse controle de conteúdo convive com o accordion de linha das tabelas (`v-mobile-accordion`), sem substituir a navegação por campos do registro.
 
 ## Logs
 
