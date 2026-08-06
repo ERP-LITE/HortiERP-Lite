@@ -255,7 +255,7 @@ onMounted(() => {
           <div class="flex items-start justify-between gap-3">
             <div class="min-w-0">
               <h2 class="truncate text-sm font-semibold text-gray-900 dark:text-gray-100">{{ product.name }}</h2>
-              <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">{{ product.category?.name }}</p>
+              <p class="mt-0.5 break-all text-xs text-gray-500 dark:text-gray-400">{{ product.category?.name }}</p>
             </div>
             <div class="flex shrink-0 items-center gap-2">
               <BaseBadge v-if="Number(product.currentStock) <= Number(product.minStock)" variant="warning">

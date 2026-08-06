@@ -83,10 +83,10 @@ onBeforeUnmount(() => {
         class="app-modal-scrollbar relative w-full max-h-[95vh] overflow-y-auto rounded-xl bg-white shadow-lg outline-none dark:bg-gray-800"
         :class="sizeClass"
       >
-        <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-          <h2 :id="titleId" class="text-lg font-semibold text-gray-900 dark:text-gray-100">{{ title }}</h2>
+        <div class="flex items-start justify-between gap-3 px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+          <h2 :id="titleId" class="min-w-0 break-all text-lg font-semibold text-gray-900 dark:text-gray-100">{{ title }}</h2>
           <button
-            class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 leading-none"
+            class="shrink-0 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 leading-none"
             type="button"
             aria-label="Fechar modal"
             @click="close"

@@ -133,9 +133,14 @@ onMounted(() => {
               <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
                 {{ formatDateTime(movement.createdAt) }}
               </p>
-              <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
-                Por {{ movement.createdByUser?.name || 'Usuário não identificado' }}
-              </p>
+              <div class="mt-0.5 flex min-w-0 items-start gap-1 text-xs text-gray-500 dark:text-gray-400">
+                <span class="shrink-0">Por</span>
+                <ExpandableText
+                  :text="movement.createdByUser?.name"
+                  :max-length="40"
+                  empty-text="Usuário não identificado"
+                />
+              </div>
             </div>
             <BaseBadge :variant="typeVariant[movement.type]">{{ typeLabels[movement.type] }}</BaseBadge>
           </div>

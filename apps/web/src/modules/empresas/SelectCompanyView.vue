@@ -65,9 +65,11 @@ onMounted(loadCompanies)
         :disabled="!company.active || !!entering"
         @click="enterCompany(company)"
       >
-        <div class="flex items-center gap-3">
+        <div class="flex min-w-0 items-center gap-3">
           <Store :size="18" class="text-primary-600 dark:text-primary-400 shrink-0" />
-          <span class="text-sm font-medium text-gray-900 dark:text-gray-100">{{ company.name }}</span>
+          <span class="min-w-0 truncate text-sm font-medium text-gray-900 dark:text-gray-100" :title="company.name">
+            {{ company.name }}
+          </span>
           <BaseBadge v-if="!company.active" variant="neutral">Suspensa</BaseBadge>
         </div>
         <span class="text-xs text-gray-400">{{ entering === company.id ? 'Entrando...' : '' }}</span>
