@@ -298,7 +298,7 @@ onMounted(() => {
           <div><dt class="text-gray-500 dark:text-gray-400">Duração</dt><dd class="font-medium dark:text-gray-100">{{ selectedLog.durationMs }} ms</dd></div>
           <div><dt class="text-gray-500 dark:text-gray-400">IP</dt><dd class="font-medium dark:text-gray-100">{{ selectedLog.ip || '—' }}</dd></div>
           <div><dt class="text-gray-500 dark:text-gray-400">Código do erro</dt><dd class="font-medium dark:text-gray-100">{{ selectedLog.errorCode || '—' }}</dd></div>
-          <div v-if="selectedLog.errorMessage" class="sm:col-span-2"><dt class="text-gray-500 dark:text-gray-400">Mensagem do erro</dt><dd class="mt-1 rounded-lg bg-red-50 p-3 text-red-700 dark:bg-red-950/40 dark:text-red-300">{{ selectedLog.errorMessage }}</dd></div>
+          <div v-if="selectedLog.errorMessage" class="sm:col-span-2"><dt class="text-gray-500 dark:text-gray-400">Mensagem do erro</dt><dd class="mt-1 break-all rounded-lg bg-red-50 p-3 text-red-700 dark:bg-red-950/40 dark:text-red-300">{{ selectedLog.errorMessage }}</dd></div>
           <div class="sm:col-span-2"><dt class="text-gray-500 dark:text-gray-400">Navegador/cliente</dt><dd class="mt-1 break-all text-xs dark:text-gray-300">{{ selectedLog.userAgent || '—' }}</dd></div>
         </template>
       </dl>

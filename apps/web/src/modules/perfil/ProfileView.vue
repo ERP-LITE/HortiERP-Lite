@@ -57,11 +57,11 @@ async function handleSubmit() {
         <dl class="space-y-3 text-sm">
           <div>
             <dt class="text-gray-500 dark:text-gray-400">Nome</dt>
-            <dd class="text-gray-900 dark:text-gray-100 font-medium">{{ auth.user?.name }}</dd>
+            <dd class="break-all text-gray-900 dark:text-gray-100 font-medium">{{ auth.user?.name }}</dd>
           </div>
           <div>
             <dt class="text-gray-500 dark:text-gray-400">E-mail</dt>
-            <dd class="text-gray-900 dark:text-gray-100 font-medium">{{ auth.user?.email }}</dd>
+            <dd class="break-all text-gray-900 dark:text-gray-100 font-medium">{{ auth.user?.email }}</dd>
           </div>
           <div>
             <dt class="text-gray-500 dark:text-gray-400">Perfil</dt>
