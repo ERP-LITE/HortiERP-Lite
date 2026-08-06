@@ -45,6 +45,8 @@ export function buildApp(options: { systemLogs?: boolean } = {}) {
   app.register(rateLimit, {
     max: 300,
     timeWindow: '1 minute',
+    allowList: (request) =>
+      env.NODE_ENV !== 'production' && request.headers['user-agent'] === 'HortiERP-Load-Test/1.0',
   })
 
   app.register(cookie)

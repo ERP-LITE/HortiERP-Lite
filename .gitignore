@@ -32,3 +32,4 @@ tmp/
 *.tsbuildinfo
 storage/
 apps/api/storage/
+tests/load/results/
