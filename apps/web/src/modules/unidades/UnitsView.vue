@@ -4,6 +4,7 @@ import { Pencil, Plus, Trash2 } from '@lucide/vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
+import ExpandableText from '@/components/ui/ExpandableText.vue'
 import BaseModal from '@/components/ui/BaseModal.vue'
 import Pagination from '@/components/ui/Pagination.vue'
 import SearchInput from '@/components/ui/SearchInput.vue'
@@ -202,7 +203,9 @@ onMounted(loadUnits)
                 @toggle="toggleOne(unit.id)"
               />
             </td>
-            <td class="px-4 py-3 text-sm font-medium text-gray-900 dark:text-gray-100">{{ unit.name }}</td>
+            <td class="max-w-72 px-4 py-3 text-sm font-medium text-gray-900 dark:text-gray-100">
+              <ExpandableText :text="unit.name" :max-length="45" />
+            </td>
             <td class="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">{{ unit.abbreviation }}</td>
             <td v-if="canManage" class="print:hidden px-4 py-3 text-right space-x-1 whitespace-nowrap" @dblclick.stop>
               <button

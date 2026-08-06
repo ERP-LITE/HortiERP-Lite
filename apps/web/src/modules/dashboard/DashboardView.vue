@@ -9,6 +9,7 @@ import BaseModal from '@/components/ui/BaseModal.vue'
 import FilterButton from '@/components/ui/FilterButton.vue'
 import PrintButton from '@/components/ui/PrintButton.vue'
 import PeriodPicker from '@/components/ui/PeriodPicker.vue'
+import ExpandableText from '@/components/ui/ExpandableText.vue'
 import { rangeForPreset, type PeriodValue } from '@/lib/period'
 import { formatDate, formatDateOnly } from '@/lib/format'
 import { useFilterModal } from '@/composables/useFilterModal'
@@ -155,7 +156,9 @@ onMounted(loadSummary)
                 </td>
               </tr>
               <tr v-for="product in summary.lowStockProducts" v-else :key="product.id">
-                <td class="px-4 py-3 text-sm font-medium text-gray-900 dark:text-gray-100">{{ product.name }}</td>
+                <td class="max-w-72 px-4 py-3 text-sm font-medium text-gray-900 dark:text-gray-100">
+                  <ExpandableText :text="product.name" :max-length="45" />
+                </td>
                 <td class="px-4 py-3 text-sm text-gray-500 dark:text-gray-400 text-right whitespace-nowrap">
                   {{ Number(product.currentStock) }} / mín. {{ Number(product.minStock) }}
                 </td>

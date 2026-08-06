@@ -76,4 +76,5 @@ export const lossesRelations = relations(losses, ({ one }) => ({
 export const stockMovementsRelations = relations(stockMovements, ({ one }) => ({
   company: one(companies, { fields: [stockMovements.companyId], references: [companies.id] }),
   product: one(products, { fields: [stockMovements.productId], references: [products.id] }),
+  createdByUser: one(users, { fields: [stockMovements.createdBy], references: [users.id] }),
 }))

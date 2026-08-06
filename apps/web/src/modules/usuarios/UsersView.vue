@@ -4,6 +4,7 @@ import { Pencil, Plus, Trash2, Wand2 } from '@lucide/vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
+import ExpandableText from '@/components/ui/ExpandableText.vue'
 import BaseSelect from '@/components/ui/BaseSelect.vue'
 import BaseModal from '@/components/ui/BaseModal.vue'
 import BaseBadge from '@/components/ui/BaseBadge.vue'
@@ -253,10 +254,12 @@ onMounted(loadUsers)
                 @toggle="toggleOne(user.id)"
               />
             </td>
-            <td class="px-4 py-3 text-sm font-medium text-gray-900 dark:text-gray-100 whitespace-nowrap">
-              {{ user.name }}
+            <td class="max-w-64 px-4 py-3 text-sm font-medium text-gray-900 dark:text-gray-100">
+              <ExpandableText :text="user.name" :max-length="40" />
             </td>
-            <td class="px-4 py-3 text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">{{ user.email }}</td>
+            <td class="max-w-72 px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
+              <ExpandableText :text="user.email" :max-length="45" />
+            </td>
             <td class="px-4 py-3 text-sm text-gray-500 dark:text-gray-400 capitalize whitespace-nowrap">
               {{ user.role }}
             </td>

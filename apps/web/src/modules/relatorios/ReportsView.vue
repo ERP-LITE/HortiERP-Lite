@@ -10,6 +10,7 @@ import SearchInput from '@/components/ui/SearchInput.vue'
 import PeriodPicker from '@/components/ui/PeriodPicker.vue'
 import Pagination from '@/components/ui/Pagination.vue'
 import StatCard from '@/components/ui/StatCard.vue'
+import ExpandableText from '@/components/ui/ExpandableText.vue'
 import { usePagination } from '@/composables/usePagination'
 import { useFilterModal } from '@/composables/useFilterModal'
 import type { PeriodValue } from '@/lib/period'
@@ -332,7 +333,9 @@ onMounted(loadActiveTab)
               <td colspan="3" class="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">Sem dados.</td>
             </tr>
             <tr v-for="row in filteredStockByCategory" v-else :key="row.categoryId">
-              <td class="px-4 py-3 text-sm font-medium text-gray-900 dark:text-gray-100">{{ row.categoryName }}</td>
+              <td class="max-w-72 px-4 py-3 text-sm font-medium text-gray-900 dark:text-gray-100">
+                <ExpandableText :text="row.categoryName" :max-length="45" />
+              </td>
               <td class="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">{{ row.productCount }}</td>
               <td class="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">{{ row.totalStock }}</td>
             </tr>
@@ -402,8 +405,8 @@ onMounted(loadActiveTab)
                 <td class="px-4 py-3 text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">
                   {{ formatDate(loss.lossDate) }}
                 </td>
-                <td class="px-4 py-3 text-sm font-medium text-gray-900 dark:text-gray-100">
-                  {{ loss.product?.name }}
+                <td class="max-w-72 px-4 py-3 text-sm font-medium text-gray-900 dark:text-gray-100">
+                  <ExpandableText :text="loss.product?.name" :max-length="45" />
                 </td>
                 <td class="px-4 py-3 whitespace-nowrap">
                   <BaseBadge variant="danger">{{ reasonLabels[loss.reason] ?? loss.reason }}</BaseBadge>
@@ -411,8 +414,12 @@ onMounted(loadActiveTab)
                 <td class="px-4 py-3 text-sm text-gray-700 dark:text-gray-300 text-right">
                   {{ Number(loss.quantity) }}
                 </td>
-                <td class="px-4 py-3 text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">
-                  {{ loss.createdByUser?.name || 'Usuário não identificado' }}
+                <td class="max-w-64 px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
+                  <ExpandableText
+                    :text="loss.createdByUser?.name"
+                    :max-length="40"
+                    empty-text="Usuário não identificado"
+                  />
                 </td>
               </tr>
             </tbody>
@@ -472,14 +479,20 @@ onMounted(loadActiveTab)
               <td class="px-4 py-3 text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">
                 {{ formatDate(entry.entryDate) }}
               </td>
-              <td class="px-4 py-3 text-sm font-medium text-gray-900 dark:text-gray-100 whitespace-nowrap">
-                {{ entry.supplierName || '—' }}
+              <td class="max-w-64 px-4 py-3 text-sm font-medium text-gray-900 dark:text-gray-100">
+                <ExpandableText :text="entry.supplierName" :max-length="40" />
               </td>
-              <td class="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
-                {{ entry.items.map((item) => `${item.product.name} (${Number(item.quantity)})`).join(', ') }}
+              <td class="max-w-80 px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
+                <ExpandableText
+                  :text="entry.items.map((item) => `${item.product.name} (${Number(item.quantity)})`).join(', ')"
+                />
               </td>
-              <td class="px-4 py-3 text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">
-                {{ entry.createdByUser?.name || 'Usuário não identificado' }}
+              <td class="max-w-64 px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
+                <ExpandableText
+                  :text="entry.createdByUser?.name"
+                  :max-length="40"
+                  empty-text="Usuário não identificado"
+                />
               </td>
             </tr>
           </tbody>

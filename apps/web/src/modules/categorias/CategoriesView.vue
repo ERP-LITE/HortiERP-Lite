@@ -10,6 +10,7 @@ import SearchInput from '@/components/ui/SearchInput.vue'
 import PrintButton from '@/components/ui/PrintButton.vue'
 import BulkSelectionBar from '@/components/ui/BulkSelectionBar.vue'
 import TableCheckbox from '@/components/ui/TableCheckbox.vue'
+import ExpandableText from '@/components/ui/ExpandableText.vue'
 import { getApiErrorMessage, resolveFormError } from '@/services/api'
 import { confirmDelete, toastError, toastSuccess } from '@/lib/alerts'
 import {
@@ -210,9 +211,11 @@ onMounted(loadCategories)
                 @toggle="toggleOne(category.id)"
               />
             </td>
-            <td class="px-4 py-3 text-sm font-medium text-gray-900 dark:text-gray-100">{{ category.name }}</td>
-            <td class="px-4 py-3 text-sm text-gray-500 dark:text-gray-400 hidden sm:table-cell">
-              {{ category.description || '—' }}
+            <td class="max-w-72 px-4 py-3 text-sm font-medium text-gray-900 dark:text-gray-100">
+              <ExpandableText :text="category.name" :max-length="45" />
+            </td>
+            <td class="max-w-80 px-4 py-3 text-sm text-gray-500 dark:text-gray-400 hidden sm:table-cell">
+              <ExpandableText :text="category.description" />
             </td>
             <td v-if="canManage" class="print:hidden px-4 py-3 text-right space-x-1 whitespace-nowrap" @dblclick.stop>
               <button
