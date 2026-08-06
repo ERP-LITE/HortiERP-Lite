@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import AuthLayout from '@/layouts/AuthLayout.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
@@ -19,6 +19,11 @@ const turnstileRef = ref<InstanceType<typeof TurnstileWidget> | null>(null)
 const auth = useAuthStore()
 const router = useRouter()
 const route = useRoute()
+const sessionMessage = computed(() =>
+  route.query.reason === 'session-ended'
+    ? 'Seu acesso foi encerrado. Entre novamente ou contate o administrador.'
+    : '',
+)
 
 async function handleSubmit() {
   loading.value = true
@@ -45,6 +50,9 @@ async function handleSubmit() {
 <template>
   <AuthLayout>
     <form class="space-y-4" novalidate @submit.prevent="handleSubmit">
+      <p v-if="sessionMessage" class="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:bg-amber-900/30 dark:text-amber-200">
+        {{ sessionMessage }}
+      </p>
       <BaseInput v-model="email" type="email" label="E-mail" placeholder="seu@email.com" :error="fieldErrors.email" />
       <BaseInput
         v-model="password"
