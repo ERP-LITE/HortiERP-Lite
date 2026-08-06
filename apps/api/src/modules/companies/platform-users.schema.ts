@@ -3,6 +3,7 @@ import { paginationQuerySchema } from '../../shared/schemas/pagination.schema.js
 
 export const listPlatformUsersQuerySchema = paginationQuerySchema.extend({
   search: z.string().trim().min(1).optional(),
+  sortBy: z.enum(['name', 'email']).optional(),
 })
 
 export const createPlatformUserSchema = z.object({

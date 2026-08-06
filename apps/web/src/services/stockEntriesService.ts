@@ -30,6 +30,8 @@ export interface UpdateStockEntryDetailsInput {
 }
 
 export interface ListStockEntriesParams {
+  sortBy?: string
+  sortOrder?: 'asc' | 'desc'
   page: number
   pageSize: number
   search?: string

@@ -1,4 +1,4 @@
-import { and, count, eq, gte, ilike, inArray, lte, or } from 'drizzle-orm'
+import { and, asc, count, desc, eq, gte, ilike, inArray, lte, or, sql } from 'drizzle-orm'
 import { db } from '../../db/client.js'
 import { stockEntries, stockEntryAttachments, stockEntryItems } from '../../db/schema/index.js'
 import { AppError } from '../../shared/errors/AppError.js'
@@ -40,6 +40,22 @@ export async function listStockEntries(companyId: string, query: ListStockEntrie
   if (query.from) conditions.push(gte(stockEntries.entryDate, query.from))
   if (query.to) conditions.push(lte(stockEntries.entryDate, query.to))
   const where = and(...conditions)
+  const invoiceStatus = sql<boolean>`(
+    ${stockEntries.invoiceNumber} is not null
+    or ${stockEntries.invoiceAccessKey} is not null
+    or exists (
+      select 1 from ${stockEntryAttachments}
+      where ${stockEntryAttachments.stockEntryId} = ${stockEntries.id}
+    )
+  )`
+  const entrySortColumns = {
+    entryDate: stockEntries.entryDate,
+    supplierName: stockEntries.supplierName,
+    invoiceStatus,
+    invoiceTotal: stockEntries.invoiceTotal,
+  }
+  const entrySortColumn = query.sortBy ? entrySortColumns[query.sortBy] : stockEntries.entryDate
+  const entryOrderBy = query.sortOrder === 'asc' ? asc(entrySortColumn) : desc(entrySortColumn)
 
   const [data, [{ total }]] = await Promise.all([
     db.query.stockEntries.findMany({
@@ -49,7 +65,7 @@ export async function listStockEntries(companyId: string, query: ListStockEntrie
         items: { with: { product: { with: { unit: true } } } },
         attachments: { columns: { id: true } },
       },
-      orderBy: (entries, { desc: desc_ }) => [desc_(entries.entryDate)],
+      orderBy: [entryOrderBy, desc(stockEntries.entryDate)],
       limit: query.pageSize,
       offset: (query.page - 1) * query.pageSize,
     }),

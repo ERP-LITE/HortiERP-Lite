@@ -16,6 +16,8 @@ export interface UpdateCompanyInput {
 }
 
 export interface ListCompaniesParams {
+  sortBy?: string
+  sortOrder?: 'asc' | 'desc'
   page: number
   pageSize: number
   search?: string

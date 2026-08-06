@@ -14,6 +14,7 @@ import Pagination from '@/components/ui/Pagination.vue'
 import FilterButton from '@/components/ui/FilterButton.vue'
 import PrintButton from '@/components/ui/PrintButton.vue'
 import SearchInput from '@/components/ui/SearchInput.vue'
+import SortableTableHeader from '@/components/ui/SortableTableHeader.vue'
 import { getApiErrorMessage, resolveFormError } from '@/services/api'
 import { toastSuccess } from '@/lib/alerts'
 import { adjustStock, listCurrentStock } from '@/services/stockService'
@@ -22,12 +23,14 @@ import { listAllProducts } from '@/services/productsService'
 import { useAuthStore } from '@/stores/auth'
 import { usePagination } from '@/composables/usePagination'
 import { useFilterModal } from '@/composables/useFilterModal'
+import { useTableSort } from '@/composables/useTableSort'
 import type { Category, Product, ProductWithRelations } from '@/types'
 
 const auth = useAuthStore()
 const canManage = computed(() => auth.user?.role === 'admin' || auth.user?.role === 'gerente')
 
 const { page, pageSize, total, totalPages, applyMeta, watchSearch } = usePagination()
+const { sortBy, sortOrder, toggleSort } = useTableSort(() => { page.value = 1; return loadStock() }, 'name')
 
 const products = ref<ProductWithRelations[]>([])
 const categories = ref<Category[]>([])
@@ -59,6 +62,8 @@ async function loadStock() {
       search: search.value || undefined,
       categoryId: filters.value.categoryId !== 'todas' ? filters.value.categoryId : undefined,
       lowStockOnly: filters.value.lowStockOnly || undefined,
+      sortBy: sortBy.value,
+      sortOrder: sortOrder.value,
     })
     products.value = result.data
     applyMeta(result)
@@ -290,18 +295,12 @@ onMounted(() => {
       <table class="hidden min-w-full divide-y divide-gray-200 dark:divide-gray-700 sm:table">
         <thead class="bg-gray-50 dark:bg-gray-900/60">
           <tr>
-            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-              Produto
-            </th>
+            <SortableTableHeader field="name" :active-field="sortBy" :order="sortOrder" @sort="toggleSort">Produto</SortableTableHeader>
             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
               Categoria
             </th>
-            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-              Estoque atual
-            </th>
-            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-              Estoque mínimo
-            </th>
+            <SortableTableHeader field="currentStock" :active-field="sortBy" :order="sortOrder" @sort="toggleSort">Estoque atual</SortableTableHeader>
+            <SortableTableHeader field="minStock" :active-field="sortBy" :order="sortOrder" @sort="toggleSort">Estoque mínimo</SortableTableHeader>
             <th class="px-4 py-3" />
             <th v-if="canManage" class="print:hidden px-4 py-3" />
           </tr>

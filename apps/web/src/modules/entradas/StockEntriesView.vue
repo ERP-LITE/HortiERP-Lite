@@ -12,15 +12,18 @@ import SearchInput from '@/components/ui/SearchInput.vue'
 import PeriodPicker from '@/components/ui/PeriodPicker.vue'
 import ExpandableText from '@/components/ui/ExpandableText.vue'
 import BaseBadge from '@/components/ui/BaseBadge.vue'
+import SortableTableHeader from '@/components/ui/SortableTableHeader.vue'
 import type { PeriodValue } from '@/lib/period'
 import { formatDate } from '@/lib/format'
 import { getApiErrorMessage } from '@/services/api'
 import { listStockEntries } from '@/services/stockEntriesService'
 import { usePagination } from '@/composables/usePagination'
 import { useFilterModal } from '@/composables/useFilterModal'
+import { useTableSort } from '@/composables/useTableSort'
 import type { StockEntrySummary } from '@/types'
 
 const { page, pageSize, total, totalPages, applyMeta, watchSearch } = usePagination()
+const { sortBy, sortOrder, toggleSort } = useTableSort(() => { page.value = 1; return loadEntries() }, 'entryDate', 'desc')
 
 const entries = ref<StockEntrySummary[]>([])
 const loading = ref(true)
@@ -58,6 +61,8 @@ async function loadEntries() {
       search: search.value || undefined,
       from: filters.value.period.from || undefined,
       to: filters.value.period.to || undefined,
+      sortBy: sortBy.value,
+      sortOrder: sortOrder.value,
     })
     entries.value = result.data
     applyMeta(result)
@@ -93,17 +98,13 @@ onMounted(loadEntries)
       <table v-mobile-accordion class="mobile-accordion-table min-w-full divide-y divide-gray-200 dark:divide-gray-700">
         <thead class="bg-gray-50 dark:bg-gray-900/60">
           <tr>
-            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Data</th>
-            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-              Fornecedor
-            </th>
+            <SortableTableHeader field="entryDate" :active-field="sortBy" :order="sortOrder" @sort="toggleSort">Data</SortableTableHeader>
+            <SortableTableHeader field="supplierName" :active-field="sortBy" :order="sortOrder" @sort="toggleSort">Fornecedor</SortableTableHeader>
             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Itens</th>
             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
               Recebido por
             </th>
-            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-              Nota fiscal
-            </th>
+            <SortableTableHeader field="invoiceStatus" :active-field="sortBy" :order="sortOrder" @sort="toggleSort">Nota fiscal</SortableTableHeader>
             <th class="print:hidden px-4 py-3" />
           </tr>
         </thead>

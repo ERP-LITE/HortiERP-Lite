@@ -2,6 +2,8 @@ import { api } from './api'
 import type { PaginatedResult, SystemLog, SystemLogLevel, SystemLogMethod } from '@/types'
 
 export interface ListLogsParams {
+  sortBy?: string
+  sortOrder?: 'asc' | 'desc'
   page: number
   pageSize: number
   search?: string

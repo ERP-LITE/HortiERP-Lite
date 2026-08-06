@@ -3,6 +3,7 @@ import { paginationQuerySchema } from '../../shared/schemas/pagination.schema.js
 
 export const listUnitsQuerySchema = paginationQuerySchema.extend({
   search: z.string().trim().min(1).optional(),
+  sortBy: z.enum(['name', 'abbreviation']).optional(),
 })
 
 export type ListUnitsQuery = z.infer<typeof listUnitsQuerySchema>

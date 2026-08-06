@@ -11,6 +11,7 @@ import PrintButton from '@/components/ui/PrintButton.vue'
 import SearchInput from '@/components/ui/SearchInput.vue'
 import PeriodPicker from '@/components/ui/PeriodPicker.vue'
 import ExpandableText from '@/components/ui/ExpandableText.vue'
+import SortableTableHeader from '@/components/ui/SortableTableHeader.vue'
 import type { PeriodValue } from '@/lib/period'
 import { formatDateTime } from '@/lib/format'
 import { getApiErrorMessage } from '@/services/api'
@@ -18,9 +19,11 @@ import { listStockMovements } from '@/services/stockService'
 import { listAllProducts } from '@/services/productsService'
 import { usePagination } from '@/composables/usePagination'
 import { useFilterModal } from '@/composables/useFilterModal'
+import { useTableSort } from '@/composables/useTableSort'
 import type { MovementType, Product, StockMovement } from '@/types'
 
 const { page, pageSize, total, totalPages, applyMeta, watchSearch } = usePagination()
+const { sortBy, sortOrder, toggleSort } = useTableSort(() => { page.value = 1; return loadMovements() }, 'createdAt', 'desc')
 
 const movements = ref<StockMovement[]>([])
 const products = ref<Product[]>([])
@@ -79,6 +82,8 @@ async function loadMovements() {
       type: filters.value.type !== 'todos' ? (filters.value.type as MovementType) : undefined,
       from: filters.value.period.from || undefined,
       to: filters.value.period.to || undefined,
+      sortBy: sortBy.value,
+      sortOrder: sortOrder.value,
     })
     movements.value = result.data
     applyMeta(result)
@@ -167,20 +172,16 @@ onMounted(() => {
       <table class="hidden min-w-full divide-y divide-gray-200 dark:divide-gray-700 sm:table">
         <thead class="bg-gray-50 dark:bg-gray-900/60">
           <tr>
-            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Data</th>
+            <SortableTableHeader field="createdAt" :active-field="sortBy" :order="sortOrder" @sort="toggleSort">Data</SortableTableHeader>
             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
               Produto
             </th>
             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
               Usuário
             </th>
-            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Tipo</th>
-            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-              Quantidade
-            </th>
-            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-              Saldo após
-            </th>
+            <SortableTableHeader field="type" :active-field="sortBy" :order="sortOrder" @sort="toggleSort">Tipo</SortableTableHeader>
+            <SortableTableHeader field="quantity" :active-field="sortBy" :order="sortOrder" @sort="toggleSort">Quantidade</SortableTableHeader>
+            <SortableTableHeader field="balanceAfter" :active-field="sortBy" :order="sortOrder" @sort="toggleSort">Saldo após</SortableTableHeader>
             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
               Motivo
             </th>

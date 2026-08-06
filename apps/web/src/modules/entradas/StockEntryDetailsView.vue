@@ -7,6 +7,7 @@ import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseModal from '@/components/ui/BaseModal.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
 import ExpandableText from '@/components/ui/ExpandableText.vue'
+import SortableTableHeader from '@/components/ui/SortableTableHeader.vue'
 import { formatDate, formatDateTime } from '@/lib/format'
 import { confirmDelete, toastError, toastSuccess } from '@/lib/alerts'
 import { getApiErrorMessage } from '@/services/api'
@@ -19,6 +20,7 @@ import {
 } from '@/services/stockEntriesService'
 import type { StockEntry, StockEntryAttachment } from '@/types'
 import { useAuthStore } from '@/stores/auth'
+import { useLocalTableSort } from '@/composables/useTableSort'
 
 const route = useRoute()
 const router = useRouter()
@@ -26,6 +28,12 @@ const auth = useAuthStore()
 const canDeleteAttachments = computed(() => auth.user?.role === 'admin' || auth.user?.role === 'gerente')
 const canEditDetails = canDeleteAttachments
 const entry = ref<StockEntry | null>(null)
+const entryItems = computed(() => entry.value?.items ?? [])
+const itemSort = useLocalTableSort(entryItems, {
+  product: (item) => item.product.name,
+  quantity: (item) => Number(item.quantity),
+  unitCost: (item) => Number(item.unitCost ?? 0),
+}, 'product')
 const loading = ref(true)
 const uploading = ref(false)
 const errorMessage = ref('')
@@ -231,8 +239,8 @@ onBeforeUnmount(clearPreview)
         <div class="border-b border-gray-200 px-5 py-4 dark:border-gray-700"><h2 class="font-semibold text-gray-800 dark:text-gray-100">Itens recebidos</h2></div>
         <div class="overflow-x-auto">
           <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-            <thead class="bg-gray-50 dark:bg-gray-900/60"><tr><th class="px-4 py-3 text-left text-xs uppercase text-gray-500">Produto</th><th class="px-4 py-3 text-right text-xs uppercase text-gray-500">Quantidade</th><th class="px-4 py-3 text-right text-xs uppercase text-gray-500">Custo unitário</th></tr></thead>
-            <tbody class="divide-y divide-gray-100 dark:divide-gray-700"><tr v-for="item in entry.items" :key="item.id"><td class="max-w-80 px-4 py-3 text-sm font-medium dark:text-gray-100"><ExpandableText :text="item.product.name" /></td><td class="px-4 py-3 text-right text-sm whitespace-nowrap dark:text-gray-300">{{ Number(item.quantity) }} {{ item.product.unit.abbreviation }}</td><td class="px-4 py-3 text-right text-sm dark:text-gray-300">{{ formatCurrency(item.unitCost) }}</td></tr></tbody>
+            <thead class="bg-gray-50 dark:bg-gray-900/60"><tr><SortableTableHeader field="product" :active-field="itemSort.sortBy.value" :order="itemSort.sortOrder.value" @sort="itemSort.toggleSort">Produto</SortableTableHeader><SortableTableHeader field="quantity" :active-field="itemSort.sortBy.value" :order="itemSort.sortOrder.value" align="right" @sort="itemSort.toggleSort">Quantidade</SortableTableHeader><SortableTableHeader field="unitCost" :active-field="itemSort.sortBy.value" :order="itemSort.sortOrder.value" align="right" @sort="itemSort.toggleSort">Custo unitário</SortableTableHeader></tr></thead>
+            <tbody class="divide-y divide-gray-100 dark:divide-gray-700"><tr v-for="item in itemSort.sortedItems.value" :key="item.id"><td class="max-w-80 px-4 py-3 text-sm font-medium dark:text-gray-100"><ExpandableText :text="item.product.name" /></td><td class="px-4 py-3 text-right text-sm whitespace-nowrap dark:text-gray-300">{{ Number(item.quantity) }} {{ item.product.unit.abbreviation }}</td><td class="px-4 py-3 text-right text-sm dark:text-gray-300">{{ formatCurrency(item.unitCost) }}</td></tr></tbody>
           </table>
         </div>
       </section>

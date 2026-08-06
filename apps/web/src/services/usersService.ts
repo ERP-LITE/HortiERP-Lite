@@ -10,6 +10,8 @@ export interface UserInput {
 }
 
 export interface ListUsersParams {
+  sortBy?: string
+  sortOrder?: 'asc' | 'desc'
   page: number
   pageSize: number
   search?: string

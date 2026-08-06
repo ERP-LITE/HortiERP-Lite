@@ -7,7 +7,9 @@ import ExpandableText from '@/components/ui/ExpandableText.vue'
 import BaseModal from '@/components/ui/BaseModal.vue'
 import Pagination from '@/components/ui/Pagination.vue'
 import SearchInput from '@/components/ui/SearchInput.vue'
+import SortableTableHeader from '@/components/ui/SortableTableHeader.vue'
 import { usePagination } from '@/composables/usePagination'
+import { useTableSort } from '@/composables/useTableSort'
 import { confirmDelete, toastError, toastSuccess } from '@/lib/alerts'
 import { generateRandomPassword } from '@/lib/password'
 import { getApiErrorMessage, resolveFormError } from '@/services/api'
@@ -22,6 +24,7 @@ import type { User } from '@/types'
 
 const auth = useAuthStore()
 const { page, pageSize, total, totalPages, applyMeta, watchSearch } = usePagination()
+const { sortBy, sortOrder, toggleSort } = useTableSort(() => { page.value = 1; return loadUsers() }, 'name')
 const users = ref<User[]>([])
 const search = ref('')
 const loading = ref(true)
@@ -41,6 +44,8 @@ async function loadUsers() {
       page: page.value,
       pageSize: pageSize.value,
       search: search.value || undefined,
+      sortBy: sortBy.value,
+      sortOrder: sortOrder.value,
     })
     users.value = result.data
     applyMeta(result)
@@ -160,8 +165,8 @@ onMounted(loadUsers)
       <table v-mobile-accordion class="mobile-accordion-table min-w-full divide-y divide-gray-200 dark:divide-gray-700">
         <thead class="bg-gray-50 dark:bg-gray-900/60">
           <tr>
-            <th class="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500 dark:text-gray-400">Nome</th>
-            <th class="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500 dark:text-gray-400">E-mail</th>
+            <SortableTableHeader field="name" :active-field="sortBy" :order="sortOrder" @sort="toggleSort">Nome</SortableTableHeader>
+            <SortableTableHeader field="email" :active-field="sortBy" :order="sortOrder" @sort="toggleSort">E-mail</SortableTableHeader>
             <th class="px-4 py-3" />
           </tr>
         </thead>

@@ -10,6 +10,8 @@ export interface LossInput {
 }
 
 export interface ListLossesParams {
+  sortBy?: string
+  sortOrder?: 'asc' | 'desc'
   page: number
   pageSize: number
   search?: string

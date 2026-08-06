@@ -20,6 +20,8 @@ export interface ListProductsParams {
   search?: string
   categoryId?: string
   active?: boolean
+  sortBy?: string
+  sortOrder?: 'asc' | 'desc'
 }
 
 export async function listProducts(params: ListProductsParams) {

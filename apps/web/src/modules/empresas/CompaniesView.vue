@@ -10,6 +10,7 @@ import BaseBadge from '@/components/ui/BaseBadge.vue'
 import BaseToggle from '@/components/ui/BaseToggle.vue'
 import Pagination from '@/components/ui/Pagination.vue'
 import SearchInput from '@/components/ui/SearchInput.vue'
+import SortableTableHeader from '@/components/ui/SortableTableHeader.vue'
 import { getApiErrorMessage, resolveFormError } from '@/services/api'
 import { toastError, toastSuccess } from '@/lib/alerts'
 import { generateRandomPassword } from '@/lib/password'
@@ -22,10 +23,12 @@ import {
   type UpdateCompanyInput,
 } from '@/services/companiesService'
 import { usePagination } from '@/composables/usePagination'
+import { useTableSort } from '@/composables/useTableSort'
 import type { Company } from '@/types'
 import PlatformUsersPanel from './PlatformUsersPanel.vue'
 
 const { page, pageSize, total, totalPages, applyMeta, watchSearch } = usePagination()
+const { sortBy, sortOrder, toggleSort } = useTableSort(() => { page.value = 1; return loadCompanies() }, 'name')
 
 const companies = ref<Company[]>([])
 const loading = ref(true)
@@ -51,7 +54,7 @@ const editForm = ref<UpdateCompanyInput>({ name: '', document: '' })
 async function loadCompanies() {
   loading.value = true
   try {
-    const result = await listCompanies({ page: page.value, pageSize: pageSize.value, search: search.value || undefined })
+    const result = await listCompanies({ page: page.value, pageSize: pageSize.value, search: search.value || undefined, sortBy: sortBy.value, sortOrder: sortOrder.value })
     companies.value = result.data
     applyMeta(result)
   } catch (error) {
@@ -154,11 +157,9 @@ onMounted(loadCompanies)
       <table v-mobile-accordion class="mobile-accordion-table min-w-full divide-y divide-gray-200 dark:divide-gray-700">
         <thead class="bg-gray-50 dark:bg-gray-900/60">
           <tr>
-            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Nome</th>
-            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-              Documento
-            </th>
-            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Status</th>
+            <SortableTableHeader field="name" :active-field="sortBy" :order="sortOrder" @sort="toggleSort">Nome</SortableTableHeader>
+            <SortableTableHeader field="document" :active-field="sortBy" :order="sortOrder" @sort="toggleSort">Documento</SortableTableHeader>
+            <SortableTableHeader field="active" :active-field="sortBy" :order="sortOrder" @sort="toggleSort">Status</SortableTableHeader>
             <th class="px-4 py-3" />
           </tr>
         </thead>

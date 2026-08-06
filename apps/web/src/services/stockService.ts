@@ -2,6 +2,8 @@ import { api } from './api'
 import type { MovementType, PaginatedResult, ProductWithRelations, StockMovement } from '@/types'
 
 export interface ListCurrentStockParams {
+  sortBy?: string
+  sortOrder?: 'asc' | 'desc'
   page: number
   pageSize: number
   search?: string
@@ -15,6 +17,8 @@ export async function listCurrentStock(params: ListCurrentStockParams) {
 }
 
 export interface ListStockMovementsParams {
+  sortBy?: string
+  sortOrder?: 'asc' | 'desc'
   page: number
   pageSize: number
   search?: string

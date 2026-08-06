@@ -12,7 +12,9 @@ import Pagination from '@/components/ui/Pagination.vue'
 import PeriodPicker from '@/components/ui/PeriodPicker.vue'
 import PrintButton from '@/components/ui/PrintButton.vue'
 import SearchInput from '@/components/ui/SearchInput.vue'
+import SortableTableHeader from '@/components/ui/SortableTableHeader.vue'
 import { usePagination } from '@/composables/usePagination'
+import { useTableSort } from '@/composables/useTableSort'
 import { getApiErrorMessage } from '@/services/api'
 import { listAllCompanies } from '@/services/companiesService'
 import { listActivityLogs, listTechnicalLogs } from '@/services/logsService'
@@ -23,6 +25,7 @@ import type { Company, SystemLog, SystemLogLevel, SystemLogMethod } from '@/type
 const props = defineProps<{ mode: 'technical' | 'activity' }>()
 const isTechnical = computed(() => props.mode === 'technical')
 const { page, pageSize, total, totalPages, applyMeta, watchSearch } = usePagination()
+const { sortBy, sortOrder, toggleSort } = useTableSort(() => { page.value = 1; return loadLogs() }, 'createdAt', 'desc')
 
 const logs = ref<SystemLog[]>([])
 const companies = ref<Company[]>([])
@@ -127,6 +130,8 @@ async function loadLogs() {
         isTechnical.value && filters.value.companyId !== 'todas' ? filters.value.companyId : undefined,
       from: filters.value.period.from || undefined,
       to: filters.value.period.to || undefined,
+      sortBy: sortBy.value,
+      sortOrder: sortOrder.value,
     }
     const result = isTechnical.value ? await listTechnicalLogs(params) : await listActivityLogs(params)
     logs.value = result.data
@@ -203,11 +208,11 @@ onMounted(() => {
       <table v-mobile-accordion class="mobile-accordion-table min-w-full divide-y divide-gray-200 dark:divide-gray-700">
         <thead class="bg-gray-50 dark:bg-gray-900/60">
           <tr>
-            <th class="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500 dark:text-gray-400">Data</th>
-            <th v-if="isTechnical" class="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500 dark:text-gray-400">Empresa</th>
-            <th class="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500 dark:text-gray-400">Usuário</th>
+            <SortableTableHeader field="createdAt" :active-field="sortBy" :order="sortOrder" @sort="toggleSort">Data</SortableTableHeader>
+            <SortableTableHeader v-if="isTechnical" field="companyName" :active-field="sortBy" :order="sortOrder" @sort="toggleSort">Empresa</SortableTableHeader>
+            <SortableTableHeader field="actorName" :active-field="sortBy" :order="sortOrder" @sort="toggleSort">Usuário</SortableTableHeader>
             <th class="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500 dark:text-gray-400">Evento</th>
-            <th v-if="isTechnical" class="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500 dark:text-gray-400">Nível</th>
+            <SortableTableHeader v-if="isTechnical" field="level" :active-field="sortBy" :order="sortOrder" @sort="toggleSort">Nível</SortableTableHeader>
             <th class="print:hidden px-4 py-3" />
           </tr>
         </thead>

@@ -10,6 +10,7 @@ import SearchInput from '@/components/ui/SearchInput.vue'
 import PrintButton from '@/components/ui/PrintButton.vue'
 import BulkSelectionBar from '@/components/ui/BulkSelectionBar.vue'
 import TableCheckbox from '@/components/ui/TableCheckbox.vue'
+import SortableTableHeader from '@/components/ui/SortableTableHeader.vue'
 import ExpandableText from '@/components/ui/ExpandableText.vue'
 import { getApiErrorMessage, resolveFormError } from '@/services/api'
 import { confirmDelete, toastError, toastSuccess } from '@/lib/alerts'
@@ -24,12 +25,14 @@ import {
 import { useAuthStore } from '@/stores/auth'
 import { usePagination } from '@/composables/usePagination'
 import { useBulkSelection } from '@/composables/useBulkSelection'
+import { useTableSort } from '@/composables/useTableSort'
 import type { Category } from '@/types'
 
 const auth = useAuthStore()
 const canManage = computed(() => auth.user?.role === 'admin' || auth.user?.role === 'gerente')
 
 const { page, pageSize, total, totalPages, applyMeta, watchSearch } = usePagination()
+const { sortBy, sortOrder, toggleSort } = useTableSort(() => { page.value = 1; return loadCategories() }, 'name')
 
 const categories = ref<Category[]>([])
 const { selectedIds, allVisibleSelected, toggleOne, toggleAllVisible, clearSelection } = useBulkSelection(() =>
@@ -50,7 +53,7 @@ const fieldErrors = ref<Record<string, string>>({})
 async function loadCategories() {
   loading.value = true
   try {
-    const result = await listCategories({ page: page.value, pageSize: pageSize.value, search: search.value || undefined })
+    const result = await listCategories({ page: page.value, pageSize: pageSize.value, search: search.value || undefined, sortBy: sortBy.value, sortOrder: sortOrder.value })
     categories.value = result.data
     clearSelection()
     applyMeta(result)
@@ -177,12 +180,8 @@ onMounted(loadCategories)
                 @toggle="toggleAllVisible"
               />
             </th>
-            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Nome</th>
-            <th
-              class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase hidden sm:table-cell"
-            >
-              Descrição
-            </th>
+            <SortableTableHeader field="name" :active-field="sortBy" :order="sortOrder" @sort="toggleSort">Nome</SortableTableHeader>
+            <SortableTableHeader field="description" :active-field="sortBy" :order="sortOrder" class="hidden sm:table-cell" @sort="toggleSort">Descrição</SortableTableHeader>
             <th class="print:hidden px-4 py-3" />
           </tr>
         </thead>

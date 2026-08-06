@@ -11,18 +11,21 @@ import SearchInput from '@/components/ui/SearchInput.vue'
 import PrintButton from '@/components/ui/PrintButton.vue'
 import BulkSelectionBar from '@/components/ui/BulkSelectionBar.vue'
 import TableCheckbox from '@/components/ui/TableCheckbox.vue'
+import SortableTableHeader from '@/components/ui/SortableTableHeader.vue'
 import { getApiErrorMessage, resolveFormError } from '@/services/api'
 import { confirmDelete, toastError, toastSuccess } from '@/lib/alerts'
 import { createUnit, deleteUnit, deleteUnits, listUnits, updateUnit, type UnitInput } from '@/services/unitsService'
 import { useAuthStore } from '@/stores/auth'
 import { usePagination } from '@/composables/usePagination'
 import { useBulkSelection } from '@/composables/useBulkSelection'
+import { useTableSort } from '@/composables/useTableSort'
 import type { Unit } from '@/types'
 
 const auth = useAuthStore()
 const canManage = computed(() => auth.user?.role === 'admin' || auth.user?.role === 'gerente')
 
 const { page, pageSize, total, totalPages, applyMeta, watchSearch } = usePagination()
+const { sortBy, sortOrder, toggleSort } = useTableSort(() => { page.value = 1; return loadUnits() }, 'name')
 
 const units = ref<Unit[]>([])
 const { selectedIds, allVisibleSelected, toggleOne, toggleAllVisible, clearSelection } = useBulkSelection(() =>
@@ -43,7 +46,7 @@ const fieldErrors = ref<Record<string, string>>({})
 async function loadUnits() {
   loading.value = true
   try {
-    const result = await listUnits({ page: page.value, pageSize: pageSize.value, search: search.value || undefined })
+    const result = await listUnits({ page: page.value, pageSize: pageSize.value, search: search.value || undefined, sortBy: sortBy.value, sortOrder: sortOrder.value })
     units.value = result.data
     clearSelection()
     applyMeta(result)
@@ -171,10 +174,8 @@ onMounted(loadUnits)
                 @toggle="toggleAllVisible"
               />
             </th>
-            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Nome</th>
-            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-              Abreviação
-            </th>
+            <SortableTableHeader field="name" :active-field="sortBy" :order="sortOrder" @sort="toggleSort">Nome</SortableTableHeader>
+            <SortableTableHeader field="abbreviation" :active-field="sortBy" :order="sortOrder" @sort="toggleSort">Abreviação</SortableTableHeader>
             <th class="print:hidden px-4 py-3" />
           </tr>
         </thead>

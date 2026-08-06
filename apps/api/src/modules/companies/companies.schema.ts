@@ -3,6 +3,7 @@ import { paginationQuerySchema } from '../../shared/schemas/pagination.schema.js
 
 export const listCompaniesQuerySchema = paginationQuerySchema.extend({
   search: z.string().trim().min(1).optional(),
+  sortBy: z.enum(['name', 'document', 'active']).optional(),
 })
 
 export type ListCompaniesQuery = z.infer<typeof listCompaniesQuerySchema>

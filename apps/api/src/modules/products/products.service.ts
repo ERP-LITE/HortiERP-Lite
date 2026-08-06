@@ -1,4 +1,4 @@
-import { and, asc, count, eq, ilike, isNull, or } from 'drizzle-orm'
+import { and, asc, count, desc, eq, ilike, isNull, or } from 'drizzle-orm'
 import { db } from '../../db/client.js'
 import { categories, products, units } from '../../db/schema/index.js'
 import { AppError } from '../../shared/errors/AppError.js'
@@ -77,13 +77,15 @@ export async function listProducts(companyId: string, query: ListProductsQuery) 
   if (query.categoryId) conditions.push(eq(products.categoryId, query.categoryId))
   if (query.active !== undefined) conditions.push(eq(products.active, query.active))
   const where = and(...conditions)
+  const sortColumn = query.sortBy ? products[query.sortBy] : products.name
+  const orderBy = query.sortOrder === 'desc' ? desc(sortColumn) : asc(sortColumn)
 
   const [data, [{ total }]] = await Promise.all([
     db
       .select()
       .from(products)
       .where(where)
-      .orderBy(asc(products.name))
+      .orderBy(orderBy, asc(products.name))
       .limit(query.pageSize)
       .offset((query.page - 1) * query.pageSize),
     db.select({ total: count() }).from(products).where(where),

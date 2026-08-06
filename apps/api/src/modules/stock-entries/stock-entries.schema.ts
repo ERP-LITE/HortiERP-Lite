@@ -5,6 +5,7 @@ export const listStockEntriesQuerySchema = paginationQuerySchema.extend({
   search: z.string().trim().min(1).optional(),
   from: z.coerce.date().optional(),
   to: z.coerce.date().optional(),
+  sortBy: z.enum(['entryDate', 'supplierName', 'invoiceStatus', 'invoiceTotal']).optional(),
 })
 
 export type ListStockEntriesQuery = z.infer<typeof listStockEntriesQuerySchema>

@@ -1,5 +1,5 @@
 import bcrypt from 'bcryptjs'
-import { and, asc, count, eq, ilike, isNull, or } from 'drizzle-orm'
+import { and, asc, count, desc, eq, ilike, isNull, or } from 'drizzle-orm'
 import { db } from '../../db/client.js'
 import { users } from '../../db/schema/index.js'
 import { AppError } from '../../shared/errors/AppError.js'
@@ -14,13 +14,15 @@ export async function listUsers(companyId: string, query: ListUsersQuery) {
   if (query.role) conditions.push(eq(users.role, query.role))
   if (query.active !== undefined) conditions.push(eq(users.active, query.active))
   const where = and(...conditions)
+  const sortColumn = query.sortBy ? users[query.sortBy] : users.name
+  const orderBy = query.sortOrder === 'desc' ? desc(sortColumn) : asc(sortColumn)
 
   const [data, [{ total }]] = await Promise.all([
     db
       .select(userPublicColumns)
       .from(users)
       .where(where)
-      .orderBy(asc(users.name))
+      .orderBy(orderBy, asc(users.name))
       .limit(query.pageSize)
       .offset((query.page - 1) * query.pageSize),
     db.select({ total: count() }).from(users).where(where),

@@ -1,4 +1,4 @@
-import { and, count, desc, eq, gte, ilike, inArray, isNull, lte, or } from 'drizzle-orm'
+import { and, asc, count, desc, eq, gte, ilike, inArray, isNull, lte, or } from 'drizzle-orm'
 import { db } from '../../db/client.js'
 import { losses, products } from '../../db/schema/index.js'
 import { AppError } from '../../shared/errors/AppError.js'
@@ -26,6 +26,8 @@ export function buildLossesConditions(
 
 export async function listLosses(companyId: string, query: ListLossesQuery) {
   const where = and(...buildLossesConditions(companyId, query))
+  const lossSortColumn = query.sortBy ? losses[query.sortBy] : losses.lossDate
+  const lossOrderBy = query.sortOrder === 'asc' ? asc(lossSortColumn) : desc(lossSortColumn)
 
   const [data, [{ total }]] = await Promise.all([
     db.query.losses.findMany({
@@ -34,7 +36,7 @@ export async function listLosses(companyId: string, query: ListLossesQuery) {
         createdByUser: { columns: { id: true, name: true } },
         product: true,
       },
-      orderBy: desc(losses.lossDate),
+      orderBy: [lossOrderBy, desc(losses.lossDate)],
       limit: query.pageSize,
       offset: (query.page - 1) * query.pageSize,
     }),
