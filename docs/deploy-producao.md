@@ -11,7 +11,7 @@
 
 ## Pré-requisitos
 
-1. Servidor Linux com Docker Engine e Compose (as imagens usam Node.js 22 na etapa de build/runtime da API).
+1. Servidor Linux com Docker Engine e Docker Compose recente, com suporte a `docker compose up --wait` (as imagens usam Node.js 22 na etapa de build/runtime da API).
 2. DNS `A`/`AAAA` de `APP_DOMAIN` apontando para o servidor.
 3. Portas TCP 80 e 443 e UDP 443 liberadas. Não libere a porta 5432.
 4. Widget Turnstile real restrito ao domínio de produção.
@@ -50,6 +50,72 @@ Para usar outro arquivo de ambiente:
 sh deploy/deploy.sh /caminho/seguro/erp-production.env
 ```
 
+## Atualização de uma instalação existente
+
+Esta versão adiciona dados e anexos privados de notas fiscais às entradas de mercadoria. A atualização é aditiva:
+a migration `0006_brief_scarlet_spider.sql` cria as colunas fiscais e a tabela `stock_entry_attachments`, sem alterar
+estoques ou entradas já existentes. O Compose cria automaticamente o volume persistente `invoice_files`; não remova
+esse volume em atualizações futuras.
+
+Não copie `.env.production.example` por cima do `.env.production` existente. Preserve os segredos atuais. A única
+variável nova é opcional:
+
+```dotenv
+# Limite por anexo; se ausente, usa 10 MB.
+INVOICE_MAX_FILE_SIZE=10485760
+```
+
+Antes de atualizar o código, registre o hash/tag da versão atual e gere um backup adicional:
+
+```bash
+git rev-parse --short HEAD
+docker compose --env-file .env.production -f docker-compose.production.yml ps
+docker compose --env-file .env.production -f docker-compose.production.yml exec backup backup.sh once
+docker compose --env-file .env.production -f docker-compose.production.yml logs --tail=50 backup
+```
+
+Depois de atualizar os arquivos do repositório pelo processo adotado no servidor, execute na raiz do projeto:
+
+```bash
+npm install
+npm test
+npm run build:api
+npm run build:web
+sh deploy/deploy.sh
+```
+
+O deploy reconstrói API, frontend e backup. O serviço `migrate` aplica a migration antes de liberar a nova API, e os
+dados existentes permanecem no volume `postgres_production_data`. Não execute `docker compose down -v`, pois `-v`
+remove os volumes persistentes do banco, dos anexos e dos backups.
+
+Confirme a migration, os serviços e o novo volume:
+
+```bash
+docker compose --env-file .env.production -f docker-compose.production.yml ps -a migrate
+docker compose --env-file .env.production -f docker-compose.production.yml ps
+docker compose --env-file .env.production -f docker-compose.production.yml logs --tail=100 migrate api web backup
+docker compose --env-file .env.production -f docker-compose.production.yml config --volumes
+```
+
+O container `migrate` deve aparecer como encerrado com código `0`; API, web, gateway, PostgreSQL e backup devem estar
+ativos/saudáveis. `config --volumes` deve listar `invoice_files` junto dos volumes já existentes.
+
+Faça também um teste funcional autenticado:
+
+1. Abra uma entrada existente e confirme que produtos, quantidades e unidades continuam corretos.
+2. Registre uma entrada com dados fiscais e anexe uma imagem ou PDF pequeno.
+3. Confira pré-visualização e download; XML deve oferecer somente download.
+4. Edite fornecedor ou dados fiscais com admin/gerente e confirme que os itens e o estoque não mudaram.
+5. Confirme que operador não vê a exclusão; admin/gerente deve conseguir excluir após confirmação.
+6. Entre como `super_admin`, acesse uma empresa por impersonação e valide as mesmas ações administrativas.
+7. Gere outro backup e execute o teste de restauração para incluir e validar o pacote de anexos.
+
+```bash
+docker compose --env-file .env.production -f docker-compose.production.yml exec backup backup.sh once
+docker compose --profile maintenance --env-file .env.production \
+  -f docker-compose.production.yml run --rm restore-check
+```
+
 ## Verificação
 
 ```bash
@@ -59,7 +125,9 @@ curl -I https://SEU_DOMINIO/health
 ```
 
 O endpoint público `/health` é atendido pelo frontend e deve responder `200`. A API possui seu próprio `/health`,
-usado internamente pelo Docker.
+usado internamente pelo Docker; ele só responde `200` depois de consultar o PostgreSQL e confirmar que o volume
+privado de anexos está gravável. Falha em qualquer dependência retorna `503` e impede o deploy de ser marcado como
+concluído.
 
 ## Primeiro super administrador
 
@@ -84,6 +152,11 @@ sh deploy/rollback.sh IMAGE_TAG_ANTERIOR
 
 O rollback não desfaz migrations automaticamente. Migrations novas devem ser compatíveis com a versão anterior ou
 ter um procedimento específico e testado de restauração do banco.
+
+Nesta atualização, a migration fiscal é aditiva e a versão anterior ignora as novas colunas/tabela, portanto o
+rollback apenas da aplicação é possível. O volume `invoice_files` e a migration devem permanecer; não os apague
+durante o rollback. Anexos enviados enquanto a versão nova esteve ativa voltarão a aparecer quando ela for publicada
+novamente.
 
 ## Atualização segura
 
@@ -122,8 +195,10 @@ docker compose --env-file .env.production -f docker-compose.production.yml ps ba
 ## Teste de restauração
 
 O teste usa o dump mais recente, cria o banco temporário de nome fixo `hortierp_restore_test`, restaura o conteúdo,
-verifica tabelas essenciais e valida checksum, descriptografia e integridade do pacote mais recente de anexos. Depois
-remove o banco temporário. O banco principal e o volume real de anexos nunca são apagados ou alterados.
+verifica tabelas essenciais e valida checksum e descriptografia do pacote mais recente de anexos. O pacote é extraído
+num diretório temporário e cada `storedName` do banco restaurado precisa corresponder a um arquivo real; banco com
+anexos e pacote ausente também reprova o teste. Depois, banco e arquivos temporários são removidos. O banco principal
+e o volume real de anexos nunca são apagados ou alterados.
 
 ```bash
 docker compose --profile maintenance --env-file .env.production \

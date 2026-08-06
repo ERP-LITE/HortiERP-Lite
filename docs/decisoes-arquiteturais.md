@@ -24,6 +24,7 @@ Não há tabela de junção usuário-empresa: um usuário pertence a exatamente 
 - Sessão = JWT assinado, guardado em cookie `httpOnly` + `sameSite=lax` (nunca exposto a JS no browser). Emissão centralizada em `apps/api/src/shared/auth/session.ts` (`issueSession`), reaproveitada por login, impersonação e saída de impersonação — evita duplicar a lógica de cookie/expiração em cada rota.
 - Rate limit dedicado em `/auth/login` e `/auth/password` (10 req/min) além do rate limit global da API.
 - Toda rota autenticada também confirma no banco que o usuário real, seu papel e a empresa da sessão continuam ativos. Em impersonação, tanto a empresa Plataforma do `super_admin` quanto a empresa acessada são verificadas. Assim, excluir/desativar usuário, mudar seu papel ou suspender uma empresa invalida imediatamente os JWTs já emitidos.
+- O frontend valida `/auth/me` a cada 45 segundos e quando a aba volta ao foco/visibilidade. Isso não substitui a proteção por requisição do backend: serve para retirar proativamente da interface quem ficou parado numa tela depois de a empresa ser suspensa, o usuário ser desativado ou o papel ser alterado. Um `401` redireciona ao login com mensagem genérica, sem revelar a causa administrativa.
 - O logout é idempotente e não exige que o JWT ainda seja válido: `POST /auth/logout` sempre tenta remover o cookie. O frontend também registra localmente a intenção de sair antes da chamada; se a API estiver indisponível, um F5 não restaura por engano o JWT que possa ter permanecido no navegador.
 
 ## Papéis e permissões

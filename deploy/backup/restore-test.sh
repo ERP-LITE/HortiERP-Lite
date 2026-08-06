@@ -30,10 +30,15 @@ fi
 
 plain_file=$(mktemp /tmp/hortierp-restore.dump.XXXXXX)
 invoice_plain=''
+invoice_restore_dir=''
 
 cleanup() {
   rm -f "$plain_file"
   if [ -n "$invoice_plain" ]; then rm -f "$invoice_plain"; fi
+  if [ -n "$invoice_restore_dir" ] && [ -d "$invoice_restore_dir" ]; then
+    find "$invoice_restore_dir" -mindepth 1 -delete
+    rmdir "$invoice_restore_dir"
+  fi
   psql --dbname=postgres --set=ON_ERROR_STOP=1 \
     --command="SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '$restore_database' AND pid <> pg_backend_pid();" \
     --command="DROP DATABASE IF EXISTS $restore_database;" >/dev/null
@@ -61,6 +66,14 @@ if [ "$tables" != '4' ]; then
 fi
 
 latest_invoice_backup=$(find "$backup_dir" -maxdepth 1 -type f -name 'hortierp_invoices_*.tar.gz.enc' -print | sort | tail -n 1)
+attachment_count=$(psql --dbname="$restore_database" --tuples-only --no-align --set=ON_ERROR_STOP=1 \
+  --command='SELECT count(*) FROM stock_entry_attachments;')
+
+if [ -z "$latest_invoice_backup" ] && [ "$attachment_count" != '0' ]; then
+  echo "Restauração inválida: o banco possui $attachment_count anexo(s), mas o pacote de arquivos não existe" >&2
+  exit 1
+fi
+
 if [ -n "$latest_invoice_backup" ]; then
   invoice_checksum="$latest_invoice_backup.sha256"
   [ -f "$invoice_checksum" ] || { echo "Checksum ausente: $invoice_checksum" >&2; exit 1; }
@@ -71,8 +84,26 @@ if [ -n "$latest_invoice_backup" ]; then
     -in "$latest_invoice_backup" \
     -out "$invoice_plain"
   tar -tzf "$invoice_plain" >/dev/null
+  invoice_restore_dir=$(mktemp -d /tmp/hortierp-invoices-restore.XXXXXX)
+  tar -xzf "$invoice_plain" -C "$invoice_restore_dir"
+
+  psql --dbname="$restore_database" --tuples-only --no-align --set=ON_ERROR_STOP=1 \
+    --command='SELECT stored_name FROM stock_entry_attachments ORDER BY stored_name;' |
+  while IFS= read -r stored_name; do
+    case "$stored_name" in
+      ''|*/*|*'..'*)
+        echo "Nome interno de anexo inválido no banco restaurado: $stored_name" >&2
+        exit 1
+        ;;
+    esac
+    if [ ! -f "$invoice_restore_dir/$stored_name" ]; then
+      echo "Arquivo fiscal ausente no pacote restaurado: $stored_name" >&2
+      exit 1
+    fi
+  done
+
   rm -f "$invoice_plain"
   invoice_plain=''
 fi
 
-echo "Teste de restauração concluído com sucesso usando $(basename "$latest_backup")"
+echo "Teste de restauração concluído com sucesso usando $(basename "$latest_backup"); $attachment_count anexo(s) conferido(s)"

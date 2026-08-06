@@ -9,6 +9,17 @@ import { authCookie, createTenant, setupTestApp } from './helpers.js'
 
 const ctx = setupTestApp()
 
+describe('saúde operacional', () => {
+  test('health confirma banco e armazenamento fiscal', async () => {
+    const response = await ctx.app.inject({ method: 'GET', url: '/health' })
+    assert.equal(response.statusCode, 200)
+    assert.deepEqual(response.json(), {
+      status: 'ok',
+      checks: { database: 'ok', invoiceStorage: 'ok' },
+    })
+  })
+})
+
 describe('concorrência de estoque', () => {
   test('entradas simultâneas acumulam todas as quantidades sem perder atualização', async () => {
     const tenant = await createTenant('entries', '0')

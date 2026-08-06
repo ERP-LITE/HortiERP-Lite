@@ -104,3 +104,7 @@ container ao terminar. A suíte recusa executar se o nome do banco em `DATABASE_
 
 O workflow em `.github/workflows/ci.yml` também executa os builds da API e do frontend, aplica as migrations em um
 banco descartável e roda a suíte a cada push e pull request.
+
+Antes de atualizar uma instalação existente em produção, siga o roteiro de
+[atualização segura](./docs/deploy-producao.md#atualização-de-uma-instalação-existente). Ele cobre backup prévio,
+migration fiscal, criação do volume privado de anexos, smoke tests e rollback.

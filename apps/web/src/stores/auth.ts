@@ -63,6 +63,11 @@ export const useAuthStore = defineStore('auth', () => {
     applySession(response)
   }
 
+  async function validateSession() {
+    const session = await fetchMe()
+    applySession(session)
+  }
+
   async function exitImpersonation() {
     const response = await exitImpersonationRequest()
     applySession(response)
@@ -88,5 +93,6 @@ export const useAuthStore = defineStore('auth', () => {
     exitImpersonation,
     logout,
     restoreSession,
+    validateSession,
   }
 })

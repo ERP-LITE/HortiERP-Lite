@@ -4,7 +4,11 @@ import cors from '@fastify/cors'
 import jwt from '@fastify/jwt'
 import rateLimit from '@fastify/rate-limit'
 import multipart from '@fastify/multipart'
+import { mkdir, open } from 'node:fs/promises'
+import { join } from 'node:path'
+import { sql } from 'drizzle-orm'
 import { env } from './shared/config/env.js'
+import { db } from './db/client.js'
 import { errorHandler } from './shared/middlewares/errorHandler.js'
 import { authRoutes } from './modules/auth/auth.routes.js'
 import { companiesRoutes } from './modules/companies/companies.routes.js'
@@ -63,7 +67,18 @@ export function buildApp(options: { systemLogs?: boolean } = {}) {
   app.setErrorHandler(errorHandler)
   if (options.systemLogs !== false) registerSystemLogsHook(app)
 
-  app.get('/health', async () => ({ status: 'ok' }))
+  app.get('/health', async (_request, reply) => {
+    try {
+      await db.execute(sql`select 1`)
+      await mkdir(env.INVOICE_STORAGE_PATH, { recursive: true, mode: 0o700 })
+      const marker = await open(join(env.INVOICE_STORAGE_PATH, '.healthcheck'), 'a', 0o600)
+      await marker.close()
+      return { status: 'ok', checks: { database: 'ok', invoiceStorage: 'ok' } }
+    } catch (error) {
+      app.log.error({ error }, 'Health check de dependências falhou')
+      return reply.status(503).send({ status: 'error' })
+    }
+  })
 
   app.register(authRoutes, { prefix: '/api' })
   app.register(companiesRoutes, { prefix: '/api' })

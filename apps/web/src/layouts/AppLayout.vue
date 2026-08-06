@@ -25,6 +25,7 @@ import BaseModal from '@/components/ui/BaseModal.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useIdleLogout } from '@/composables/useIdleLogout'
+import { useSessionMonitor } from '@/composables/useSessionMonitor'
 import { getApiErrorMessage } from '@/services/api'
 import { toastError } from '@/lib/alerts'
 
@@ -34,6 +35,7 @@ const router = useRouter()
 const sidebarOpen = ref(false)
 const exitingImpersonation = ref(false)
 const { showWarning, secondsLeft, stayLoggedIn } = useIdleLogout()
+useSessionMonitor()
 
 async function handleExitImpersonation() {
   exitingImpersonation.value = true

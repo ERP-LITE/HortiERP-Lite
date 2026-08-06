@@ -6,11 +6,16 @@ export const api = axios.create({
   withCredentials: true,
 })
 
+let redirectingToLogin = false
+
 api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401 && window.location.pathname !== '/login') {
-      window.location.href = '/login'
+      if (!redirectingToLogin) {
+        redirectingToLogin = true
+        window.location.replace('/login?reason=session-ended')
+      }
     }
 
     return Promise.reject(error)
