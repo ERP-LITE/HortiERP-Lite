@@ -16,6 +16,7 @@ import { useFilterModal } from '@/composables/useFilterModal'
 import DonutChart from '@/components/charts/DonutChart.vue'
 import MovementsTrendChart from '@/components/charts/MovementsTrendChart.vue'
 import LossesByReasonChart from '@/components/charts/LossesByReasonChart.vue'
+import DashboardSkeleton from './DashboardSkeleton.vue'
 import { getApiErrorMessage } from '@/services/api'
 import { fetchDashboardSummary } from '@/services/dashboardService'
 import type { DashboardSummary, MovementType } from '@/types'
@@ -60,6 +61,7 @@ function formatMovementTime(value: string) {
 
 async function loadSummary() {
   loading.value = true
+  errorMessage.value = ''
   try {
     summary.value = await fetchDashboardSummary({ from: period.value.from || undefined, to: period.value.to || undefined })
   } catch (error) {
@@ -86,7 +88,7 @@ onMounted(loadSummary)
     </p>
 
     <p v-if="errorMessage" class="text-sm text-red-600 dark:text-red-400 mb-4">{{ errorMessage }}</p>
-    <p v-else-if="loading" class="text-sm text-gray-500 dark:text-gray-400">Carregando...</p>
+    <DashboardSkeleton v-else-if="loading" />
 
     <template v-else-if="summary">
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
@@ -99,8 +101,9 @@ onMounted(loadSummary)
         />
         <StatCard label="Valor de estoque (custo)" :value="formatCurrency(summary.stockValue)" :icon="Coins" />
         <StatCard
-          label="Perdas no período"
-          :value="`${summary.lossesInPeriod.lossesQuantity} un. / ${summary.lossesInPeriod.lossesCount} registros`"
+          label="Valor perdido no período"
+          :value="formatCurrency(summary.lossesInPeriod.lossValue)"
+          :supporting-text="`${summary.lossesInPeriod.lossesCount} ${summary.lossesInPeriod.lossesCount === 1 ? 'registro de perda' : 'registros de perda'}`"
           tone="danger"
           :icon="TrendingDown"
         />
@@ -126,7 +129,12 @@ onMounted(loadSummary)
           </div>
           <div class="p-4">
             <DonutChart
-              :data="summary.stockByCategory.map((c) => ({ label: c.categoryName, value: c.totalStock }))"
+              :data="summary.stockByCategory.map((c) => ({
+                label: c.categoryName,
+                value: c.productCount,
+                totalsByUnit: c.totalsByUnit,
+                products: c.products,
+              }))"
             />
           </div>
         </div>

@@ -13,6 +13,7 @@ export const losses = pgTable('losses', {
     .notNull()
     .references(() => products.id),
   quantity: numeric('quantity', { precision: 12, scale: 3 }).notNull(),
+  unitCost: numeric('unit_cost', { precision: 12, scale: 2 }),
   reason: lossReasonEnum('reason').notNull(),
   notes: text('notes'),
   lossDate: timestamp('loss_date', { withTimezone: true }).notNull().defaultNow(),

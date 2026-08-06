@@ -50,6 +50,13 @@
       "when": 1786024729910,
       "tag": "0006_brief_scarlet_spider",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1786037609303,
+      "tag": "0007_free_millenium_guard",
+      "breakpoints": true
     }
   ]
 }

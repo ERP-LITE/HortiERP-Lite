@@ -5,6 +5,7 @@ const CATEGORICAL_DARK = ['#3987e5', '#d95926', '#199e70', '#c98500', '#d55181',
 
 export const STATUS_GOOD = '#0ca30c'
 export const STATUS_CRITICAL = '#d03b3b'
+export const STATUS_NEUTRAL = '#64748b'
 
 export function useCategoricalPalette() {
   const theme = useThemeStore()

@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { ref } from 'vue'
 import type { ApiErrorPayload } from '@/types'
 
 export const api = axios.create({
@@ -6,11 +7,25 @@ export const api = axios.create({
   withCredentials: true,
 })
 
+export const pendingApiRequests = ref(0)
+
+api.interceptors.request.use(
+  (config) => {
+    pendingApiRequests.value += 1
+    return config
+  },
+  (error) => Promise.reject(error),
+)
+
 let redirectingToLogin = false
 
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    pendingApiRequests.value = Math.max(0, pendingApiRequests.value - 1)
+    return response
+  },
   (error) => {
+    pendingApiRequests.value = Math.max(0, pendingApiRequests.value - 1)
     if (error.response?.status === 401 && window.location.pathname !== '/login') {
       if (!redirectingToLogin) {
         redirectingToLogin = true

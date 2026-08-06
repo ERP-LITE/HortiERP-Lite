@@ -5,6 +5,7 @@ withDefaults(
   defineProps<{
     label: string
     value: string
+    supportingText?: string
     tone?: 'default' | 'warning' | 'danger'
     icon?: Component
   }>(),
@@ -30,6 +31,7 @@ const iconToneClasses: Record<string, string> = {
       <div>
         <p class="text-sm text-gray-500 dark:text-gray-400">{{ label }}</p>
         <p class="mt-2 text-2xl font-bold" :class="toneClasses[tone]">{{ value }}</p>
+        <p v-if="supportingText" class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ supportingText }}</p>
       </div>
       <div v-if="icon" class="shrink-0 rounded-lg p-2" :class="iconToneClasses[tone]">
         <component :is="icon" :size="20" />
