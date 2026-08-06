@@ -10,6 +10,7 @@ import FilterButton from '@/components/ui/FilterButton.vue'
 import PrintButton from '@/components/ui/PrintButton.vue'
 import SearchInput from '@/components/ui/SearchInput.vue'
 import PeriodPicker from '@/components/ui/PeriodPicker.vue'
+import ExpandableText from '@/components/ui/ExpandableText.vue'
 import type { PeriodValue } from '@/lib/period'
 import { formatDate } from '@/lib/format'
 import { getApiErrorMessage } from '@/services/api'
@@ -108,12 +109,14 @@ onMounted(loadEntries)
             <td class="px-4 py-3 text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">
               {{ formatDate(entry.entryDate) }}
             </td>
-            <td class="px-4 py-3 text-sm font-medium text-gray-900 dark:text-gray-100 whitespace-nowrap">
-              {{ entry.supplierName || '—' }}
+            <td class="max-w-64 px-4 py-3 text-sm font-medium text-gray-900 dark:text-gray-100">
+              <ExpandableText :text="entry.supplierName" :max-length="40" />
             </td>
-            <td class="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">{{ itemsSummary(entry) }}</td>
-            <td class="px-4 py-3 text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap">
-              {{ entry.createdByUser?.name || 'Usuário não identificado' }}
+            <td class="max-w-80 px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
+              <ExpandableText :text="itemsSummary(entry)" />
+            </td>
+            <td class="max-w-64 px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
+              <ExpandableText :text="entry.createdByUser?.name" :max-length="40" empty-text="Usuário não identificado" />
             </td>
           </tr>
         </tbody>

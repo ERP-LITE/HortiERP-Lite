@@ -12,6 +12,7 @@ import FilterButton from '@/components/ui/FilterButton.vue'
 import PrintButton from '@/components/ui/PrintButton.vue'
 import SearchInput from '@/components/ui/SearchInput.vue'
 import PeriodPicker from '@/components/ui/PeriodPicker.vue'
+import ExpandableText from '@/components/ui/ExpandableText.vue'
 import type { PeriodValue } from '@/lib/period'
 import { formatDate } from '@/lib/format'
 import { getApiErrorMessage, resolveFormError } from '@/services/api'
@@ -195,8 +196,8 @@ onMounted(loadAll)
             <td class="px-4 py-3 text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">
               {{ formatDate(loss.lossDate) }}
             </td>
-            <td class="px-4 py-3 text-sm font-medium text-gray-900 dark:text-gray-100 whitespace-nowrap">
-              {{ loss.product?.name }}
+            <td class="max-w-72 px-4 py-3 text-sm font-medium text-gray-900 dark:text-gray-100">
+              <ExpandableText :text="loss.product?.name" :max-length="45" />
             </td>
             <td class="px-4 py-3 text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap">
               {{ Number(loss.quantity) }}
@@ -204,11 +205,11 @@ onMounted(loadAll)
             <td class="px-4 py-3 whitespace-nowrap">
               <BaseBadge variant="danger">{{ reasonLabels[loss.reason] }}</BaseBadge>
             </td>
-            <td class="px-4 py-3 text-sm text-gray-500 dark:text-gray-400 hidden sm:table-cell">
-              {{ loss.notes || '—' }}
+            <td class="max-w-80 px-4 py-3 text-sm text-gray-500 dark:text-gray-400 hidden sm:table-cell">
+              <ExpandableText :text="loss.notes" />
             </td>
-            <td class="px-4 py-3 text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap">
-              {{ loss.createdByUser?.name || 'Usuário não identificado' }}
+            <td class="max-w-64 px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
+              <ExpandableText :text="loss.createdByUser?.name" :max-length="40" empty-text="Usuário não identificado" />
             </td>
           </tr>
         </tbody>

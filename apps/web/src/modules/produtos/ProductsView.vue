@@ -4,6 +4,7 @@ import { Pencil, Plus, Trash2 } from '@lucide/vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
+import ExpandableText from '@/components/ui/ExpandableText.vue'
 import BaseSelect from '@/components/ui/BaseSelect.vue'
 import BaseModal from '@/components/ui/BaseModal.vue'
 import BaseBadge from '@/components/ui/BaseBadge.vue'
@@ -300,11 +301,11 @@ onMounted(loadAll)
                 @toggle="toggleOne(product.id)"
               />
             </td>
-            <td class="px-4 py-3 text-sm font-medium text-gray-900 dark:text-gray-100 whitespace-nowrap">
-              {{ product.name }}
+            <td class="max-w-72 px-4 py-3 text-sm font-medium text-gray-900 dark:text-gray-100">
+              <ExpandableText :text="product.name" :max-length="45" />
             </td>
-            <td class="px-4 py-3 text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">
-              {{ categoryName(product.categoryId) }}
+            <td class="max-w-64 px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
+              <ExpandableText :text="categoryName(product.categoryId)" :max-length="40" />
             </td>
             <td class="px-4 py-3 text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap">
               {{ Number(product.currentStock) }} {{ unitAbbreviation(product.unitId) }}

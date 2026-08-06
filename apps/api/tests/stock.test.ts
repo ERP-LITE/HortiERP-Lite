@@ -97,6 +97,28 @@ describe('entradas e perdas: busca e integridade multiempresa', () => {
     assert.deepEqual(loss.createdByUser, { id: tenant.admin.id, name: tenant.admin.name })
   })
 
+  test('histórico de movimentações identifica o usuário responsável', async () => {
+    const tenant = await createTenant('movement-author', '10')
+
+    await createLoss(tenant.companyId, tenant.operator.id, {
+      productId: tenant.productId,
+      quantity: 1,
+      reason: 'avariado',
+    })
+
+    const response = await ctx.app.inject({
+      method: 'GET',
+      url: '/api/stock/movements?page=1&pageSize=15',
+      headers: { cookie: authCookie(ctx.app, tenant.operator) },
+    })
+    assert.equal(response.statusCode, 200)
+
+    const [movement] = response
+      .json<{ data: { createdByUser: { id: string; name: string } | null }[] }>()
+      .data
+    assert.deepEqual(movement.createdByUser, { id: tenant.operator.id, name: tenant.operator.name })
+  })
+
   test('busca entradas por fornecedor e pelo nome do item', async () => {
     const tenant = await createTenant('entry-search')
     await createStockEntry(tenant.companyId, tenant.operator.id, {

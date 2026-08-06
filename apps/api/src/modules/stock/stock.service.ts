@@ -42,7 +42,10 @@ export async function listStockMovements(companyId: string, query: ListStockMove
   const [data, [{ total }]] = await Promise.all([
     db.query.stockMovements.findMany({
       where,
-      with: { product: true },
+      with: {
+        product: true,
+        createdByUser: { columns: { id: true, name: true } },
+      },
       orderBy: desc(stockMovements.createdAt),
       limit: query.pageSize,
       offset: (query.page - 1) * query.pageSize,

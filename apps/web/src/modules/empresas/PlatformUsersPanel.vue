@@ -3,6 +3,7 @@ import { onMounted, ref } from 'vue'
 import { Pencil, Plus, Trash2, Wand2 } from '@lucide/vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
+import ExpandableText from '@/components/ui/ExpandableText.vue'
 import BaseModal from '@/components/ui/BaseModal.vue'
 import Pagination from '@/components/ui/Pagination.vue'
 import SearchInput from '@/components/ui/SearchInput.vue'
@@ -181,11 +182,13 @@ onMounted(loadUsers)
             title="Duplo clique para editar"
             @dblclick="openEditModal(user)"
           >
-            <td class="whitespace-nowrap px-4 py-3 text-sm font-medium text-gray-900 dark:text-gray-100">
-              {{ user.name }}
+            <td class="max-w-64 px-4 py-3 text-sm font-medium text-gray-900 dark:text-gray-100">
+              <ExpandableText :text="user.name" :max-length="40" />
               <span v-if="user.id === auth.user?.id" class="ml-1 text-xs font-normal text-gray-500 dark:text-gray-400">(você)</span>
             </td>
-            <td class="whitespace-nowrap px-4 py-3 text-sm text-gray-500 dark:text-gray-400">{{ user.email }}</td>
+            <td class="max-w-72 px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
+              <ExpandableText :text="user.email" :max-length="45" />
+            </td>
             <td class="whitespace-nowrap px-4 py-3 text-right space-x-1" @dblclick.stop>
               <button
                 class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-primary-600 hover:bg-primary-50 dark:text-primary-400 dark:hover:bg-primary-900/30"

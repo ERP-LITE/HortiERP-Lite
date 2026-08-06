@@ -10,6 +10,7 @@ import FilterButton from '@/components/ui/FilterButton.vue'
 import PrintButton from '@/components/ui/PrintButton.vue'
 import SearchInput from '@/components/ui/SearchInput.vue'
 import PeriodPicker from '@/components/ui/PeriodPicker.vue'
+import ExpandableText from '@/components/ui/ExpandableText.vue'
 import type { PeriodValue } from '@/lib/period'
 import { formatDateTime } from '@/lib/format'
 import { getApiErrorMessage } from '@/services/api'
@@ -124,11 +125,16 @@ onMounted(() => {
         <article v-for="movement in movements" v-else :key="movement.id" class="space-y-3 p-4">
           <div class="flex items-start justify-between gap-3">
             <div class="min-w-0">
-              <h2 class="truncate text-sm font-semibold text-gray-900 dark:text-gray-100">
-                {{ movement.product?.name }}
-              </h2>
+              <ExpandableText
+                :text="movement.product?.name"
+                :max-length="45"
+                class="text-sm font-semibold text-gray-900 dark:text-gray-100"
+              />
               <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
                 {{ formatDateTime(movement.createdAt) }}
+              </p>
+              <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+                Por {{ movement.createdByUser?.name || 'Usuário não identificado' }}
               </p>
             </div>
             <BaseBadge :variant="typeVariant[movement.type]">{{ typeLabels[movement.type] }}</BaseBadge>
@@ -145,7 +151,12 @@ onMounted(() => {
               <dd class="mt-0.5 text-sm text-gray-700 dark:text-gray-300">{{ Number(movement.balanceAfter) }}</dd>
             </div>
           </dl>
-          <p v-if="movement.notes" class="text-xs text-gray-500 dark:text-gray-400">{{ movement.notes }}</p>
+          <ExpandableText
+            v-if="movement.notes"
+            :text="movement.notes"
+            :max-length="80"
+            class="text-xs text-gray-500 dark:text-gray-400"
+          />
         </article>
       </div>
       <table class="hidden min-w-full divide-y divide-gray-200 dark:divide-gray-700 sm:table">
@@ -154,6 +165,9 @@ onMounted(() => {
             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Data</th>
             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
               Produto
+            </th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+              Usuário
             </th>
             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Tipo</th>
             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
@@ -169,10 +183,10 @@ onMounted(() => {
         </thead>
         <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
           <tr v-if="loading">
-            <td colspan="6" class="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">Carregando...</td>
+            <td colspan="7" class="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">Carregando...</td>
           </tr>
           <tr v-else-if="movements.length === 0">
-            <td colspan="6" class="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">
+            <td colspan="7" class="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">
               Nenhuma movimentação registrada.
             </td>
           </tr>
@@ -180,8 +194,15 @@ onMounted(() => {
             <td class="px-4 py-3 text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">
               {{ formatDateTime(movement.createdAt) }}
             </td>
-            <td class="px-4 py-3 text-sm font-medium text-gray-900 dark:text-gray-100 whitespace-nowrap">
-              {{ movement.product?.name }}
+            <td class="max-w-72 px-4 py-3 text-sm font-medium text-gray-900 dark:text-gray-100">
+              <ExpandableText :text="movement.product?.name" :max-length="45" />
+            </td>
+            <td class="max-w-64 px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
+              <ExpandableText
+                :text="movement.createdByUser?.name"
+                :max-length="40"
+                empty-text="Usuário não identificado"
+              />
             </td>
             <td class="px-4 py-3 whitespace-nowrap">
               <BaseBadge :variant="typeVariant[movement.type]">{{ typeLabels[movement.type] }}</BaseBadge>
@@ -192,7 +213,9 @@ onMounted(() => {
             <td class="px-4 py-3 text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">
               {{ Number(movement.balanceAfter) }}
             </td>
-            <td class="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">{{ movement.notes || '—' }}</td>
+            <td class="max-w-80 px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
+              <ExpandableText :text="movement.notes" />
+            </td>
           </tr>
         </tbody>
       </table>

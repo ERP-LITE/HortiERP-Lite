@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from 'vue'
 import { Eye } from '@lucide/vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import BaseBadge from '@/components/ui/BaseBadge.vue'
+import ExpandableText from '@/components/ui/ExpandableText.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseModal from '@/components/ui/BaseModal.vue'
 import BaseSelect from '@/components/ui/BaseSelect.vue'
@@ -225,18 +226,21 @@ onMounted(() => {
             <td class="whitespace-nowrap px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
               {{ formatDateTime(log.createdAt) }}
             </td>
-            <td v-if="isTechnical" class="whitespace-nowrap px-4 py-3 text-sm font-medium text-gray-900 dark:text-gray-100">
-              {{ log.companyName || 'Plataforma/visitante' }}
+            <td v-if="isTechnical" class="max-w-64 px-4 py-3 text-sm font-medium text-gray-900 dark:text-gray-100">
+              <ExpandableText :text="log.companyName" :max-length="40" empty-text="Plataforma/visitante" />
             </td>
-            <td class="whitespace-nowrap px-4 py-3 text-sm text-gray-600 dark:text-gray-300">
-              <span class="block font-medium">{{ log.actorName || 'Não identificado' }}</span>
-              <span v-if="log.actorEmail" class="block text-xs text-gray-400">{{ log.actorEmail }}</span>
+            <td class="max-w-72 px-4 py-3 text-sm text-gray-600 dark:text-gray-300">
+              <ExpandableText :text="log.actorName" :max-length="40" empty-text="Não identificado" class="font-medium" />
+              <ExpandableText v-if="log.actorEmail" :text="log.actorEmail" :max-length="45" class="text-xs text-gray-400" />
             </td>
             <td class="min-w-56 px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
               <span class="font-medium">{{ actionLabel(log) }}</span>
-              <span v-if="isTechnical" class="mt-0.5 block font-mono text-xs text-gray-400">
-                {{ log.method }} {{ log.path }} · HTTP {{ log.statusCode }} · {{ log.durationMs }} ms
-              </span>
+              <ExpandableText
+                v-if="isTechnical"
+                :text="`${log.method} ${log.path} · HTTP ${log.statusCode} · ${log.durationMs} ms`"
+                :max-length="65"
+                class="mt-0.5 font-mono text-xs text-gray-400"
+              />
             </td>
             <td v-if="isTechnical" class="whitespace-nowrap px-4 py-3">
               <BaseBadge :variant="levelVariants[log.level]">{{ levelLabels[log.level] }}</BaseBadge>

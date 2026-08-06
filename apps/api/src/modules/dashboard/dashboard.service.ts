@@ -80,7 +80,10 @@ export async function getDashboardSummary(companyId: string, range: { from?: Dat
       gte(stockMovements.createdAt, periodStart),
       lte(stockMovements.createdAt, periodEnd),
     ),
-    with: { product: true },
+    with: {
+      product: true,
+      createdByUser: { columns: { id: true, name: true } },
+    },
     orderBy: desc(stockMovements.createdAt),
     limit: 10,
   })
@@ -125,7 +128,10 @@ export async function getDashboardSummary(companyId: string, range: { from?: Dat
       totalStock: sql<number>`coalesce(sum(${products.currentStock}), 0)`.mapWith(Number),
     })
     .from(categories)
-    .leftJoin(products, and(eq(products.categoryId, categories.id), isNull(products.deletedAt)))
+    .leftJoin(
+      products,
+      and(eq(products.categoryId, categories.id), isNull(products.deletedAt), eq(products.active, true)),
+    )
     .where(and(eq(categories.companyId, companyId), isNull(categories.deletedAt)))
     .groupBy(categories.id, categories.name)
 

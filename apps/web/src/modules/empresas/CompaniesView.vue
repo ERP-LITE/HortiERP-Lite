@@ -4,6 +4,7 @@ import { Pencil, Plus, Wand2 } from '@lucide/vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
+import ExpandableText from '@/components/ui/ExpandableText.vue'
 import BaseModal from '@/components/ui/BaseModal.vue'
 import BaseBadge from '@/components/ui/BaseBadge.vue'
 import BaseToggle from '@/components/ui/BaseToggle.vue'
@@ -178,11 +179,11 @@ onMounted(loadCompanies)
             title="Duplo clique para editar"
             @dblclick="openEditModal(company)"
           >
-            <td class="px-4 py-3 text-sm font-medium text-gray-900 dark:text-gray-100 whitespace-nowrap">
-              {{ company.name }}
+            <td class="max-w-72 px-4 py-3 text-sm font-medium text-gray-900 dark:text-gray-100">
+              <ExpandableText :text="company.name" :max-length="45" />
             </td>
-            <td class="px-4 py-3 text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">
-              {{ company.document || '—' }}
+            <td class="max-w-64 px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
+              <ExpandableText :text="company.document" :max-length="35" />
             </td>
             <td class="px-4 py-3 whitespace-nowrap" @dblclick.stop @click.stop>
               <div class="flex items-center gap-2">

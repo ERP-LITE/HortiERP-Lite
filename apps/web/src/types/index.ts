@@ -123,6 +123,7 @@ export interface StockMovement {
   referenceId: string
   notes: string | null
   createdAt: string
+  createdByUser: { id: string; name: string } | null
   product: Product
 }
 
