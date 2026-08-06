@@ -1,15 +1,15 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { Plus, Trash2 } from '@lucide/vue'
+import { FileUp, Plus, Trash2 } from '@lucide/vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
 import BaseSelect from '@/components/ui/BaseSelect.vue'
 import { getApiErrorMessage } from '@/services/api'
-import { toastSuccess } from '@/lib/alerts'
+import { toastError, toastSuccess } from '@/lib/alerts'
 import { listAllProducts } from '@/services/productsService'
-import { createStockEntry } from '@/services/stockEntriesService'
+import { createStockEntry, uploadStockEntryAttachment } from '@/services/stockEntriesService'
 import type { Product } from '@/types'
 
 interface ItemRow {
@@ -26,6 +26,13 @@ const errorMessage = ref('')
 
 const supplierName = ref('')
 const notes = ref('')
+const invoiceNumber = ref('')
+const invoiceSeries = ref('')
+const invoiceAccessKey = ref('')
+const invoiceIssuedAt = ref('')
+const invoiceTotal = ref('')
+const attachments = ref<File[]>([])
+const invoiceErrors = ref<Record<string, string>>({})
 const items = ref<ItemRow[]>([{ productId: '', quantity: '', unitCost: '' }])
 const itemErrors = ref<{ productId?: string; quantity?: string }[]>([])
 
@@ -53,6 +60,10 @@ async function loadProducts() {
 }
 
 function validate(): boolean {
+  invoiceErrors.value = {}
+  if (invoiceAccessKey.value && !/^\d{44}$/.test(invoiceAccessKey.value)) {
+    invoiceErrors.value.invoiceAccessKey = 'A chave da NF-e deve ter 44 dígitos'
+  }
   itemErrors.value = items.value.map((item) => {
     const rowErrors: { productId?: string; quantity?: string } = {}
     if (!item.productId) rowErrors.productId = 'Selecione o produto'
@@ -60,7 +71,18 @@ function validate(): boolean {
     return rowErrors
   })
 
-  return itemErrors.value.every((rowErrors) => Object.keys(rowErrors).length === 0)
+  return itemErrors.value.every((rowErrors) => Object.keys(rowErrors).length === 0) &&
+    Object.keys(invoiceErrors.value).length === 0
+}
+
+function handleFiles(event: Event) {
+  const input = event.target as HTMLInputElement
+  const selected = Array.from(input.files ?? [])
+  invoiceErrors.value.attachments = ''
+  if (selected.length > 3) invoiceErrors.value.attachments = 'Selecione no máximo 3 arquivos'
+  else if (selected.some((file) => file.size > 10 * 1024 * 1024)) invoiceErrors.value.attachments = 'Cada arquivo pode ter até 10 MB'
+  else attachments.value = selected
+  input.value = ''
 }
 
 async function handleSubmit() {
@@ -70,15 +92,27 @@ async function handleSubmit() {
   saving.value = true
 
   try {
-    await createStockEntry({
+    const entry = await createStockEntry({
       supplierName: supplierName.value || undefined,
       notes: notes.value || undefined,
+      invoiceNumber: invoiceNumber.value || undefined,
+      invoiceSeries: invoiceSeries.value || undefined,
+      invoiceAccessKey: invoiceAccessKey.value || undefined,
+      invoiceIssuedAt: invoiceIssuedAt.value ? `${invoiceIssuedAt.value}T12:00:00` : undefined,
+      invoiceTotal: invoiceTotal.value ? Number(invoiceTotal.value) : undefined,
       items: items.value.map((item) => ({
         productId: item.productId,
         quantity: Number(item.quantity),
         unitCost: item.unitCost ? Number(item.unitCost) : undefined,
       })),
     })
+    try {
+      for (const file of attachments.value) await uploadStockEntryAttachment(entry.id, file)
+    } catch (error) {
+      toastError(getApiErrorMessage(error, 'A entrada foi registrada, mas um anexo não pôde ser enviado'))
+      router.push({ name: 'entradas-detalhes', params: { id: entry.id } })
+      return
+    }
     toastSuccess('Entrada registrada com sucesso')
     router.push({ name: 'entradas' })
   } catch (error) {
@@ -105,6 +139,41 @@ onMounted(loadProducts)
         <BaseInput v-model="supplierName" label="Fornecedor (opcional)" />
         <BaseInput v-model="notes" label="Observações (opcional)" />
       </div>
+
+      <section class="space-y-4 rounded-xl border border-gray-200 p-4 dark:border-gray-700">
+        <div>
+          <h2 class="text-sm font-semibold text-gray-800 dark:text-gray-200">Nota fiscal (opcional)</h2>
+          <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+            Identifique a NF-e e anexe até 3 arquivos XML, PDF ou imagem, com no máximo 10 MB cada.
+          </p>
+        </div>
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <BaseInput v-model="invoiceNumber" label="Número da nota" />
+          <BaseInput v-model="invoiceSeries" label="Série" />
+          <BaseInput v-model="invoiceIssuedAt" type="date" label="Data de emissão" />
+          <BaseInput v-model="invoiceTotal" :decimal-places="2" label="Valor total (R$)" />
+          <div class="sm:col-span-2">
+            <BaseInput
+              v-model="invoiceAccessKey"
+              label="Chave de acesso (44 dígitos)"
+              :error="invoiceErrors.invoiceAccessKey"
+            />
+          </div>
+        </div>
+        <label
+          class="flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-gray-300 px-4 py-4 text-sm text-gray-600 transition-colors hover:border-primary-500 hover:text-primary-600 dark:border-gray-600 dark:text-gray-300"
+        >
+          <FileUp :size="18" />
+          <span>{{ attachments.length ? `${attachments.length} arquivo(s) selecionado(s)` : 'Selecionar anexos da nota' }}</span>
+          <input class="sr-only" type="file" multiple accept=".xml,.pdf,.jpg,.jpeg,.png,.webp" @change="handleFiles" />
+        </label>
+        <p v-if="invoiceErrors.attachments" class="text-xs text-red-600">{{ invoiceErrors.attachments }}</p>
+        <ul v-if="attachments.length" class="space-y-1 text-xs text-gray-500 dark:text-gray-400">
+          <li v-for="file in attachments" :key="`${file.name}-${file.size}`" class="break-all">
+            {{ file.name }} · {{ (file.size / 1024 / 1024).toFixed(2) }} MB
+          </li>
+        </ul>
+      </section>
 
       <div>
         <div class="flex items-center justify-between mb-2">

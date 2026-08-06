@@ -1,6 +1,6 @@
 # HortiERP Lite
 
-Sistema web modular para controle de estoque, entradas de mercadorias e perdas voltado para hortifrutis, frutarias, verdureiras, sacolões e pequenos mercados.
+Sistema web modular para controle de estoque, entradas de mercadorias, notas fiscais vinculadas e perdas voltado para hortifrutis, frutarias, verdureiras, sacolões e pequenos mercados.
 
 Multiempresa: cada empresa-cliente tem seus dados totalmente isolados (produtos, estoque, entradas, perdas, usuários). Empresas-cliente são cadastradas por um usuário `super_admin` pela tela `/empresas`, que também cria o primeiro admin de cada uma.
 

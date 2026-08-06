@@ -4,10 +4,10 @@
 
 - `gateway`: Caddy exposto nas portas 80/443, responsável por HTTPS automático e headers de segurança.
 - `web`: build estático do Vue servido por Nginx numa rede interna.
-- `api`: build TypeScript executado com Node.js como usuário sem privilégios.
+- `api`: build TypeScript executado com Node.js como usuário sem privilégios; grava anexos fiscais no volume privado `invoice_files`.
 - `migrate`: usa a mesma imagem da API e precisa terminar com sucesso antes da API iniciar.
 - `postgres`: acessível apenas pela rede Docker interna, sem porta publicada.
-- `backup`: gera dumps criptografados diariamente, mantém retenção local e envia uma cópia para storage S3 compatível.
+- `backup`: gera dumps do banco e arquivos compactados dos anexos, ambos criptografados diariamente, mantém retenção local e envia cópias para storage S3 compatível.
 
 ## Pré-requisitos
 
@@ -98,8 +98,9 @@ npm run build:web
 ## Backup automático
 
 O container `backup` executa imediatamente ao iniciar e depois repete conforme `BACKUP_INTERVAL_SECONDS` (24 horas
-por padrão). Cada dump usa o formato customizado do PostgreSQL, é criptografado com AES-256/PBKDF2 e recebe um
-arquivo SHA-256. Nenhum dump em texto puro permanece no volume.
+por padrão). Cada dump usa o formato customizado do PostgreSQL; os anexos do volume `invoice_files` são empacotados
+separadamente. Os dois artefatos são criptografados com AES-256/PBKDF2 e recebem arquivos SHA-256. Nenhum dump ou
+arquivo fiscal em texto puro permanece no volume de backup.
 
 Os arquivos ficam no volume `backup_data` e, quando `BACKUP_REMOTE_PATH` está preenchido, também são enviados por
 `rclone` para um storage S3 compatível. O backup local no mesmo servidor não é suficiente para clientes reais;
@@ -120,8 +121,9 @@ docker compose --env-file .env.production -f docker-compose.production.yml ps ba
 
 ## Teste de restauração
 
-O teste usa somente o dump mais recente, cria o banco temporário de nome fixo `hortierp_restore_test`, restaura o
-conteúdo, verifica tabelas essenciais e remove esse banco ao terminar. O banco principal nunca é apagado ou alterado.
+O teste usa o dump mais recente, cria o banco temporário de nome fixo `hortierp_restore_test`, restaura o conteúdo,
+verifica tabelas essenciais e valida checksum, descriptografia e integridade do pacote mais recente de anexos. Depois
+remove o banco temporário. O banco principal e o volume real de anexos nunca são apagados ou alterados.
 
 ```bash
 docker compose --profile maintenance --env-file .env.production \

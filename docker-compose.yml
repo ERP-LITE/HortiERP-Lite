@@ -28,6 +28,7 @@ services:
       - apps/api/.env
     environment:
       DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      INVOICE_STORAGE_PATH: /app/storage/invoices
       CHOKIDAR_USEPOLLING: "true"
       CHOKIDAR_INTERVAL: "500"
     ports:
@@ -35,6 +36,7 @@ services:
     volumes:
       - ./apps/api:/app/apps/api
       - /app/apps/api/node_modules
+      - invoice_files:/app/storage/invoices
     depends_on:
       postgres:
         condition: service_healthy
@@ -70,3 +72,4 @@ services:
 
 volumes:
   postgres_data:
+  invoice_files:
