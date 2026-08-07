@@ -127,4 +127,5 @@ ERP-LITE/
 ├── docs/
 ├── docker-compose.yml
 ├── README.md
-└── CLAUDE.md
+└── claude.md
+```
