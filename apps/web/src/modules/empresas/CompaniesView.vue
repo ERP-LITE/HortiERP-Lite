@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref, watch } from 'vue'
-import { Pencil, Plus, Wand2 } from '@lucide/vue'
+import { Building2, MapPin, Pencil, Plus, UserCog, Wand2 } from '@lucide/vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
@@ -331,33 +331,42 @@ onMounted(loadCompanies)
         <button
           type="button"
           role="tab"
+          aria-label="Dados gerais"
+          title="Dados gerais"
           :aria-selected="modalTab === 'company'"
-          class="flex-1 rounded-md px-3 py-2 text-sm font-medium transition-colors"
+          class="flex flex-1 items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors"
           :class="modalTab === 'company' ? 'bg-white text-primary-700 shadow-sm dark:bg-gray-700 dark:text-primary-300' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'"
           @click="modalTab = 'company'"
         >
-          1. Dados gerais
+          <Building2 :size="17" aria-hidden="true" />
+          <span class="hidden sm:inline">1. Dados gerais</span>
         </button>
         <button
           type="button"
           role="tab"
+          aria-label="Endereço"
+          title="Endereço"
           :aria-selected="modalTab === 'address'"
-          class="flex-1 rounded-md px-3 py-2 text-sm font-medium transition-colors"
+          class="flex flex-1 items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors"
           :class="modalTab === 'address' ? 'bg-white text-primary-700 shadow-sm dark:bg-gray-700 dark:text-primary-300' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'"
           @click="modalTab = 'address'"
         >
-          2. Endereço
+          <MapPin :size="17" aria-hidden="true" />
+          <span class="hidden sm:inline">2. Endereço</span>
         </button>
         <button
           v-if="!editingId"
           type="button"
           role="tab"
+          aria-label="Administrador da empresa"
+          title="Administrador da empresa"
           :aria-selected="modalTab === 'admin'"
-          class="flex-1 rounded-md px-3 py-2 text-sm font-medium transition-colors"
+          class="flex flex-1 items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors"
           :class="modalTab === 'admin' ? 'bg-white text-primary-700 shadow-sm dark:bg-gray-700 dark:text-primary-300' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'"
           @click="modalTab = 'admin'"
         >
-          3. Administrador da empresa
+          <UserCog :size="17" aria-hidden="true" />
+          <span class="hidden sm:inline">3. Administrador da empresa</span>
         </button>
       </div>
 
