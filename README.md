@@ -4,7 +4,7 @@ Sistema web modular para controle de estoque, entradas de mercadorias, notas fis
 
 Multiempresa: cada empresa-cliente tem seus dados totalmente isolados (produtos, estoque, entradas, perdas, usuários). Empresas-cliente são cadastradas por um usuário `super_admin` pela tela `/empresas`, com identificação fiscal, contato, endereço e criação do primeiro administrador em uma única operação.
 
-Ver [CLAUDE.md](./CLAUDE.md) para a visão completa do projeto.
+Ver [claude.md](./claude.md) para a visão completa do projeto.
 
 ## Stack
 
@@ -125,4 +125,4 @@ apagar um upload em andamento. Vale agendar mensalmente em produção.
 
 Antes de atualizar uma instalação existente em produção, siga o roteiro de
 [atualização segura](./docs/deploy-producao.md#atualização-de-uma-instalação-existente). Ele cobre backup prévio,
-migration fiscal, criação do volume privado de anexos, smoke tests e rollback.
+migrations incrementais, volumes persistentes, smoke tests e rollback.

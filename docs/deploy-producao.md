@@ -74,10 +74,17 @@ sh deploy/deploy.sh /caminho/seguro/erp-production.env
 
 ## Atualização de uma instalação existente
 
-Esta versão adiciona dados e anexos privados de notas fiscais às entradas de mercadoria. A atualização é aditiva:
-a migration `0006_brief_scarlet_spider.sql` cria as colunas fiscais e a tabela `stock_entry_attachments`, sem alterar
-estoques ou entradas já existentes. O Compose cria automaticamente o volume persistente `invoice_files`; não remova
-esse volume em atualizações futuras.
+As migrations recentes são aditivas e preservam os registros existentes:
+
+- `0006_brief_scarlet_spider.sql` cria os dados fiscais e anexos privados das entradas;
+- `0007_free_millenium_guard.sql` acrescenta o custo congelado às perdas;
+- `0008_smiling_gauntlet.sql` acrescenta identificação fiscal, contato e endereço às empresas, além do índice único
+  parcial de CNPJ.
+
+Os novos campos de empresa são nuláveis no PostgreSQL para manter compatibilidade com a empresa Plataforma e com
+clientes já cadastrados; novas empresas passam pelo contrato completo da API. Antes de aplicar a `0008` em uma base
+que já possua documentos, confirme que não existem CNPJs repetidos com a mesma representação. O Compose cria
+automaticamente o volume persistente `invoice_files`; não remova esse volume em atualizações futuras.
 
 Não copie `.env.production.example` por cima do `.env.production` existente. Preserve os segredos atuais. A única
 variável nova é opcional:
@@ -130,7 +137,9 @@ Faça também um teste funcional autenticado:
 4. Edite fornecedor ou dados fiscais com admin/gerente e confirme que os itens e o estoque não mudaram.
 5. Confirme que operador não vê a exclusão; admin/gerente deve conseguir excluir após confirmação.
 6. Entre como `super_admin`, acesse uma empresa por impersonação e valide as mesmas ações administrativas.
-7. Gere outro backup e execute o teste de restauração para incluir e validar o pacote de anexos.
+7. Cadastre uma empresa de teste com CNPJ, contato e endereço; confira validação de duplicidade e preenchimento do
+   CEP. Se os provedores externos estiverem indisponíveis, confirme que o endereço ainda aceita digitação manual.
+8. Gere outro backup e execute o teste de restauração para incluir e validar o pacote de anexos.
 
 ```bash
 docker compose --env-file .env.production -f docker-compose.production.yml exec backup backup.sh once
@@ -151,10 +160,11 @@ usado internamente pelo Docker; ele só responde `200` depois de consultar o Pos
 privado de anexos está gravável. Falha em qualquer dependência retorna `503` e impede o deploy de ser marcado como
 concluído.
 
-A checagem do volume não cria arquivo nenhum: ela garante o diretório e testa a permissão de escrita. Um marcador
+A checagem do volume não cria arquivo nenhum: ela garante o diretório e consulta a permissão de escrita. Um marcador
 gravado a cada chamada ficaria misturado aos anexos fiscais e entraria nos backups junto com eles. Volume não
-montado falha ao criar o diretório; sistema de arquivos somente-leitura ou permissão errada falha no teste de
-escrita — os dois casos que o health check precisa pegar.
+montado falha ao criar o diretório e permissão incompatível falha no `access(W_OK)`. Essa verificação não substitui
+monitoramento de espaço livre nem uma gravação real periódica, necessários para detectar disco cheio e alguns erros
+de I/O.
 
 ## Primeiro super administrador
 
@@ -195,10 +205,10 @@ sh deploy/rollback.sh IMAGE_TAG_ANTERIOR
 O rollback não desfaz migrations automaticamente. Migrations novas devem ser compatíveis com a versão anterior ou
 ter um procedimento específico e testado de restauração do banco.
 
-Nesta atualização, a migration fiscal é aditiva e a versão anterior ignora as novas colunas/tabela, portanto o
-rollback apenas da aplicação é possível. O volume `invoice_files` e a migration devem permanecer; não os apague
-durante o rollback. Anexos enviados enquanto a versão nova esteve ativa voltarão a aparecer quando ela for publicada
-novamente.
+As migrations fiscais e cadastrais desta versão são aditivas; versões anteriores ignoram as novas colunas e tabelas,
+portanto o rollback apenas da aplicação é possível. O volume `invoice_files` e as migrations aplicadas devem
+permanecer; não os apague durante o rollback. Anexos e dados cadastrais gravados enquanto a versão nova esteve ativa
+voltarão a aparecer quando ela for publicada novamente.
 
 ## Atualização segura
 
