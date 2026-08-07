@@ -43,10 +43,16 @@ Raiz do multiempresa — cada linha é um cliente (frutaria/hortifrúti) contrat
 | Coluna | Tipo | Observação |
 |---|---|---|
 | `id` | uuid | PK |
-| `name` | text | obrigatório |
-| `document` | text | opcional, texto livre (CNPJ), sem validação de formato |
+| `name`, `legalName` | text | nome fantasia e razão social; os registros anteriores à migration podem ter `legalName` nulo |
+| `document` | text | CNPJ normalizado (14 dígitos), validado na API e único entre empresas não excluídas |
+| `stateRegistration` | text | inscrição estadual opcional |
+| `contactName`, `contactEmail`, `phone` | text | responsável e canais de contato; telefone é persistido apenas com dígitos |
+| `postalCode`, `street`, `addressNumber` | text | CEP normalizado, logradouro e número |
+| `complement`, `district`, `city`, `state` | text | complemento opcional, bairro, cidade e UF com duas letras |
 | `active` | boolean | default `true` — `false` = empresa suspensa, bloqueia login de todos os usuários dela |
 | `createdAt`/`updatedAt`/`deletedAt` | timestamp | |
+
+Os campos cadastrais novos são nuláveis no banco para que empresas criadas antes da migration continuem legíveis. A API exige os dados essenciais ao criar uma empresa nova; editar um registro legado pela tela também solicita sua regularização. CNPJ, telefone e CEP são armazenados sem máscara, que é responsabilidade da interface.
 
 ### `users`
 | Coluna | Tipo | Observação |

@@ -35,7 +35,19 @@ export interface User {
 export interface Company {
   id: string
   name: string
+  legalName: string | null
   document: string | null
+  stateRegistration: string | null
+  contactName: string | null
+  contactEmail: string | null
+  phone: string | null
+  postalCode: string | null
+  street: string | null
+  addressNumber: string | null
+  complement: string | null
+  district: string | null
+  city: string | null
+  state: string | null
   active: boolean
   createdAt: string
   updatedAt: string

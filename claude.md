@@ -18,6 +18,7 @@ Criar um MVP funcional com:
 
 - Login e senha;
 - Controle de usuários;
+- Cadastro comercial completo das empresas-cliente (razão social, CNPJ, contato e endereço);
 - Permissões básicas por perfil;
 - Cadastro de produtos;
 - Cadastro de categorias;

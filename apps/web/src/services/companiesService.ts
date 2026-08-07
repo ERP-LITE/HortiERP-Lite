@@ -2,18 +2,30 @@ import { api } from './api'
 import type { Company, PaginatedResult, SessionResponse } from '@/types'
 import { fetchAllPages } from './paginatedOptions'
 
-export interface CreateCompanyInput {
+export interface CompanyDetailsInput {
   name: string
-  document?: string
+  legalName: string
+  document: string
+  stateRegistration?: string
+  contactName: string
+  contactEmail: string
+  phone: string
+  postalCode: string
+  street: string
+  addressNumber: string
+  complement?: string
+  district: string
+  city: string
+  state: string
+}
+
+export interface CreateCompanyInput extends CompanyDetailsInput {
   adminName: string
   adminEmail: string
   adminPassword: string
 }
 
-export interface UpdateCompanyInput {
-  name?: string
-  document?: string
-}
+export type UpdateCompanyInput = CompanyDetailsInput
 
 export interface ListCompaniesParams {
   sortBy?: string

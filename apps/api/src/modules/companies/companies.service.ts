@@ -19,8 +19,27 @@ function assertUniqueAdminEmail(email: string) {
   })
 }
 
+function assertUniqueCompanyDocument(document: string, excludeId?: string) {
+  return assertUniqueField({
+    table: companies,
+    idColumn: companies.id,
+    valueColumn: companies.document,
+    value: document,
+    field: 'document',
+    message: 'Já existe uma empresa com esse CNPJ',
+    deletedAtColumn: companies.deletedAt,
+    excludeId,
+  })
+}
+
 function isUniqueViolation(error: unknown): boolean {
   return typeof error === 'object' && error !== null && 'code' in error && (error as { code: unknown }).code === '23505'
+}
+
+function uniqueConstraint(error: unknown): string | undefined {
+  return typeof error === 'object' && error !== null && 'constraint' in error && typeof error.constraint === 'string'
+    ? error.constraint
+    : undefined
 }
 
 function platformCompanyIdsSubquery() {
@@ -40,7 +59,15 @@ async function isPlatformCompany(companyId: string): Promise<boolean> {
 export async function listCompanies(query: ListCompaniesQuery) {
   const conditions = [isNull(companies.deletedAt), notInArray(companies.id, platformCompanyIdsSubquery())]
   if (query.search) {
-    conditions.push(or(ilike(companies.name, `%${query.search}%`), ilike(companies.document, `%${query.search}%`))!)
+    const term = `%${query.search}%`
+    conditions.push(
+      or(
+        ilike(companies.name, term),
+        ilike(companies.legalName, term),
+        ilike(companies.document, term),
+        ilike(companies.contactEmail, term),
+      )!,
+    )
   }
   const where = and(...conditions)
   const orderBy = orderByColumn(query.sortBy ? companies[query.sortBy] : companies.name, query.sortOrder)
@@ -71,7 +98,7 @@ export async function getCompany(id: string) {
 }
 
 export async function createCompanyWithAdmin(data: CreateCompanyInput) {
-  await assertUniqueAdminEmail(data.adminEmail)
+  await Promise.all([assertUniqueAdminEmail(data.adminEmail), assertUniqueCompanyDocument(data.document)])
 
   const passwordHash = await bcrypt.hash(data.adminPassword, 10)
 
@@ -79,7 +106,22 @@ export async function createCompanyWithAdmin(data: CreateCompanyInput) {
     return await db.transaction(async (tx) => {
       const [company] = await tx
         .insert(companies)
-        .values({ name: data.name, document: data.document })
+        .values({
+          name: data.name,
+          legalName: data.legalName,
+          document: data.document,
+          stateRegistration: data.stateRegistration,
+          contactName: data.contactName,
+          contactEmail: data.contactEmail,
+          phone: data.phone,
+          postalCode: data.postalCode,
+          street: data.street,
+          addressNumber: data.addressNumber,
+          complement: data.complement,
+          district: data.district,
+          city: data.city,
+          state: data.state,
+        })
         .returning()
 
       const [admin] = await tx
@@ -99,7 +141,12 @@ export async function createCompanyWithAdmin(data: CreateCompanyInput) {
       }
     })
   } catch (error) {
-    if (isUniqueViolation(error)) throw AppError.duplicate('adminEmail', 'Já existe um usuário com esse e-mail')
+    if (isUniqueViolation(error)) {
+      if (uniqueConstraint(error) === 'companies_document_active_unique') {
+        throw AppError.duplicate('document', 'Já existe uma empresa com esse CNPJ')
+      }
+      throw AppError.duplicate('adminEmail', 'Já existe um usuário com esse e-mail')
+    }
     throw error
   }
 }
@@ -116,6 +163,7 @@ export async function assertCompanyAccessible(companyId: string) {
 
 export async function updateCompany(id: string, data: UpdateCompanyInput) {
   await getCompany(id)
+  if (data.document) await assertUniqueCompanyDocument(data.document, id)
 
   const [company] = await db
     .update(companies)

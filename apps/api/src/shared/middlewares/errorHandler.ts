@@ -43,6 +43,7 @@ export function errorHandler(error: FastifyError | Error, request: FastifyReques
       },
       products_company_name_active_unique: { field: 'name', message: 'Já existe um produto com esse nome' },
       products_company_sku_active_unique: { field: 'sku', message: 'Já existe um produto com esse SKU' },
+      companies_document_active_unique: { field: 'document', message: 'Já existe uma empresa com esse CNPJ' },
       users_email_unique: { field: 'email', message: 'Já existe um usuário com esse e-mail' },
     }
     const duplicate = duplicateByConstraint[constraint]
