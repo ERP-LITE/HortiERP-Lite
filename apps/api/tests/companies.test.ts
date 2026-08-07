@@ -39,3 +39,75 @@ describe('impersonação', () => {
     assert.equal(suspendedResponse.statusCode, 401)
   })
 })
+
+describe('cadastro de empresas', () => {
+  async function superAdminFixture(suffix: string) {
+    const [platform] = await db.insert(companies).values({ name: 'Plataforma' }).returning({ id: companies.id })
+    return createUser(platform.id, 'super_admin', suffix)
+  }
+
+  const companyPayload = {
+    name: 'Mercado da Praça',
+    legalName: 'Mercado da Praça Ltda',
+    document: '11.222.333/0001-81',
+    stateRegistration: '123456789',
+    contactName: 'Maria Silva',
+    contactEmail: 'contato@mercadodapraca.test',
+    phone: '(11) 99999-8888',
+    postalCode: '01001-000',
+    street: 'Praça da Sé',
+    addressNumber: '100',
+    complement: 'Loja 2',
+    district: 'Sé',
+    city: 'São Paulo',
+    state: 'sp',
+    adminName: 'Administradora',
+    adminEmail: 'admin@mercadodapraca.test',
+    adminPassword: 'senha-forte-123',
+  }
+
+  test('cria empresa com identificação, contato e endereço normalizados', async () => {
+    const superAdmin = await superAdminFixture('company-create')
+    const response = await ctx.app.inject({
+      method: 'POST',
+      url: '/api/companies',
+      headers: { cookie: authCookie(ctx.app, superAdmin) },
+      payload: companyPayload,
+    })
+
+    assert.equal(response.statusCode, 201)
+    const result = response.json<{ company: { document: string; phone: string; postalCode: string; state: string } }>()
+    assert.equal(result.company.document, '11222333000181')
+    assert.equal(result.company.phone, '11999998888')
+    assert.equal(result.company.postalCode, '01001000')
+    assert.equal(result.company.state, 'SP')
+  })
+
+  test('rejeita CNPJ inválido e impede CNPJ duplicado', async () => {
+    const superAdmin = await superAdminFixture('company-validation')
+    const invalid = await ctx.app.inject({
+      method: 'POST',
+      url: '/api/companies',
+      headers: { cookie: authCookie(ctx.app, superAdmin) },
+      payload: { ...companyPayload, document: '11.111.111/1111-11' },
+    })
+    assert.equal(invalid.statusCode, 422)
+
+    const first = await ctx.app.inject({
+      method: 'POST',
+      url: '/api/companies',
+      headers: { cookie: authCookie(ctx.app, superAdmin) },
+      payload: companyPayload,
+    })
+    assert.equal(first.statusCode, 201)
+
+    const duplicate = await ctx.app.inject({
+      method: 'POST',
+      url: '/api/companies',
+      headers: { cookie: authCookie(ctx.app, superAdmin) },
+      payload: { ...companyPayload, adminEmail: 'outro-admin@test.local' },
+    })
+    assert.equal(duplicate.statusCode, 409)
+    assert.match(duplicate.body, /CNPJ/)
+  })
+})
