@@ -11,6 +11,7 @@ const props = defineProps<{
     lossesCount: number
     totalsByUnit: DashboardQuantityByUnit[]
     products: DashboardProductQuantity[]
+    otherProductsCount: number
   }[]
 }>()
 
@@ -49,15 +50,20 @@ function showTooltip(event: MouseEvent | FocusEvent, item: (typeof sorted.value)
     label: 'Quantidade perdida',
     value: `${item.lossesCount} ${item.lossesCount === 1 ? 'registro' : 'registros'}`,
     color,
-    details: buildDetails(item.totalsByUnit, item.products),
+    details: buildDetails(item.totalsByUnit, item.products, item.otherProductsCount),
   }
 }
 
-function buildDetails(totals: DashboardQuantityByUnit[], products: DashboardProductQuantity[]) {
+// A API já corta a lista nos produtos de maior quantidade e informa quantos
+// sobraram, então aqui é só montar as linhas.
+function buildDetails(
+  totals: DashboardQuantityByUnit[],
+  products: DashboardProductQuantity[],
+  otherProductsCount: number,
+) {
   const lines = totals.map((item) => `Total: ${formatNumber(item.quantity)} ${item.unitAbbreviation}`)
-  const visible = [...products].sort((a, b) => a.productName.localeCompare(b.productName, 'pt-BR')).slice(0, 4)
-  lines.push(...visible.map((item) => `${item.productName}: ${formatNumber(item.quantity)} ${item.unitAbbreviation}`))
-  if (products.length > visible.length) lines.push(`+ ${products.length - visible.length} outros produtos`)
+  lines.push(...products.map((item) => `${item.productName}: ${formatNumber(item.quantity)} ${item.unitAbbreviation}`))
+  if (otherProductsCount > 0) lines.push(`+ ${otherProductsCount} outros produtos`)
   return lines
 }
 

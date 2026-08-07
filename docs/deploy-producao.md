@@ -151,6 +151,11 @@ usado internamente pelo Docker; ele só responde `200` depois de consultar o Pos
 privado de anexos está gravável. Falha em qualquer dependência retorna `503` e impede o deploy de ser marcado como
 concluído.
 
+A checagem do volume não cria arquivo nenhum: ela garante o diretório e testa a permissão de escrita. Um marcador
+gravado a cada chamada ficaria misturado aos anexos fiscais e entraria nos backups junto com eles. Volume não
+montado falha ao criar o diretório; sistema de arquivos somente-leitura ou permissão errada falha no teste de
+escrita — os dois casos que o health check precisa pegar.
+
 ## Primeiro super administrador
 
 Depois do primeiro deploy, crie a empresa Plataforma e o primeiro acesso sem registrar a senha no histórico do shell:
@@ -228,6 +233,21 @@ Confira o histórico e o health check:
 docker compose --env-file .env.production -f docker-compose.production.yml logs --tail=100 backup
 docker compose --env-file .env.production -f docker-compose.production.yml ps backup
 ```
+
+## Limpeza de anexos órfãos
+
+O upload de nota grava o arquivo em disco antes de inserir a linha em `stock_entry_attachments`. Uma queda da API ou
+do container entre as duas etapas deixa um arquivo sem dono, e nenhum fluxo da aplicação o remove — ele passa a
+ocupar o volume `invoice_files` e a entrar em todos os backups criptografados junto com os anexos legítimos.
+
+```bash
+docker compose --env-file .env.production -f docker-compose.production.yml exec api npm run invoices:cleanup -- --dry-run
+docker compose --env-file .env.production -f docker-compose.production.yml exec api npm run invoices:cleanup
+```
+
+O script só apaga arquivos que não têm registro correspondente **e** foram modificados há mais de 24 horas; a
+carência evita remover um upload em andamento. Comece sempre pelo `--dry-run`, que lista os candidatos sem tocar em
+nada. Agende mensalmente — a frequência não precisa ser alta, já que só quedas no meio de um upload geram órfãos.
 
 ## Teste de restauração
 

@@ -1,4 +1,5 @@
-import { and, asc, count, desc, eq, ilike, isNull, or } from 'drizzle-orm'
+import { and, asc, count, eq, ilike, isNull, or } from 'drizzle-orm'
+import { orderByColumn } from '../../shared/db/sorting.js'
 import { db } from '../../db/client.js'
 import { categories } from '../../db/schema/index.js'
 import { AppError } from '../../shared/errors/AppError.js'
@@ -28,8 +29,7 @@ export async function listCategories(companyId: string, query: ListCategoriesQue
     conditions.push(or(ilike(categories.name, `%${query.search}%`), ilike(categories.description, `%${query.search}%`))!)
   }
   const where = and(...conditions)
-  const sortColumn = query.sortBy ? categories[query.sortBy] : categories.name
-  const orderBy = query.sortOrder === 'desc' ? desc(sortColumn) : asc(sortColumn)
+  const orderBy = orderByColumn(query.sortBy ? categories[query.sortBy] : categories.name, query.sortOrder)
 
   const [data, [{ total }]] = await Promise.all([
     db

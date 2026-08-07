@@ -22,6 +22,12 @@ O histórico e o relatório de entradas exibem o nome do usuário de `createdBy`
 
 Depois de criar a entrada, a interface envia até 3 anexos pelos endpoints `/stock-entries/:id/attachments`. São aceitos XML, PDF, JPG, PNG e WEBP, com limite padrão de 10 MB por arquivo. Os arquivos não ficam em pasta pública: a API grava nomes aleatórios no volume privado configurado por `INVOICE_STORAGE_PATH`, enquanto `stock_entry_attachments` mantém nome original, MIME type, tamanho e autoria. Todo acesso valida o `companyId` da sessão; imagens e PDFs podem ser pré-visualizados, e XML é entregue somente como download. A assinatura do conteúdo é conferida para impedir que apenas a extensão/MIME seja falsificada. A listagem permite pesquisar também pelo número ou pela chave de acesso da nota. Administradores e gerentes podem excluir anexos definitivamente; operadores podem enviar, visualizar e baixar, mas não excluir. Uploads simultâneos da mesma entrada são serializados no banco para preservar o limite de 3 arquivos.
 
+A ordem das etapas do upload é deliberada: a transferência e a validação do conteúdo acontecem **fora** de qualquer transação, e só depois abre-se uma transação curta com `pg_advisory_xact_lock` para reconferir a contagem e inserir o registro. Fazer a gravação dentro da transação faria um cliente lento segurar uma conexão do pool e o lock da entrada durante toda a transferência — poucos envios simultâneos de 10 MB bastariam para travar a API inteira. Antes de aceitar os bytes há ainda uma contagem sem lock, só para recusar cedo uma entrada que já está cheia; a contagem que vale é a de dentro da transação. Se qualquer etapa falhar, o arquivo já gravado é removido do disco.
+
+A rota de upload tem rate limit próprio de **10 requisições por minuto**, bem abaixo do teto global de 300: cada chamada aqui pode gravar até `INVOICE_MAX_FILE_SIZE` em disco, e o limite global permitiria encher o volume em poucos minutos. Anexar nota é uma ação manual, então o teto baixo não atrapalha o uso real.
+
+Sobra um caso que nenhuma dessas proteções cobre: se a API cair entre a gravação do arquivo e o insert, o arquivo fica no disco sem dono, e nada no fluxo normal o remove. O comando `npm run invoices:cleanup` varre o diretório, compara com `stock_entry_attachments` e apaga o que não tem registro há mais de 24 horas (a carência protege uploads em andamento). Aceita `--dry-run`. Vale agendar mensalmente em produção — sem isso os restos só acumulam, ocupando volume e entrando nos backups criptografados junto com os anexos legítimos.
+
 Se um upload falhar depois do registro da entrada, o lançamento de estoque permanece válido e a tela de detalhes permite adicionar novamente o anexo ausente. Essa separação evita manter uma transação de banco aberta durante transferência de arquivo.
 
 Administradores e gerentes podem corrigir posteriormente fornecedor, observações e os dados fiscais da entrada. Produtos, quantidades e custos permanecem imutáveis nesse fluxo para não alterar retroativamente o estoque; uma correção de quantidades deve ser feita pelo fluxo auditável de ajuste de estoque.
@@ -32,7 +38,7 @@ Tela `/perdas`. Rota `POST /losses`, service `losses.service.ts::createLoss`. Me
 
 1. Pelo helper compartilhado `applyStockMovement`, **subtrai e valida o saldo numa única atualização atômica** (`currentStock >= quantidade`). A condição é reavaliada pelo PostgreSQL mesmo quando existem perdas simultâneas.
 2. Se o produto não existir, rejeita com `404`; se existir mas não houver saldo suficiente, rejeita com `422 INSUFFICIENT_STOCK`.
-3. Insere a linha em `losses` (motivo: `vencido` / `avariado` / `roubo_furto` / `erro_operacional` / `outro`).
+3. Insere a linha em `losses` (motivo: `vencido` / `avariado` / `roubo_furto` / `erro_operacional` / `outro`), congelando em `unitCost` o `costPrice` que o produto tem naquele momento — assim o valor perdido do passado não muda quando o custo do produto é reajustado depois.
 4. Grava um `stock_movements` com `type: 'perda'`, **quantidade negativa** e `balanceAfter` = novo saldo retornado pelo banco.
 
 Tudo em uma transação — perda só é registrada se o estoque puder de fato ser decrementado.
@@ -62,7 +68,13 @@ O payload sempre é `{ notes, items: [{ productId, quantity }] }` — a correç�
 
 ## Dashboard
 
-`GET /dashboard/summary` agrega, para o período selecionado: total de produtos ativos, quantidade com estoque baixo, valor de estoque (soma de `currentStock * costPrice`), contagem/quantidade de perdas no período, timeline diária de entradas × perdas, distribuição do estoque **ativo** por categoria e de perdas por motivo, e as 10 movimentações mais recentes dentro do mesmo período. O card de movimentações exibe explicitamente o intervalo aplicado. Produtos inativos não entram nos totais nem na distribuição por categoria.
+`GET /dashboard/summary` agrega, para o período selecionado: total de produtos ativos, quantidade com estoque baixo, valor de estoque (soma de `currentStock * costPrice`), valor perdido no período, timeline diária de entradas × perdas × ajustes, distribuição dos produtos **ativos** por categoria e de perdas por motivo, e as 10 movimentações mais recentes dentro do mesmo período. O card de movimentações exibe explicitamente o intervalo aplicado. Produtos inativos não entram nos totais nem na distribuição por categoria.
+
+**Quantidades nunca são somadas entre unidades de medida diferentes.** Somar 3 kg com 2 caixas não significa nada, então cada agrupamento devolve `totalsByUnit` — um total por unidade — em vez de um número único. Por consequência, os gráficos que precisam de um valor escalar por fatia usam grandezas que somam entre unidades: o gráfico de categorias plota **quantidade de produtos** (por isso se chama "Produtos por categoria", não "Estoque por categoria") e o de perdas plota **quantidade de registros**; as quantidades por unidade aparecem no tooltip.
+
+O valor perdido usa `losses.unitCost`, o custo congelado no momento em que a perda foi registrada. Perdas anteriores a essa coluna têm `unitCost` nulo e caem no `costPrice` atual do produto — nesses registros históricos, reajustar o custo de um produto move o valor perdido do passado.
+
+Cada agrupamento também traz um detalhamento por produto, limitado aos maiores em quantidade (`TOP_PRODUCTS_PER_GROUP`, hoje 5) mais um `otherProductsCount` com quantos ficaram de fora. O endpoint não é paginado e o tooltip só exibe alguns itens: sem esse corte, um período de 90 dias com centenas de produtos girando produzia dezenas de milhares de objetos num único JSON que a tela nunca chegava a mostrar.
 
 Contagens, somas e agrupamentos são calculados no PostgreSQL; produtos e perdas completos não são carregados em memória apenas para produzir os totais. Categorias excluídas logicamente não participam dos agrupamentos.
 

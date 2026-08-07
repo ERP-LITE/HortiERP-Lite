@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { describe, test } from 'node:test'
 import { eq } from 'drizzle-orm'
 import { db } from '../src/db/client.js'
-import { categories, companies, users } from '../src/db/schema/index.js'
+import { categories, companies, losses, products, users } from '../src/db/schema/index.js'
 import { authCookie, createTenant, setupTestApp } from './helpers.js'
 
 const ctx = setupTestApp()
@@ -67,6 +67,53 @@ describe('isolamento multiempresa e permissões', () => {
     const result = response.json<{ data: Array<{ name: string }>; total: number }>()
     assert.equal(result.total, 3)
     assert.deepEqual(result.data.map(({ name }) => name), ['Zimbro', 'Categoria sorting'])
+  })
+
+  test('ordenação decrescente mantém registros sem valor no fim da lista', async () => {
+    const tenant = await createTenant('nulos')
+    await db.insert(products).values([
+      {
+        companyId: tenant.companyId,
+        categoryId: tenant.categoryId,
+        unitId: tenant.unitId,
+        name: 'Com custo',
+        costPrice: '10.00',
+        createdBy: tenant.admin.id,
+      },
+    ])
+
+    const response = await ctx.app.inject({
+      method: 'GET',
+      url: '/api/products?page=1&pageSize=10&sortBy=costPrice&sortOrder=desc',
+      headers: { cookie: authCookie(ctx.app, tenant.admin) },
+    })
+
+    assert.equal(response.statusCode, 200)
+    const result = response.json<{ data: Array<{ name: string; costPrice: string | null }> }>()
+    // O produto criado pelo fixture não tem custo: no Postgres, `desc` traz
+    // nulos primeiro por padrão, então ele subiria ao topo sem o `nulls last`.
+    assert.deepEqual(result.data.map(({ name }) => name), ['Com custo', 'Produto nulos'])
+  })
+
+  test('ordenação por motivo de perda segue a ordem alfabética dos rótulos da tela', async () => {
+    const tenant = await createTenant('motivos', '100')
+    await db.insert(losses).values([
+      { companyId: tenant.companyId, productId: tenant.productId, quantity: '1', reason: 'vencido', createdBy: tenant.admin.id },
+      { companyId: tenant.companyId, productId: tenant.productId, quantity: '1', reason: 'avariado', createdBy: tenant.admin.id },
+      { companyId: tenant.companyId, productId: tenant.productId, quantity: '1', reason: 'outro', createdBy: tenant.admin.id },
+    ])
+
+    const response = await ctx.app.inject({
+      method: 'GET',
+      url: '/api/losses?page=1&pageSize=10&sortBy=reason&sortOrder=asc',
+      headers: { cookie: authCookie(ctx.app, tenant.admin) },
+    })
+
+    assert.equal(response.statusCode, 200)
+    const result = response.json<{ data: Array<{ reason: string }> }>()
+    // Rótulos: Avariado, Outro, Vencido. A ordem de declaração do enum é
+    // outra (vencido → avariado → ... → outro) e não serviria aqui.
+    assert.deepEqual(result.data.map(({ reason }) => reason), ['avariado', 'outro', 'vencido'])
   })
 })
 

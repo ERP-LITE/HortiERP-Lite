@@ -14,8 +14,11 @@ const props = defineProps<{
     perdaByUnit: DashboardQuantityByUnit[]
     ajusteByUnit: DashboardQuantityByUnit[]
     entradaProducts: DashboardProductQuantity[]
+    entradaOtherProductsCount: number
     perdaProducts: DashboardProductQuantity[]
+    perdaOtherProductsCount: number
     ajusteProducts: DashboardProductQuantity[]
+    ajusteOtherProductsCount: number
   }[]
 }>()
 
@@ -57,8 +60,11 @@ const bars = computed(() => {
       perdaByUnit: day.perdaByUnit,
       ajusteByUnit: day.ajusteByUnit,
       entradaProducts: day.entradaProducts,
+      entradaOtherProductsCount: day.entradaOtherProductsCount,
       perdaProducts: day.perdaProducts,
+      perdaOtherProductsCount: day.perdaOtherProductsCount,
       ajusteProducts: day.ajusteProducts,
+      ajusteOtherProductsCount: day.ajusteOtherProductsCount,
       entradaX: slotX + gap,
       perdaX: slotX + gap * 2 + barWidth,
       ajusteX: slotX + gap * 3 + barWidth * 2,
@@ -91,6 +97,7 @@ function showTooltip(
   count: number,
   quantities: DashboardQuantityByUnit[],
   products: DashboardProductQuantity[],
+  otherProductsCount: number,
 ) {
   const bounds = chartContainer.value?.getBoundingClientRect()
   if (!bounds) return
@@ -103,17 +110,22 @@ function showTooltip(
     label: type,
     value: `${count} ${count === 1 ? 'movimentação' : 'movimentações'}`,
     color: type === 'Entrada' ? STATUS_GOOD : type === 'Perda' ? STATUS_CRITICAL : STATUS_NEUTRAL,
-    details: buildDetails(quantities, products),
+    details: buildDetails(quantities, products, otherProductsCount),
   }
 }
 
-function buildDetails(quantities: DashboardQuantityByUnit[], products: DashboardProductQuantity[]) {
+// A API já corta a lista nos produtos de maior quantidade e informa quantos
+// sobraram, então aqui é só montar as linhas.
+function buildDetails(
+  quantities: DashboardQuantityByUnit[],
+  products: DashboardProductQuantity[],
+  otherProductsCount: number,
+) {
   const totals = quantities.map((item) => `Total: ${formatNumber(item.quantity)} ${item.unitAbbreviation}`)
-  const visibleProducts = [...products].sort((a, b) => a.productName.localeCompare(b.productName, 'pt-BR')).slice(0, 4)
-  const productLines = visibleProducts.map(
+  const productLines = products.map(
     (item) => `${item.productName}: ${formatNumber(item.quantity)} ${item.unitAbbreviation}`,
   )
-  if (products.length > visibleProducts.length) productLines.push(`+ ${products.length - visibleProducts.length} outros produtos`)
+  if (otherProductsCount > 0) productLines.push(`+ ${otherProductsCount} outros produtos`)
   return totals.length ? [...totals, ...productLines] : ['Nenhuma quantidade registrada']
 }
 
@@ -170,10 +182,10 @@ function hideTooltip() {
           tabindex="0"
           role="img"
           :aria-label="`${formatDayLabel(bar.date)}, ${bar.entradaCount} movimentações de entrada`"
-          @mouseenter="showTooltip($event, bar.date, 'Entrada', bar.entradaCount, bar.entradaByUnit, bar.entradaProducts)"
-          @mousemove="showTooltip($event, bar.date, 'Entrada', bar.entradaCount, bar.entradaByUnit, bar.entradaProducts)"
+          @mouseenter="showTooltip($event, bar.date, 'Entrada', bar.entradaCount, bar.entradaByUnit, bar.entradaProducts, bar.entradaOtherProductsCount)"
+          @mousemove="showTooltip($event, bar.date, 'Entrada', bar.entradaCount, bar.entradaByUnit, bar.entradaProducts, bar.entradaOtherProductsCount)"
           @mouseleave="hideTooltip"
-          @focus="showTooltip($event, bar.date, 'Entrada', bar.entradaCount, bar.entradaByUnit, bar.entradaProducts)"
+          @focus="showTooltip($event, bar.date, 'Entrada', bar.entradaCount, bar.entradaByUnit, bar.entradaProducts, bar.entradaOtherProductsCount)"
           @blur="hideTooltip"
         />
         <rect
@@ -187,10 +199,10 @@ function hideTooltip() {
           tabindex="0"
           role="img"
           :aria-label="`${formatDayLabel(bar.date)}, ${bar.ajusteCount} ajustes de estoque`"
-          @mouseenter="showTooltip($event, bar.date, 'Ajuste', bar.ajusteCount, bar.ajusteByUnit, bar.ajusteProducts)"
-          @mousemove="showTooltip($event, bar.date, 'Ajuste', bar.ajusteCount, bar.ajusteByUnit, bar.ajusteProducts)"
+          @mouseenter="showTooltip($event, bar.date, 'Ajuste', bar.ajusteCount, bar.ajusteByUnit, bar.ajusteProducts, bar.ajusteOtherProductsCount)"
+          @mousemove="showTooltip($event, bar.date, 'Ajuste', bar.ajusteCount, bar.ajusteByUnit, bar.ajusteProducts, bar.ajusteOtherProductsCount)"
           @mouseleave="hideTooltip"
-          @focus="showTooltip($event, bar.date, 'Ajuste', bar.ajusteCount, bar.ajusteByUnit, bar.ajusteProducts)"
+          @focus="showTooltip($event, bar.date, 'Ajuste', bar.ajusteCount, bar.ajusteByUnit, bar.ajusteProducts, bar.ajusteOtherProductsCount)"
           @blur="hideTooltip"
         />
         <rect
@@ -204,10 +216,10 @@ function hideTooltip() {
           tabindex="0"
           role="img"
           :aria-label="`${formatDayLabel(bar.date)}, ${bar.perdaCount} movimentações de perda`"
-          @mouseenter="showTooltip($event, bar.date, 'Perda', bar.perdaCount, bar.perdaByUnit, bar.perdaProducts)"
-          @mousemove="showTooltip($event, bar.date, 'Perda', bar.perdaCount, bar.perdaByUnit, bar.perdaProducts)"
+          @mouseenter="showTooltip($event, bar.date, 'Perda', bar.perdaCount, bar.perdaByUnit, bar.perdaProducts, bar.perdaOtherProductsCount)"
+          @mousemove="showTooltip($event, bar.date, 'Perda', bar.perdaCount, bar.perdaByUnit, bar.perdaProducts, bar.perdaOtherProductsCount)"
           @mouseleave="hideTooltip"
-          @focus="showTooltip($event, bar.date, 'Perda', bar.perdaCount, bar.perdaByUnit, bar.perdaProducts)"
+          @focus="showTooltip($event, bar.date, 'Perda', bar.perdaCount, bar.perdaByUnit, bar.perdaProducts, bar.perdaOtherProductsCount)"
           @blur="hideTooltip"
         />
         <text

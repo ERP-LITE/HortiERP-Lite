@@ -1,4 +1,5 @@
 import { and, asc, count, desc, eq, gte, ilike, inArray, isNull, lte } from 'drizzle-orm'
+import { MOVEMENT_TYPE_LABEL_ORDER, orderByColumn, orderByLabeledEnum } from '../../shared/db/sorting.js'
 import { db } from '../../db/client.js'
 import { products, stockMovements } from '../../db/schema/index.js'
 import { AppError } from '../../shared/errors/AppError.js'
@@ -13,8 +14,7 @@ export async function listCurrentStock(companyId: string, query: ListStockQuery)
   if (query.categoryId) conditions.push(eq(products.categoryId, query.categoryId))
   if (query.lowStockOnly) conditions.push(lte(products.currentStock, products.minStock))
   const where = and(...conditions)
-  const stockSortColumn = query.sortBy ? products[query.sortBy] : products.name
-  const stockOrderBy = query.sortOrder === 'desc' ? desc(stockSortColumn) : asc(stockSortColumn)
+  const stockOrderBy = orderByColumn(query.sortBy ? products[query.sortBy] : products.name, query.sortOrder)
 
   const [data, [{ total }]] = await Promise.all([
     db.query.products.findMany({
@@ -40,8 +40,10 @@ export async function listStockMovements(companyId: string, query: ListStockMove
   if (query.from) conditions.push(gte(stockMovements.createdAt, query.from))
   if (query.to) conditions.push(lte(stockMovements.createdAt, query.to))
   const where = and(...conditions)
-  const movementSortColumn = query.sortBy ? stockMovements[query.sortBy] : stockMovements.createdAt
-  const movementOrderBy = query.sortOrder === 'asc' ? asc(movementSortColumn) : desc(movementSortColumn)
+  const movementOrderBy =
+    query.sortBy === 'type'
+      ? orderByLabeledEnum(stockMovements.type, MOVEMENT_TYPE_LABEL_ORDER, query.sortOrder)
+      : orderByColumn(query.sortBy ? stockMovements[query.sortBy] : stockMovements.createdAt, query.sortOrder, 'desc')
 
   const [data, [{ total }]] = await Promise.all([
     db.query.stockMovements.findMany({

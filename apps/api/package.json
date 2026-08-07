@@ -11,6 +11,7 @@
     "db:migrate": "tsx src/db/migrate.ts",
     "db:seed": "tsx src/db/seed.ts",
     "db:seed:platform": "tsx src/db/seedPlatform.ts",
+    "invoices:cleanup": "tsx src/scripts/cleanupInvoiceOrphans.ts",
     "test": "sh scripts/test-integration.sh",
     "test:run": "tsx --test --test-concurrency=1 tests/**/*.test.ts"
   },

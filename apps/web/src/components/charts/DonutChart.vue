@@ -10,6 +10,7 @@ const props = defineProps<{
     value: number
     totalsByUnit: DashboardQuantityByUnit[]
     products: DashboardProductQuantity[]
+    otherProductsCount: number
   }[]
 }>()
 
@@ -68,15 +69,21 @@ function showTooltip(event: MouseEvent | FocusEvent, segment: (typeof segments.v
     value: `${segment.value} ${segment.value === 1 ? 'produto' : 'produtos'}`,
     color: segment.color,
     detail: `${(segment.fraction * 100).toFixed(1)}% dos produtos em estoque`,
-    details: buildDetails(segment.totalsByUnit, segment.products),
+    details: buildDetails(segment.totalsByUnit, segment.products, segment.otherProductsCount),
   }
 }
 
-function buildDetails(totals: DashboardQuantityByUnit[], products: DashboardProductQuantity[]) {
+// A API já devolve só os produtos de maior quantidade do grupo, junto com
+// quantos ficaram de fora — por isso a contagem de "outros" vem pronta em vez
+// de ser deduzida do tamanho da lista.
+function buildDetails(
+  totals: DashboardQuantityByUnit[],
+  products: DashboardProductQuantity[],
+  otherProductsCount: number,
+) {
   const lines = totals.map((item) => `Total: ${formatNumber(item.quantity)} ${item.unitAbbreviation}`)
-  const visible = [...products].sort((a, b) => a.productName.localeCompare(b.productName, 'pt-BR')).slice(0, 4)
-  lines.push(...visible.map((item) => `${item.productName}: ${formatNumber(item.quantity)} ${item.unitAbbreviation}`))
-  if (products.length > visible.length) lines.push(`+ ${products.length - visible.length} outros produtos`)
+  lines.push(...products.map((item) => `${item.productName}: ${formatNumber(item.quantity)} ${item.unitAbbreviation}`))
+  if (otherProductsCount > 0) lines.push(`+ ${otherProductsCount} outros produtos`)
   return lines
 }
 

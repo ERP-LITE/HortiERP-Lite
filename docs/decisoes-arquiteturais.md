@@ -76,6 +76,18 @@ Os detalhamentos dos relatórios de perdas e entradas também seguem esse contra
 
 Campos textuais potencialmente extensos nas tabelas usam o componente compartilhado `ExpandableText`: a célula mantém largura limitada, exibe uma prévia e permite expandir pelo chevron sem provocar overflow horizontal. O componente força a quebra de sequências sem espaços e libera o conteúdo completo para impressão. Esse comportamento é independente do `v-mobile-accordion`, responsável por transformar linhas de tabela em cartões expansíveis em telas pequenas.
 
+## Ordenação das listagens
+
+`sortOrder` (`asc`/`desc`) mora no `paginationQuerySchema` compartilhado; cada módulo declara seu próprio `sortBy` como `z.enum([...])` com as colunas que aquela tela expõe. **Nenhum nome de coluna vindo do cliente entra em SQL**: o enum validado é usado para indexar a tabela do Drizzle ou um mapa explícito de colunas, então um valor fora da lista é rejeitado pelo Zod antes de chegar ao banco.
+
+A expressão de ordenação sai de `shared/db/sorting.ts`, e não de `asc()`/`desc()` soltos em cada service, para que três decisões fiquem num lugar só:
+
+- **`nulls last` sempre.** No Postgres, `desc` traz os nulos primeiro por padrão. Sem isso, ordenar produtos por custo decrescente colocaria justamente os produtos *sem* custo cadastrado no topo da tela.
+- **Direção padrão explícita por módulo.** Cadastros assumem `asc` (nome), listagens temporais assumem `desc` (mais recente primeiro). Antes cada service repetia essa escolha na mão e elas divergiam entre módulos para quem chamasse a API sem mandar `sortOrder`.
+- **Enums ordenam pelo rótulo, não pela ordem de declaração.** `orderByLabeledEnum` monta um `CASE` que ordena `loss_reason` e `movement_type` na ordem alfabética dos textos exibidos na tela; ordenar pelo enum cru produziria uma sequência (`vencido → avariado → ...`) que não corresponde a nada visível. A exceção é `systemLogs.level`, que fica na ordem de declaração de propósito, porque ali ela equivale à ordem de severidade.
+
+Toda listagem aplica ainda um segundo critério estável (nome ou data) como desempate, e o frontend volta para a página 1 ao trocar a ordenação — o `useTableSort` recebe o `reload` já com esse reset.
+
 ## Integridade e índices
 
 Além das validações amigáveis dos services, nomes de categorias, unidades e produtos e abreviações/SKUs possuem índices únicos parciais e case-insensitive por empresa. Os índices consideram apenas registros com `deletedAt` nulo, preservando o comportamento de soft delete. Consultas operacionais frequentes também possuem índices compostos por empresa/data ou empresa/produto.

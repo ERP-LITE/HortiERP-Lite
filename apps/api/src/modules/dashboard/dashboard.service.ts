@@ -6,6 +6,15 @@ const DEFAULT_SPAN_DAYS = 30
 const MAX_SPAN_DAYS = 90
 const DAY_MS = 24 * 60 * 60 * 1000
 
+/**
+ * Quantos produtos cada agrupamento do painel devolve. O detalhamento por
+ * produto só aparece nos tooltips, que mostram uns poucos itens — mandar a
+ * lista inteira inflava a resposta sem nada aparecer na tela: 90 dias com
+ * algumas centenas de produtos girando geravam dezenas de milhares de objetos
+ * num único JSON, e esse endpoint não é paginado.
+ */
+const TOP_PRODUCTS_PER_GROUP = 5
+
 function formatDay(date: Date) {
   return date.toISOString().slice(0, 10)
 }
@@ -146,6 +155,19 @@ export async function getDashboardSummary(companyId: string, range: { from?: Dat
     if (existing) existing.quantity += value.quantity
     else target.push({ ...value })
   }
+  /**
+   * Corta o detalhamento aos produtos de maior quantidade e informa quantos
+   * ficaram de fora, para o tooltip conseguir escrever "+ N outros produtos"
+   * sem receber a lista completa.
+   */
+  function topProducts(products: ProductQuantity[]) {
+    if (products.length <= TOP_PRODUCTS_PER_GROUP) return { products, otherProductsCount: 0 }
+    const ordered = [...products].sort((left, right) => right.quantity - left.quantity)
+    return {
+      products: ordered.slice(0, TOP_PRODUCTS_PER_GROUP),
+      otherProductsCount: products.length - TOP_PRODUCTS_PER_GROUP,
+    }
+  }
   type TimelineBucket = {
     entradaCount: number
     perdaCount: number
@@ -157,9 +179,8 @@ export async function getDashboardSummary(companyId: string, range: { from?: Dat
     perdaProducts: ProductQuantity[]
     ajusteProducts: ProductQuantity[]
   }
-  const timelineByDay = new Map<string, TimelineBucket>()
-  for (const row of timelineRows) {
-    const bucket = timelineByDay.get(row.day) ?? {
+  function emptyTimelineBucket(): TimelineBucket {
+    return {
       entradaCount: 0,
       perdaCount: 0,
       ajusteCount: 0,
@@ -170,6 +191,10 @@ export async function getDashboardSummary(companyId: string, range: { from?: Dat
       perdaProducts: [],
       ajusteProducts: [],
     }
+  }
+  const timelineByDay = new Map<string, TimelineBucket>()
+  for (const row of timelineRows) {
+    const bucket = timelineByDay.get(row.day) ?? emptyTimelineBucket()
     const quantity = {
       unitId: row.unitId,
       unitName: row.unitName,
@@ -214,18 +239,25 @@ export async function getDashboardSummary(companyId: string, range: { from?: Dat
     const date = new Date(periodStart)
     date.setDate(date.getDate() + index)
     const key = formatDay(date)
-    const bucket = timelineByDay.get(key) ?? {
-      entradaCount: 0,
-      perdaCount: 0,
-      ajusteCount: 0,
-      entradaByUnit: [],
-      perdaByUnit: [],
-      ajusteByUnit: [],
-      entradaProducts: [],
-      perdaProducts: [],
-      ajusteProducts: [],
+    const bucket = timelineByDay.get(key) ?? emptyTimelineBucket()
+    const entrada = topProducts(bucket.entradaProducts)
+    const perda = topProducts(bucket.perdaProducts)
+    const ajuste = topProducts(bucket.ajusteProducts)
+    return {
+      date: key,
+      entradaCount: bucket.entradaCount,
+      perdaCount: bucket.perdaCount,
+      ajusteCount: bucket.ajusteCount,
+      entradaByUnit: bucket.entradaByUnit,
+      perdaByUnit: bucket.perdaByUnit,
+      ajusteByUnit: bucket.ajusteByUnit,
+      entradaProducts: entrada.products,
+      entradaOtherProductsCount: entrada.otherProductsCount,
+      perdaProducts: perda.products,
+      perdaOtherProductsCount: perda.otherProductsCount,
+      ajusteProducts: ajuste.products,
+      ajusteOtherProductsCount: ajuste.otherProductsCount,
     }
-    return { date: key, ...bucket }
   })
 
   const stockByCategoryRows = await db
@@ -283,6 +315,10 @@ export async function getDashboardSummary(companyId: string, range: { from?: Dat
   const stockByCategory = [...categoryMap.values()]
     .filter((row) => row.productCount > 0)
     .sort((a, b) => b.productCount - a.productCount)
+    .map(({ products, ...category }) => {
+      const top = topProducts(products)
+      return { ...category, products: top.products, otherProductsCount: top.otherProductsCount }
+    })
 
   const lossReasonMap = new Map<string, {
     reason: typeof lossesByReasonRows[number]['reason']
@@ -312,7 +348,10 @@ export async function getDashboardSummary(companyId: string, range: { from?: Dat
     })
     lossReasonMap.set(row.reason, reason)
   }
-  const lossesByReason = [...lossReasonMap.values()]
+  const lossesByReason = [...lossReasonMap.values()].map(({ products, ...reason }) => {
+    const top = topProducts(products)
+    return { ...reason, products: top.products, otherProductsCount: top.otherProductsCount }
+  })
   const lossesByUnitMap = new Map<string, QuantityByUnit>()
   for (const row of lossesByReasonRows) {
     const total = lossesByUnitMap.get(row.unitId) ?? {
