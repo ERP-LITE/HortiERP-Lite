@@ -10,14 +10,19 @@ import { count, eq, sql } from 'drizzle-orm'
 import { env } from '../../shared/config/env.js'
 import { AppError } from '../../shared/errors/AppError.js'
 
-const allowedFiles: Record<string, { extension: string; previewable: boolean }> = {
-  'application/pdf': { extension: '.pdf', previewable: true },
-  'application/xml': { extension: '.xml', previewable: false },
-  'text/xml': { extension: '.xml', previewable: false },
-  'image/jpeg': { extension: '.jpg', previewable: true },
-  'image/png': { extension: '.png', previewable: true },
-  'image/webp': { extension: '.webp', previewable: true },
-}
+// Map em vez de objeto literal: o MIME type vem do cabeçalho enviado pelo
+// cliente, e uma busca por chave herdada (`constructor`, `__proto__`) num
+// objeto comum devolveria valor do prototype em vez de `undefined`.
+const allowedFiles = new Map<string, { extension: string; previewable: boolean }>([
+  ['application/pdf', { extension: '.pdf', previewable: true }],
+  ['application/xml', { extension: '.xml', previewable: false }],
+  ['text/xml', { extension: '.xml', previewable: false }],
+  ['image/jpeg', { extension: '.jpg', previewable: true }],
+  ['image/png', { extension: '.png', previewable: true }],
+  ['image/webp', { extension: '.webp', previewable: true }],
+])
+
+const MAX_ATTACHMENTS_PER_ENTRY = 3
 
 async function hasValidSignature(path: string, mimeType: string) {
   const handle = await open(path, 'r')
@@ -39,7 +44,7 @@ async function hasValidSignature(path: string, mimeType: string) {
 }
 
 export function isPreviewableInvoiceFile(mimeType: string) {
-  return allowedFiles[mimeType]?.previewable ?? false
+  return allowedFiles.get(mimeType)?.previewable ?? false
 }
 
 export function invoiceFilePath(storedName: string) {
@@ -54,6 +59,24 @@ export async function deleteInvoiceFile(storedName: string) {
   await rm(invoiceFilePath(storedName), { force: true })
 }
 
+type DbExecutor = typeof db | Parameters<Parameters<typeof db.transaction>[0]>[0]
+
+async function countAttachments(executor: DbExecutor, stockEntryId: string) {
+  const [{ total }] = await executor
+    .select({ total: count() })
+    .from(stockEntryAttachments)
+    .where(eq(stockEntryAttachments.stockEntryId, stockEntryId))
+  return total
+}
+
+function attachmentLimitError() {
+  return new AppError(
+    `Cada entrada aceita no máximo ${MAX_ATTACHMENTS_PER_ENTRY} anexos`,
+    422,
+    'ATTACHMENT_LIMIT',
+  )
+}
+
 export async function storeInvoiceAttachment(
   companyId: string,
   userId: string,
@@ -63,7 +86,7 @@ export async function storeInvoiceAttachment(
   const originalExtension = extname(file.filename).toLowerCase()
   const inferredMimeType =
     file.mimetype === 'application/octet-stream' && originalExtension === '.xml' ? 'application/xml' : file.mimetype
-  const allowed = allowedFiles[inferredMimeType]
+  const allowed = allowedFiles.get(inferredMimeType)
   if (!allowed) {
     file.file.resume()
     throw new AppError('Formato inválido. Envie XML, PDF, JPG, PNG ou WEBP', 422, 'INVALID_FILE_TYPE')
@@ -74,35 +97,44 @@ export async function storeInvoiceAttachment(
     throw new AppError('A extensão do arquivo não corresponde ao formato enviado', 422, 'INVALID_FILE_TYPE')
   }
 
+  // Recusa cedo quando a entrada já está cheia, para não transferir o arquivo
+  // inteiro à toa. A checagem que vale é a de dentro da transação, abaixo.
+  if ((await countAttachments(db, stockEntryId)) >= MAX_ATTACHMENTS_PER_ENTRY) {
+    file.file.resume()
+    throw attachmentLimitError()
+  }
+
   await mkdir(env.INVOICE_STORAGE_PATH, { recursive: true, mode: 0o700 })
   const storedName = `${randomUUID()}${allowed.extension}`
   const path = invoiceFilePath(storedName)
 
   try {
+    // A gravação e a validação do conteúdo ficam fora de qualquer transação:
+    // dentro dela, um upload lento seguraria uma conexão do pool e o advisory
+    // lock durante toda a transferência, travando a API com poucos envios
+    // simultâneos.
+    await pipeline(file.file, createWriteStream(path, { flags: 'wx', mode: 0o600 }))
+    if (file.file.truncated) {
+      throw new AppError(
+        `O arquivo excede o limite de ${Math.floor(env.INVOICE_MAX_FILE_SIZE / 1024 / 1024)} MB`,
+        413,
+        'FILE_TOO_LARGE',
+      )
+    }
+    if (!(await hasValidSignature(path, inferredMimeType))) {
+      throw new AppError('O conteúdo do arquivo não corresponde ao formato informado', 422, 'INVALID_FILE_CONTENT')
+    }
+    const storedFile = await stat(path)
+
+    // Transação curta só para fechar a contagem e inserir. O advisory lock
+    // continua serializando uploads concorrentes da mesma entrada, mantendo o
+    // limite exato mesmo com vários envios chegando juntos.
     return await db.transaction(async (tx) => {
       await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${stockEntryId}, 0))`)
-      const [{ total }] = await tx
-        .select({ total: count() })
-        .from(stockEntryAttachments)
-        .where(eq(stockEntryAttachments.stockEntryId, stockEntryId))
-      if (total >= 3) {
-        file.file.resume()
-        throw new AppError('Cada entrada aceita no máximo 3 anexos', 422, 'ATTACHMENT_LIMIT')
+      if ((await countAttachments(tx, stockEntryId)) >= MAX_ATTACHMENTS_PER_ENTRY) {
+        throw attachmentLimitError()
       }
 
-      await pipeline(file.file, createWriteStream(path, { flags: 'wx', mode: 0o600 }))
-      if (file.file.truncated) {
-        throw new AppError(
-          `O arquivo excede o limite de ${Math.floor(env.INVOICE_MAX_FILE_SIZE / 1024 / 1024)} MB`,
-          413,
-          'FILE_TOO_LARGE',
-        )
-      }
-      if (!(await hasValidSignature(path, inferredMimeType))) {
-        throw new AppError('O conteúdo do arquivo não corresponde ao formato informado', 422, 'INVALID_FILE_CONTENT')
-      }
-
-      const storedFile = await stat(path)
       const [attachment] = await tx
         .insert(stockEntryAttachments)
         .values({

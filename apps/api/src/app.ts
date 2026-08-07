@@ -4,8 +4,8 @@ import cors from '@fastify/cors'
 import jwt from '@fastify/jwt'
 import rateLimit from '@fastify/rate-limit'
 import multipart from '@fastify/multipart'
-import { mkdir, open } from 'node:fs/promises'
-import { join } from 'node:path'
+import { access, mkdir } from 'node:fs/promises'
+import { constants as fsConstants } from 'node:fs'
 import { sql } from 'drizzle-orm'
 import { env } from './shared/config/env.js'
 import { db } from './db/client.js'
@@ -72,9 +72,12 @@ export function buildApp(options: { systemLogs?: boolean } = {}) {
   app.get('/health', async (_request, reply) => {
     try {
       await db.execute(sql`select 1`)
+      // Confere permissão de escrita sem criar arquivo: um marcador ficaria
+      // misturado aos anexos e entraria no backup junto com eles. Volume não
+      // montado falha no mkdir; sistema somente-leitura ou permissão errada
+      // falha no access.
       await mkdir(env.INVOICE_STORAGE_PATH, { recursive: true, mode: 0o700 })
-      const marker = await open(join(env.INVOICE_STORAGE_PATH, '.healthcheck'), 'a', 0o600)
-      await marker.close()
+      await access(env.INVOICE_STORAGE_PATH, fsConstants.W_OK)
       return { status: 'ok', checks: { database: 'ok', invoiceStorage: 'ok' } }
     } catch (error) {
       app.log.error({ error }, 'Health check de dependências falhou')

@@ -44,6 +44,66 @@ describe('indicadores financeiros do dashboard', () => {
     assert.equal(summary.lossesInPeriod.lossesCount, 1)
     assert.equal(summary.lossesInPeriod.lossValue, 25)
   })
+
+  test('detalhamento por produto vem cortado nos maiores, com a sobra contada', async () => {
+    const tenant = await createTenant('dashboard-top-n', '0')
+
+    // 8 produtos com quantidades distintas e crescentes: o corte deve manter
+    // os 5 maiores (80, 70, 60, 50, 40) e reportar 3 na sobra.
+    const createdProducts = await db
+      .insert(products)
+      .values(
+        Array.from({ length: 8 }, (_, index) => ({
+          companyId: tenant.companyId,
+          categoryId: tenant.categoryId,
+          unitId: tenant.unitId,
+          name: `Produto top ${index + 1}`,
+          createdBy: tenant.admin.id,
+        })),
+      )
+      .returning({ id: products.id, name: products.name })
+
+    await createStockEntry(tenant.companyId, tenant.operator.id, {
+      items: createdProducts.map((product, index) => ({ productId: product.id, quantity: (index + 1) * 10 })),
+    })
+
+    const response = await ctx.app.inject({
+      method: 'GET',
+      url: '/api/dashboard/summary',
+      headers: { cookie: authCookie(ctx.app, tenant.admin) },
+    })
+
+    assert.equal(response.statusCode, 200)
+    const summary = response.json<{
+      movementsTimeline: {
+        entradaCount: number
+        entradaByUnit: { quantity: number }[]
+        entradaProducts: { productName: string; quantity: number }[]
+        entradaOtherProductsCount: number
+      }[]
+      stockByCategory: { products: unknown[]; otherProductsCount: number; productCount: number }[]
+    }>()
+
+    const dayWithEntries = summary.movementsTimeline.find((day) => day.entradaCount > 0)
+    assert.ok(dayWithEntries, 'esperava um dia com entradas na timeline')
+    assert.equal(dayWithEntries.entradaProducts.length, 5)
+    assert.equal(dayWithEntries.entradaOtherProductsCount, 3)
+    assert.deepEqual(
+      dayWithEntries.entradaProducts.map(({ quantity }) => quantity),
+      [80, 70, 60, 50, 40],
+    )
+
+    // O corte é só do detalhamento: contagem e totais por unidade continuam
+    // considerando os 8 produtos (10+20+...+80 = 360).
+    assert.equal(dayWithEntries.entradaCount, 8)
+    assert.equal(dayWithEntries.entradaByUnit[0].quantity, 360)
+
+    // O produto do fixture entra na categoria sem ter movimento, somando 9.
+    const [category] = summary.stockByCategory
+    assert.equal(category.productCount, 9)
+    assert.equal(category.products.length, 5)
+    assert.equal(category.otherProductsCount, 3)
+  })
 })
 
 describe('concorrência de estoque', () => {

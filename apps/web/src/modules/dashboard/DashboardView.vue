@@ -125,7 +125,7 @@ onMounted(loadSummary)
 
         <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
           <div class="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
-            <h2 class="text-sm font-semibold text-gray-700 dark:text-gray-300">Estoque por categoria</h2>
+            <h2 class="text-sm font-semibold text-gray-700 dark:text-gray-300">Produtos por categoria</h2>
           </div>
           <div class="p-4">
             <DonutChart
@@ -134,6 +134,7 @@ onMounted(loadSummary)
                 value: c.productCount,
                 totalsByUnit: c.totalsByUnit,
                 products: c.products,
+                otherProductsCount: c.otherProductsCount,
               }))"
             />
           </div>

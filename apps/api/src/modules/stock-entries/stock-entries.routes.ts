@@ -43,13 +43,23 @@ export async function stockEntriesRoutes(app: FastifyInstance) {
     },
   )
 
-  app.post<{ Params: { id: string } }>('/stock-entries/:id/attachments', async (request, reply) => {
-    await getStockEntry(request.user.companyId, request.params.id)
-    const file = await request.file()
-    if (!file) throw new AppError('Arquivo não enviado', 422, 'FILE_REQUIRED')
-    const attachment = await storeInvoiceAttachment(request.user.companyId, request.user.sub, request.params.id, file)
-    return reply.status(201).send(attachment)
-  })
+  app.post<{ Params: { id: string } }>(
+    '/stock-entries/:id/attachments',
+    {
+      // Limite próprio, bem abaixo do global de 300/min: cada requisição aqui
+      // pode gravar até INVOICE_MAX_FILE_SIZE em disco, então o teto global
+      // permitiria encher o volume em poucos minutos. Anexar nota é uma ação
+      // manual — 10 por minuto sobra para o uso real.
+      config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
+    },
+    async (request, reply) => {
+      await getStockEntry(request.user.companyId, request.params.id)
+      const file = await request.file()
+      if (!file) throw new AppError('Arquivo não enviado', 422, 'FILE_REQUIRED')
+      const attachment = await storeInvoiceAttachment(request.user.companyId, request.user.sub, request.params.id, file)
+      return reply.status(201).send(attachment)
+    },
+  )
 
   app.get<{ Params: { id: string; attachmentId: string }; Querystring: { preview?: string } }>(
     '/stock-entries/:id/attachments/:attachmentId',

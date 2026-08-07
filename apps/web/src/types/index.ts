@@ -168,8 +168,11 @@ export interface DashboardSummary {
     perdaByUnit: DashboardQuantityByUnit[]
     ajusteByUnit: DashboardQuantityByUnit[]
     entradaProducts: DashboardProductQuantity[]
+    entradaOtherProductsCount: number
     perdaProducts: DashboardProductQuantity[]
+    perdaOtherProductsCount: number
     ajusteProducts: DashboardProductQuantity[]
+    ajusteOtherProductsCount: number
   }[]
   stockByCategory: {
     categoryId: string
@@ -177,12 +180,14 @@ export interface DashboardSummary {
     productCount: number
     totalsByUnit: DashboardQuantityByUnit[]
     products: DashboardProductQuantity[]
+    otherProductsCount: number
   }[]
   lossesByReason: {
     reason: LossReason
     lossesCount: number
     totalsByUnit: DashboardQuantityByUnit[]
     products: DashboardProductQuantity[]
+    otherProductsCount: number
   }[]
 }
 

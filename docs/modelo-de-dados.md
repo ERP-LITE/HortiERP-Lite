@@ -92,7 +92,9 @@ Entrada de mercadoria (cabeçalho + itens), ver [fluxo de entrada](./fluxos-de-n
 Metadados dos arquivos privados associados à nota fiscal. Cada registro contém `id`, `companyId`, `stockEntryId`, `originalName`, `storedName` único e aleatório, `mimeType`, `size`, `createdAt` e `createdBy`. O arquivo binário não fica no PostgreSQL: é armazenado no volume persistente da API, e `storedName` faz a ligação com o disco. `companyId` é duplicado intencionalmente para permitir que download, pré-visualização e exclusão validem isolamento multiempresa sem depender apenas da rota pai. Campos internos como `storedName` e `companyId` não são expostos nas respostas públicas de anexos.
 
 ### `losses`
-Registro de perda de estoque. `id`, `companyId`, `productId` (FK), `quantity` numeric(12,3), `reason` (enum `loss_reason`: `vencido` \| `avariado` \| `roubo_furto` \| `erro_operacional` \| `outro`), `notes?`, `lossDate`, timestamps, auditBy.
+Registro de perda de estoque. `id`, `companyId`, `productId` (FK), `quantity` numeric(12,3), `unitCost?` numeric(12,2), `reason` (enum `loss_reason`: `vencido` \| `avariado` \| `roubo_furto` \| `erro_operacional` \| `outro`), `notes?`, `lossDate`, timestamps, auditBy.
+
+`unitCost` é uma cópia do `products.costPrice` no instante do registro, não uma FK viva: o valor perdido de um período fechado não pode mudar porque alguém reajustou o custo do produto depois. É nulo nas perdas anteriores à coluna, e o dashboard cai no `costPrice` atual nesses casos.
 
 ### `stock_movements`
 Histórico append-only de toda variação de estoque — nunca é editado ou apagado, só inserido pelos fluxos de entrada, perda e ajuste manual por meio de `applyStockMovement`.

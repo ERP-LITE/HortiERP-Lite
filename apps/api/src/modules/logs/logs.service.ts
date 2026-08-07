@@ -1,4 +1,5 @@
-import { and, asc, count, desc, eq, gte, ilike, lte, ne, or } from 'drizzle-orm'
+import { and, count, desc, eq, gte, ilike, lte, ne, or } from 'drizzle-orm'
+import { orderByColumn } from '../../shared/db/sorting.js'
 import { db } from '../../db/client.js'
 import { companies, systemLogs, users } from '../../db/schema/index.js'
 import { buildPaginatedResult } from '../../shared/db/paginate.js'
@@ -66,8 +67,9 @@ async function queryLogs(conditions: ReturnType<typeof eq>[], query: ListLogsQue
     level: systemLogs.level,
     statusCode: systemLogs.statusCode,
   }
-  const sortColumn = query.sortBy ? sortColumns[query.sortBy] : systemLogs.createdAt
-  const orderBy = query.sortOrder === 'asc' ? asc(sortColumn) : desc(sortColumn)
+  // `level` fica na ordem de declaração do enum de propósito: ali ela equivale
+  // à ordem de severidade, que é mais útil do que a ordem alfabética.
+  const orderBy = orderByColumn(query.sortBy ? sortColumns[query.sortBy] : systemLogs.createdAt, query.sortOrder, 'desc')
 
   const baseQuery = db
     .select(logColumns)

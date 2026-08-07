@@ -1,4 +1,5 @@
-import { and, asc, count, desc, eq, gte, ilike, inArray, lte, or, sql } from 'drizzle-orm'
+import { and, count, desc, eq, gte, ilike, inArray, lte, or, sql } from 'drizzle-orm'
+import { orderByColumn } from '../../shared/db/sorting.js'
 import { db } from '../../db/client.js'
 import { stockEntries, stockEntryAttachments, stockEntryItems } from '../../db/schema/index.js'
 import { AppError } from '../../shared/errors/AppError.js'
@@ -54,8 +55,11 @@ export async function listStockEntries(companyId: string, query: ListStockEntrie
     invoiceStatus,
     invoiceTotal: stockEntries.invoiceTotal,
   }
-  const entrySortColumn = query.sortBy ? entrySortColumns[query.sortBy] : stockEntries.entryDate
-  const entryOrderBy = query.sortOrder === 'asc' ? asc(entrySortColumn) : desc(entrySortColumn)
+  const entryOrderBy = orderByColumn(
+    query.sortBy ? entrySortColumns[query.sortBy] : stockEntries.entryDate,
+    query.sortOrder,
+    'desc',
+  )
 
   const [data, [{ total }]] = await Promise.all([
     db.query.stockEntries.findMany({

@@ -1,5 +1,6 @@
 import bcrypt from 'bcryptjs'
-import { and, asc, count, desc, eq, ilike, isNull, or } from 'drizzle-orm'
+import { and, asc, count, eq, ilike, isNull, or } from 'drizzle-orm'
+import { orderByColumn } from '../../shared/db/sorting.js'
 import { db } from '../../db/client.js'
 import { users } from '../../db/schema/index.js'
 import { buildPaginatedResult } from '../../shared/db/paginate.js'
@@ -27,8 +28,7 @@ export async function listPlatformUsers(companyId: string, query: ListPlatformUs
   const conditions = [eq(users.companyId, companyId), eq(users.role, 'super_admin'), isNull(users.deletedAt)]
   if (query.search) conditions.push(or(ilike(users.name, `%${query.search}%`), ilike(users.email, `%${query.search}%`))!)
   const where = and(...conditions)
-  const sortColumn = query.sortBy ? users[query.sortBy] : users.name
-  const orderBy = query.sortOrder === 'desc' ? desc(sortColumn) : asc(sortColumn)
+  const orderBy = orderByColumn(query.sortBy ? users[query.sortBy] : users.name, query.sortOrder)
 
   const [data, [{ total }]] = await Promise.all([
     db

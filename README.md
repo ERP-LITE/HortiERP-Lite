@@ -105,8 +105,23 @@ container ao terminar. A suíte recusa executar se o nome do banco em `DATABASE_
 O workflow em `.github/workflows/ci.yml` também executa os builds da API e do frontend, aplica as migrations em um
 banco descartável e roda a suíte a cada push e pull request.
 
-O teste de carga autenticado e não destrutivo possui perfis de 5, 30 e 80 usuários virtuais. Consulte o
+O teste de carga tem dois cenários: `read` (autenticado e não destrutivo, perfis de 5, 30 e 80 usuários virtuais) e
+`write`, que exercita entrada de mercadoria, upload de anexo e registro de perda — os caminhos onde a concorrência
+importa. O cenário de escrita **grava dados reais** e exige `ALLOW_WRITE_LOAD_TEST=true`. Consulte o
 [guia do teste de carga](./tests/load/README.md) antes de executar `npm run test:load`.
+
+## Manutenção
+
+Um upload interrompido por queda da API pode deixar o arquivo do anexo em disco sem o registro correspondente no
+banco. Nenhum fluxo normal remove esses restos, então existe um comando para isso:
+
+```bash
+npm run invoices:cleanup -- --dry-run   # lista o que seria removido
+npm run invoices:cleanup                # remove
+```
+
+Só entram na varredura arquivos sem linha em `stock_entry_attachments` e com mais de 24 horas — a carência evita
+apagar um upload em andamento. Vale agendar mensalmente em produção.
 
 Antes de atualizar uma instalação existente em produção, siga o roteiro de
 [atualização segura](./docs/deploy-producao.md#atualização-de-uma-instalação-existente). Ele cobre backup prévio,
