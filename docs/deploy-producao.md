@@ -14,7 +14,6 @@
 1. Servidor Linux com Docker Engine e Docker Compose recente, com suporte a `docker compose up --wait` (as imagens usam Node.js 22 na etapa de build/runtime da API).
 2. DNS `A`/`AAAA` de `APP_DOMAIN` apontando para o servidor.
 3. Portas TCP 80 e 443 e UDP 443 liberadas. Não libere a porta 5432.
-4. Widget Turnstile real restrito ao domínio de produção.
 
 ## Configuração inicial
 
@@ -29,8 +28,7 @@ Preencha todos os valores. Gere o JWT com, por exemplo:
 openssl rand -base64 48
 ```
 
-O backend recusa iniciar em produção quando o JWT tem menos de 32 caracteres, o CORS não usa HTTPS ou a chave
-Turnstile é uma chave oficial de teste. O build do frontend também recusa as site keys de teste conhecidas.
+O backend recusa iniciar em produção quando o JWT tem menos de 32 caracteres ou o CORS não usa HTTPS.
 
 Evite caracteres reservados de URL na senha do PostgreSQL porque o Compose monta `DATABASE_URL` a partir dela.
 
@@ -40,16 +38,13 @@ Evite caracteres reservados de URL na senha do PostgreSQL porque o Compose monta
 
 Antes do **primeiro deploy que receberá dados reais**, faça uma revisão única do banco e das migrations:
 
-1. Confirme que nenhum ambiente que precise ser preservado já aplicou as migrations atuais.
-2. Se o produto ainda não entrou em produção, consolide o histórico de desenvolvimento (`0000`, `0001`, etc.) em
-   uma migration inicial limpa, gerada a partir do schema final. Inclua no Git o SQL, o snapshot em `meta/` e o
-   `_journal.json` resultantes.
-3. Valide essa migration partindo de um PostgreSQL vazio e execute toda a suíte de testes. Não basta concatenar ou
-   renomear os arquivos SQL existentes.
-4. Zere somente o banco destinado ao primeiro lançamento, antes de cadastrar clientes ou importar dados, e deixe o
-   deploy aplicar a migration inicial consolidada.
-5. Não execute o seed de desenvolvimento (`db:seed`) em produção, pois ele cria empresas, usuários e dados de teste.
-6. Execute apenas o bootstrap `db:seed:platform` descrito em
+1. Confirme que o destino é um PostgreSQL vazio e que nenhum ambiente que precise ser preservado depende deste
+   histórico.
+2. A migration `0000` já representa o schema final consolidado. Não concatene SQL antigo nem regenere essa migration
+   depois que o primeiro banco de produção for criado.
+3. Valide a migration partindo de um PostgreSQL vazio e execute toda a suíte de testes.
+4. Não execute o seed de desenvolvimento (`db:seed`) em produção, pois ele cria empresas, usuários e dados de teste.
+5. Execute apenas o bootstrap `db:seed:platform` descrito em
    [Primeiro super administrador](#primeiro-super-administrador), criando a empresa Plataforma e exatamente um
    usuário `super_admin` inicial.
 
@@ -64,7 +59,9 @@ sh deploy/deploy.sh
 
 O script valida o Compose, cria imagens versionadas pelo hash curto do Git, aplica migrations, inicia os serviços e
 exibe o estado final. A API só inicia quando o PostgreSQL está saudável e as migrations terminam com sucesso; o
-gateway só inicia quando API e frontend estão saudáveis.
+gateway só inicia quando API e frontend estão saudáveis. As imagens são construídas sequencialmente por padrão para
+funcionar também em hosts com pouca memória; em um servidor maior, use `COMPOSE_PARALLEL_LIMIT=2` ou mais para
+paralelizar a construção.
 
 Para usar outro arquivo de ambiente:
 
@@ -74,25 +71,12 @@ sh deploy/deploy.sh /caminho/seguro/erp-production.env
 
 ## Atualização de uma instalação existente
 
-As migrations recentes são aditivas e preservam os registros existentes:
+Depois do primeiro deploy, preserve a migration `0000` e publique toda alteração de banco como uma nova migration
+incremental. Nunca regenere, renomeie ou remova uma migration que já tenha sido aplicada. O Compose mantém banco,
+anexos e backups em volumes persistentes; não remova esses volumes durante atualizações.
 
-- `0006_brief_scarlet_spider.sql` cria os dados fiscais e anexos privados das entradas;
-- `0007_free_millenium_guard.sql` acrescenta o custo congelado às perdas;
-- `0008_smiling_gauntlet.sql` acrescenta identificação fiscal, contato e endereço às empresas, além do índice único
-  parcial de CNPJ.
-
-Os novos campos de empresa são nuláveis no PostgreSQL para manter compatibilidade com a empresa Plataforma e com
-clientes já cadastrados; novas empresas passam pelo contrato completo da API. Antes de aplicar a `0008` em uma base
-que já possua documentos, confirme que não existem CNPJs repetidos com a mesma representação. O Compose cria
-automaticamente o volume persistente `invoice_files`; não remova esse volume em atualizações futuras.
-
-Não copie `.env.production.example` por cima do `.env.production` existente. Preserve os segredos atuais. A única
-variável nova é opcional:
-
-```dotenv
-# Limite por anexo; se ausente, usa 10 MB.
-INVOICE_MAX_FILE_SIZE=10485760
-```
+Não copie `.env.production.example` por cima do `.env.production` existente. Preserve os segredos atuais e acrescente
+somente variáveis novas explicitamente documentadas na versão que será instalada.
 
 Antes de atualizar o código, registre o hash/tag da versão atual e gere um backup adicional:
 
@@ -205,10 +189,9 @@ sh deploy/rollback.sh IMAGE_TAG_ANTERIOR
 O rollback não desfaz migrations automaticamente. Migrations novas devem ser compatíveis com a versão anterior ou
 ter um procedimento específico e testado de restauração do banco.
 
-As migrations fiscais e cadastrais desta versão são aditivas; versões anteriores ignoram as novas colunas e tabelas,
-portanto o rollback apenas da aplicação é possível. O volume `invoice_files` e as migrations aplicadas devem
-permanecer; não os apague durante o rollback. Anexos e dados cadastrais gravados enquanto a versão nova esteve ativa
-voltarão a aparecer quando ela for publicada novamente.
+O volume `invoice_files` e todas as migrations aplicadas devem permanecer durante um rollback. Antes de cada nova
+migration, documente se a versão anterior da aplicação continua compatível com o schema novo; se não continuar, o
+rollback exige restauração coordenada do backup e não apenas a troca da imagem.
 
 ## Atualização segura
 

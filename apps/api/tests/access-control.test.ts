@@ -1,11 +1,29 @@
 import assert from 'node:assert/strict'
 import { describe, test } from 'node:test'
+import bcrypt from 'bcryptjs'
 import { eq } from 'drizzle-orm'
 import { db } from '../src/db/client.js'
 import { categories, companies, losses, products, users } from '../src/db/schema/index.js'
 import { authCookie, createTenant, setupTestApp } from './helpers.js'
 
 const ctx = setupTestApp()
+
+describe('autenticação por credenciais', () => {
+  test('login aceita somente e-mail e senha e emite o cookie de sessão', async () => {
+    const tenant = await createTenant('login')
+    const password = 'senha-segura-123'
+    await db.update(users).set({ passwordHash: await bcrypt.hash(password, 10) }).where(eq(users.id, tenant.admin.id))
+
+    const response = await ctx.app.inject({
+      method: 'POST',
+      url: '/api/auth/login',
+      payload: { email: 'admin-login@test.local', password },
+    })
+
+    assert.equal(response.statusCode, 200)
+    assert.ok(response.cookies.some(({ name, value }) => name === 'token' && value.length > 0))
+  })
+})
 
 describe('isolamento multiempresa e permissões', () => {
   test('uma empresa não lista nem acessa categorias de outra empresa', async () => {

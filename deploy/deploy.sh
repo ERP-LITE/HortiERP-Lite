@@ -6,6 +6,11 @@ env_file=${1:-"$repository_dir/.env.production"}
 image_tag=${IMAGE_TAG:-$(git -C "$repository_dir" rev-parse --short HEAD 2>/dev/null || date +%Y%m%d%H%M%S)}
 compose_file="$repository_dir/docker-compose.production.yml"
 
+# Evita que hosts pequenos (como a VM Always Free de 1 GB usada para demos)
+# construam API, frontend e backup simultaneamente e esgotem RAM/swap. Hosts
+# maiores podem sobrescrever este valor ao executar o script.
+export COMPOSE_PARALLEL_LIMIT=${COMPOSE_PARALLEL_LIMIT:-1}
+
 if [ ! -f "$env_file" ]; then
   echo "Arquivo de ambiente não encontrado: $env_file" >&2
   echo "Copie .env.production.example para .env.production e preencha os valores reais." >&2

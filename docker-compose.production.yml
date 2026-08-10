@@ -24,7 +24,6 @@ services:
       DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       JWT_SECRET: ${JWT_SECRET:?Defina JWT_SECRET}
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-8h}
-      TURNSTILE_SECRET_KEY: ${TURNSTILE_SECRET_KEY:?Defina TURNSTILE_SECRET_KEY}
       CORS_ORIGIN: https://${APP_DOMAIN:?Defina APP_DOMAIN}
       TRUST_PROXY: "true"
       INVOICE_STORAGE_PATH: /app/storage/invoices
@@ -68,7 +67,6 @@ services:
       target: production
       args:
         VITE_API_URL: ""
-        VITE_TURNSTILE_SITE_KEY: ${VITE_TURNSTILE_SITE_KEY:?Defina VITE_TURNSTILE_SITE_KEY}
     restart: unless-stopped
     depends_on:
       api:
@@ -129,7 +127,9 @@ services:
         condition: service_completed_successfully
     healthcheck:
       test: ["CMD-SHELL", "test -f /backups/.last-success && find /backups/.last-success -mmin -2880 | grep -q ."]
-      interval: 15m
+      # O deploy aguarda no máximo 180 s; a primeira verificação precisa ocorrer
+      # dentro dessa janela. O comando é local e barato, então 1 min é suficiente.
+      interval: 1m
       timeout: 5s
       start_period: 2m
       retries: 3

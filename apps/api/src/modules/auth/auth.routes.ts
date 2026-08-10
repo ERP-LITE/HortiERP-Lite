@@ -2,7 +2,6 @@ import type { FastifyInstance } from 'fastify'
 import { authenticate } from '../../shared/middlewares/auth.js'
 import { clearSessionCookie, issueSession } from '../../shared/auth/session.js'
 import { AppError } from '../../shared/errors/AppError.js'
-import { verifyTurnstileToken } from '../../shared/security/verifyTurnstile.js'
 import { getCompany } from '../companies/companies.service.js'
 import { changePasswordSchema, loginSchema } from './auth.schema.js'
 import { authenticateUser, changeOwnPassword, getUserProfile } from './auth.service.js'
@@ -12,9 +11,7 @@ export async function authRoutes(app: FastifyInstance) {
     '/auth/login',
     { config: { rateLimit: { max: 10, timeWindow: '1 minute' } } },
     async (request, reply) => {
-      const { email, password, turnstileToken } = loginSchema.parse(request.body)
-
-      await verifyTurnstileToken(turnstileToken, request.ip)
+      const { email, password } = loginSchema.parse(request.body)
 
       const user = await authenticateUser(email, password)
 
