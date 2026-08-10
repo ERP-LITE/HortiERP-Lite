@@ -51,7 +51,6 @@ docker run --rm \
   -e ALLOW_WRITE_LOAD_TEST="${ALLOW_WRITE_LOAD_TEST:-false}" \
   -e LOAD_TEST_EMAIL="${LOAD_TEST_EMAIL:-operador@hortierp.com}" \
   -e LOAD_TEST_PASSWORD="${LOAD_TEST_PASSWORD:-operador123}" \
-  -e LOAD_TEST_TURNSTILE_TOKEN="${LOAD_TEST_TURNSTILE_TOKEN:-load-test}" \
   -v "$repository_dir/tests/load:/scripts:ro" \
   -v "$repository_dir/tests/load/results:/results" \
   grafana/k6:0.54.0 run --summary-export "$result_file" "/scripts/$scenario_file"

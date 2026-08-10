@@ -44,7 +44,6 @@ export function setup() {
     JSON.stringify({
       email: __ENV.LOAD_TEST_EMAIL || 'operador@hortierp.com',
       password: __ENV.LOAD_TEST_PASSWORD || 'operador123',
-      turnstileToken: __ENV.LOAD_TEST_TURNSTILE_TOKEN || 'load-test',
     }),
     {
       headers: { 'Content-Type': 'application/json', 'User-Agent': 'HortiERP-Load-Test/1.0' },
@@ -56,7 +55,7 @@ export function setup() {
     'login do teste de carga funcionou': (result) => result.status === 200 && Boolean(result.cookies.token?.[0]?.value),
   })
   if (!authenticated) {
-    throw new Error(`Login falhou com HTTP ${response.status}. Confira credenciais e Turnstile de homologação.`)
+    throw new Error(`Login falhou com HTTP ${response.status}. Confira as credenciais de homologação.`)
   }
 
   return { token: response.cookies.token[0].value }

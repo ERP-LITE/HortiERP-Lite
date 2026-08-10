@@ -4,7 +4,6 @@ import { useRoute, useRouter } from 'vue-router'
 import AuthLayout from '@/layouts/AuthLayout.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
-import TurnstileWidget from '@/components/ui/TurnstileWidget.vue'
 import { useAuthStore } from '@/stores/auth'
 import { resolveFormError } from '@/services/api'
 
@@ -13,8 +12,6 @@ const password = ref('')
 const loading = ref(false)
 const errorMessage = ref('')
 const fieldErrors = ref<Record<string, string>>({})
-const turnstileToken = ref('')
-const turnstileRef = ref<InstanceType<typeof TurnstileWidget> | null>(null)
 
 const auth = useAuthStore()
 const router = useRouter()
@@ -31,16 +28,14 @@ async function handleSubmit() {
   fieldErrors.value = {}
 
   try {
-    await auth.login(email.value, password.value, turnstileToken.value)
+    await auth.login(email.value, password.value)
     const fallback = auth.user?.role === 'super_admin' ? '/selecionar-empresa' : '/'
     const redirect = (route.query.redirect as string) || fallback
     router.push(redirect)
   } catch (error) {
     const resolved = resolveFormError(error, 'Não foi possível entrar. Verifique suas credenciais.')
     fieldErrors.value = resolved.fieldErrors
-    errorMessage.value = resolved.fieldErrors.turnstileToken ?? resolved.message
-    turnstileToken.value = ''
-    turnstileRef.value?.reset()
+    errorMessage.value = resolved.message
   } finally {
     loading.value = false
   }
@@ -62,15 +57,9 @@ async function handleSubmit() {
         :error="fieldErrors.password"
       />
 
-      <TurnstileWidget
-        ref="turnstileRef"
-        @verified="(token) => (turnstileToken = token)"
-        @expired="turnstileToken = ''"
-      />
-
       <p v-if="errorMessage" class="text-sm text-red-600 dark:text-red-400">{{ errorMessage }}</p>
 
-      <BaseButton type="submit" class="w-full" :disabled="loading || !turnstileToken">
+      <BaseButton type="submit" class="w-full" :disabled="loading">
         {{ loading ? 'Entrando...' : 'Entrar' }}
       </BaseButton>
     </form>

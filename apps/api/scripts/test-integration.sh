@@ -24,6 +24,5 @@ npm run db:migrate
 DATABASE_URL="$test_database_url" \
 NODE_ENV=test \
 JWT_SECRET='integration-test-secret-with-at-least-32-characters' \
-TURNSTILE_SECRET_KEY='1x0000000000000000000000000000000AA' \
 INVOICE_STORAGE_PATH="$invoice_test_storage" \
 npm run test:run

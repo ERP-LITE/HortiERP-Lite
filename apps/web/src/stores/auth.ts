@@ -30,8 +30,8 @@ export const useAuthStore = defineStore('auth', () => {
     impersonatingCompanyName.value = null
   }
 
-  async function login(email: string, password: string, turnstileToken: string) {
-    const response = await loginRequest(email, password, turnstileToken)
+  async function login(email: string, password: string) {
+    const response = await loginRequest(email, password)
     localStorage.removeItem(LOGOUT_MARKER_KEY)
     applySession(response)
     initialized.value = true

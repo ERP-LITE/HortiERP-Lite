@@ -1,12 +1,6 @@
 import 'dotenv/config'
 import { z } from 'zod'
 
-const turnstileTestSecretKeys = new Set([
-  '1x0000000000000000000000000000000AA',
-  '2x0000000000000000000000000000000AA',
-  '3x0000000000000000000000000000000AA',
-])
-
 const envSchema = z
   .object({
     NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
@@ -19,10 +13,6 @@ const envSchema = z
       .enum(['true', 'false'])
       .default('false')
       .transform((value) => value === 'true'),
-    // O valor padrão é a chave secreta de teste da Cloudflare que "sempre passa",
-    // permitindo o desenvolvimento local sem configuração adicional. Abaixo, o uso
-    // de uma chave de teste é rejeitado explicitamente em produção.
-    TURNSTILE_SECRET_KEY: z.string().default('1x0000000000000000000000000000000AA'),
     INVOICE_STORAGE_PATH: z.string().min(1).default('./storage/invoices'),
     INVOICE_MAX_FILE_SIZE: z.coerce.number().int().positive().default(10 * 1024 * 1024),
   })
@@ -38,14 +28,6 @@ const envSchema = z
         code: z.ZodIssueCode.custom,
         path: ['JWT_SECRET'],
         message: 'JWT_SECRET deve ter ao menos 32 caracteres e não pode usar o valor de exemplo em produção',
-      })
-    }
-
-    if (turnstileTestSecretKeys.has(value.TURNSTILE_SECRET_KEY) || value.TURNSTILE_SECRET_KEY.startsWith('troque-')) {
-      context.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['TURNSTILE_SECRET_KEY'],
-        message: 'A chave de teste do Turnstile não pode ser usada em produção',
       })
     }
 

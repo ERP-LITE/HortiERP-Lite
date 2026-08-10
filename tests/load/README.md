@@ -15,7 +15,7 @@ Dois cenários, escolhidos por `LOAD_SCENARIO`:
 - Rode preferencialmente em ambiente local ou homologação com dados descartáveis.
 - O script recusa destinos remotos por padrão. Nunca use produção durante horário de operação.
 - Para homologação remota, confirme autorização com `ALLOW_REMOTE_LOAD_TEST=true` e forneça credenciais próprias.
-- O login acontece uma vez no `setup`, evitando que o rate limit e o Turnstile sejam o objeto involuntário do teste.
+- O login acontece uma vez no `setup`, evitando que o rate limit seja o objeto involuntário do teste.
 - Em `development`/`test`, somente o agente exato `HortiERP-Load-Test/1.0` é ignorado pelo rate limit global para que
   um único container consiga representar vários clientes. Essa exceção é desativada pelo código quando
   `NODE_ENV=production`; o rate limit de produção permanece intacto.
@@ -93,9 +93,5 @@ ALLOW_REMOTE_LOAD_TEST=true \
 LOAD_PROFILE=baseline \
 LOAD_TEST_EMAIL=operador-carga@exemplo.com \
 LOAD_TEST_PASSWORD='senha-exclusiva' \
-LOAD_TEST_TURNSTILE_TOKEN='token-aceito-no-ambiente' \
 sh scripts/run-load-test.sh
 ```
-
-Se o ambiente usar Turnstile real, prepare um mecanismo autorizado de teste no ambiente de homologação; não desative
-a proteção em produção.

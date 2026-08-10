@@ -1,8 +1,8 @@
 import { api } from './api'
 import type { SessionResponse } from '@/types'
 
-export async function login(email: string, password: string, turnstileToken: string) {
-  const { data } = await api.post<SessionResponse>('/auth/login', { email, password, turnstileToken })
+export async function login(email: string, password: string) {
+  const { data } = await api.post<SessionResponse>('/auth/login', { email, password })
   return data
 }
 

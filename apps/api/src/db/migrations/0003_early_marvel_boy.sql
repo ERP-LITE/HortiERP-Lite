@@ -1,6 +1,0 @@
-CREATE UNIQUE INDEX "categories_company_name_active_unique" ON "categories" USING btree ("company_id",lower("name")) WHERE "categories"."deleted_at" is null;--> statement-breakpoint
-CREATE UNIQUE INDEX "units_company_name_active_unique" ON "units" USING btree ("company_id",lower("name")) WHERE "units"."deleted_at" is null;--> statement-breakpoint
-CREATE UNIQUE INDEX "units_company_abbreviation_active_unique" ON "units" USING btree ("company_id",lower("abbreviation")) WHERE "units"."deleted_at" is null;--> statement-breakpoint
-CREATE UNIQUE INDEX "products_company_name_active_unique" ON "products" USING btree ("company_id",lower("name")) WHERE "products"."deleted_at" is null;--> statement-breakpoint
-CREATE UNIQUE INDEX "products_company_sku_active_unique" ON "products" USING btree ("company_id",lower("sku")) WHERE "products"."deleted_at" is null and "products"."sku" is not null;--> statement-breakpoint
-CREATE INDEX "products_company_active_idx" ON "products" USING btree ("company_id","active");
