@@ -37,7 +37,7 @@ if ! IMAGE_TAG="$image_tag" docker compose --env-file "$env_file" -f "$compose_f
   exit 1
 fi
 
-migrate_container=$(IMAGE_TAG="$image_tag" docker compose --env-file "$env_file" -f "$compose_file" ps -q migrate)
+migrate_container=$(IMAGE_TAG="$image_tag" docker compose --env-file "$env_file" -f "$compose_file" ps --all -q migrate)
 if [ -z "$migrate_container" ]; then
   echo "Deploy falhou: container de migration não foi encontrado." >&2
   exit 1
