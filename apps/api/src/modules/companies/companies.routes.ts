@@ -27,6 +27,7 @@ import {
   listPlatformUsers,
   updatePlatformUser,
 } from './platform-users.service.js'
+import { findAddressByCep } from './cep.service.js'
 
 export async function companiesRoutes(app: FastifyInstance) {
   app.addHook('preHandler', authenticate)
@@ -35,6 +36,10 @@ export async function companiesRoutes(app: FastifyInstance) {
   app.get('/companies', async (request) => {
     const query = listCompaniesQuerySchema.parse(request.query)
     return listCompanies(query)
+  })
+
+  app.get<{ Params: { cep: string } }>('/address/cep/:cep', async (request) => {
+    return findAddressByCep(request.params.cep)
   })
 
   app.get('/platform-users', async (request) => {
