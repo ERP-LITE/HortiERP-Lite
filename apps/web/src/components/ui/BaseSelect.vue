@@ -7,6 +7,7 @@ const props = withDefaults(defineProps<{
   label?: string
   required?: boolean
   error?: string
+  invalid?: boolean
   options: { value: string; label: string }[]
   placeholder?: string
   searchable?: boolean
@@ -120,7 +121,7 @@ onBeforeUnmount(() => {
         :value="modelValue"
         :required="required"
         class="w-full appearance-none rounded-lg border border-gray-300 pl-3.5 pr-10 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 bg-white dark:bg-gray-800 dark:border-gray-600 dark:text-gray-100"
-        :class="{ 'border-red-400': error }"
+        :class="{ 'border-red-400': error || invalid }"
         @change="$emit('update:modelValue', ($event.target as HTMLSelectElement).value)"
       >
         <option value="" disabled>{{ placeholder ?? 'Selecione...' }}</option>
@@ -139,7 +140,7 @@ onBeforeUnmount(() => {
         ref="trigger"
         type="button"
         class="flex w-full items-center rounded-lg border border-gray-300 bg-white py-2.5 pl-3.5 pr-3 text-left text-sm text-gray-900 shadow-sm transition-colors hover:border-gray-400 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:hover:border-gray-500"
-        :class="{ 'border-red-400': error }"
+        :class="{ 'border-red-400': error || invalid }"
         :aria-expanded="open"
         aria-haspopup="listbox"
         @click="toggleDropdown"
@@ -163,7 +164,7 @@ onBeforeUnmount(() => {
       />
 
     </template>
-    <span v-if="error" class="block text-xs text-red-600 mt-1">{{ error }}</span>
+    <span v-if="error" class="mt-1 block text-xs text-red-600 dark:text-red-400">{{ error }}</span>
   </div>
 
   <Teleport to="body">

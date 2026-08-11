@@ -90,6 +90,12 @@ const router = createRouter({
       meta: { roles: ['super_admin'] },
     },
     {
+      path: '/cobrancas',
+      name: 'cobrancas',
+      component: () => import('@/modules/cobrancas/BillingsView.vue'),
+      meta: { roles: ['super_admin'] },
+    },
+    {
       path: '/selecionar-empresa',
       name: 'selecionar-empresa',
       component: () => import('@/modules/empresas/SelectCompanyView.vue'),
@@ -127,6 +133,7 @@ router.beforeEach(async (to) => {
     isSuperAdmin &&
     !to.meta.public &&
     to.name !== 'empresas' &&
+    to.name !== 'cobrancas' &&
     to.name !== 'selecionar-empresa' &&
     to.name !== 'logs-tecnicos' &&
     to.name !== 'perfil'

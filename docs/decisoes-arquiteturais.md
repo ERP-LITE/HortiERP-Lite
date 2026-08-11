@@ -37,6 +37,16 @@ Padrão nos módulos de cadastro (categorias, unidades, produtos, usuários): le
 
 Já `POST /stock/adjust` (ajuste manual de estoque, ver [fluxos de negócio](./fluxos-de-negocio.md#ajuste-manual-de-estoque)) exige `admin`/`gerente`, no mesmo padrão dos cadastros. Diferente de entrada/perda, o ajuste sobrescreve diretamente o saldo calculado pelo sistema sem passar por nenhuma validação de origem — é uma correção, não uma operação rotineira, então fica sob controle gerencial.
 
+O módulo `/billings` é uma exceção administrativa da plataforma: todas as rotas exigem `super_admin` em sessão
+normal, e ficam inacessíveis durante impersonação. Ele registra recebimentos informados manualmente e não armazena
+cartão, token bancário nem inicia transações financeiras. Por lidar com dinheiro, `company_billings` é a única tabela
+cujas colunas de auditoria (`created_by`/`updated_by`) declaram chave estrangeira para `users` com `on delete set
+null`, em vez de usar o `auditBy` compartilhado — o resto do sistema aceita um uuid solto ali, aqui não.
+
+A situação de cada cobrança (`pago`, `pendente`, `atrasado`) é derivada no `select`, junto do mesmo `today` que monta
+o filtro por status — a tela só exibe o que o banco calculou. Regra duplicada em SQL e em JavaScript acabaria
+divergindo justamente na virada do dia, quando a diferença aparece pro usuário.
+
 ## Empresa da Plataforma e `super_admin`
 
 `super_admin` é o papel do dono do sistema (quem vende o ERP pra novas frutarias), não de ninguém dentro de uma empresa-cliente. Como `users.companyId` é `NOT NULL` (sem tabela de junção — ver acima), o(s) usuário(s) `super_admin` precisam pertencer a **alguma** `companyId`. Em vez de tornar essa coluna nulável (o que forçaria revisar toda query que já assume `companyId` presente), existe uma empresa dedicada chamada **"Plataforma"**, criada uma única vez por um script de bootstrap (`apps/api/src/db/seedPlatform.ts`, rodado manualmente via `npm run db:seed:platform`) — nunca é uma empresa-cliente de verdade, só existe pra satisfazer a FK.
@@ -69,7 +79,8 @@ Endpoints envolvidos: `POST /companies/:id/impersonate` (super_admin only — en
 ## Soft delete e auditoria
 
 - `deletedAt` (nulável) em quase toda tabela — "excluir" é sempre um `UPDATE ... SET deleted_at = now()`, nunca um `DELETE`. Toda query de listagem/busca filtra `isNull(deletedAt)`.
-- `createdBy`/`updatedBy`: `uuid` solto, sem `references()` — decisão deliberada (não só uma omissão) que permite a impersonação funcionar sem violar integridade referencial mesmo quando quem agiu não pertence à empresa do registro.
+- **Exceção**: `company_billings` apaga a linha de verdade, pelos motivos descritos em [fluxos de negócio](./fluxos-de-negocio.md#controle-manual-de-cobranças). A coluna `deleted_at` continua existindo ali porque vem do helper `timestamps`, mas não é usada — o mesmo já acontece em `losses` e `stock_entries`, que não expõem exclusão nenhuma.
+- `createdBy`/`updatedBy`: `uuid` solto, sem `references()` — decisão deliberada (não só uma omissão) que permite a impersonação funcionar sem violar integridade referencial mesmo quando quem agiu não pertence à empresa do registro. `company_billings` é a única tabela que declara a FK para `users` (`on delete set null`): ela nunca é escrita durante impersonação, e por lidar com dinheiro compensa amarrar o responsável.
 - Categorias, unidades, produtos e usuários aceitam exclusão individual e em lote. A operação em lote recebe de 1 a 100 ids, aplica um único `UPDATE`, sempre combina os ids com o `companyId` da sessão e mantém as mesmas regras de papel da exclusão individual (`admin`/`gerente`; usuários somente `admin`).
 
 ## Paginação
@@ -79,6 +90,23 @@ Padrão único em todo módulo de listagem: `paginationQuerySchema` (Zod, `share
 Os detalhamentos dos relatórios de perdas e entradas também seguem esse contrato. No frontend, listas usadas como opções de formulário percorrem todas as páginas por meio de `services/paginatedOptions.ts`; assim, o limite de 100 por requisição não oculta opções de empresas com cadastros maiores.
 
 Campos textuais potencialmente extensos nas tabelas usam o componente compartilhado `ExpandableText`: a célula mantém largura limitada, exibe uma prévia e permite expandir pelo chevron sem provocar overflow horizontal. O componente força a quebra de sequências sem espaços e libera o conteúdo completo para impressão. Esse comportamento é independente do `v-mobile-accordion`, responsável por transformar linhas de tabela em cartões expansíveis em telas pequenas.
+
+Datas escolhidas na interface usam o `DateInput` compartilhado, com calendário próprio em português, compatível com
+tema claro/escuro e renderizado acima de modais. Isso evita diferenças de idioma e aparência dos seletores nativos
+de cada navegador, mantendo o valor técnico enviado à API no formato ISO `AAAA-MM-DD`.
+
+"Hoje" nunca sai de `new Date().toISOString()`: isso devolve a data em UTC, que a partir das 21h de Brasília já é o
+dia seguinte — uma cobrança venceria hoje e apareceria como atrasada no fim da tarde. O front usa `todayIso()`
+(`lib/period.ts`), com o relógio local do usuário, e a API usa `todayIsoDate()` (`shared/utils/date.ts`), fixado em
+`America/Sao_Paulo` porque os containers rodam em UTC.
+
+Os controles da barra de ações das listagens (busca, filtro, impressão e o botão de novo registro) têm todos `h-10`.
+A altura mora nos componentes compartilhados (`BaseButton`, `SearchInput`, `FilterButton`, `PrintButton`), não nas
+telas — ajustar tamanho por view era o que fazia os botões saírem desalinhados entre si.
+
+Formulários com validação própria usam `novalidate`: mensagens nativas do navegador não competem com o retorno
+padronizado da aplicação. Campos inválidos recebem borda vermelha e uma mensagem em vermelho logo abaixo do
+componente, inclusive selects, competência e calendário.
 
 ## Ordenação das listagens
 

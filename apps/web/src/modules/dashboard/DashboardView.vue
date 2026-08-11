@@ -11,7 +11,7 @@ import PrintButton from '@/components/ui/PrintButton.vue'
 import PeriodPicker from '@/components/ui/PeriodPicker.vue'
 import ExpandableText from '@/components/ui/ExpandableText.vue'
 import { rangeForPreset, type PeriodValue } from '@/lib/period'
-import { formatDate, formatDateOnly } from '@/lib/format'
+import { formatCurrency, formatDate, formatDateOnly } from '@/lib/format'
 import { useFilterModal } from '@/composables/useFilterModal'
 import DonutChart from '@/components/charts/DonutChart.vue'
 import MovementsTrendChart from '@/components/charts/MovementsTrendChart.vue'
@@ -49,10 +49,6 @@ const typeVariant: Record<MovementType, 'success' | 'danger' | 'neutral'> = {
   entrada: 'success',
   perda: 'danger',
   ajuste: 'neutral',
-}
-
-function formatCurrency(value: number) {
-  return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 }
 
 function formatMovementTime(value: string) {

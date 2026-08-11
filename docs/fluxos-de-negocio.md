@@ -104,3 +104,24 @@ Fluxo exclusivo do papel `super_admin` (dono da plataforma, não de nenhum clien
 2. Em `/empresas`, cadastra uma nova empresa-cliente junto com o primeiro usuário admin dela numa única transação (`POST /companies`). Para manter o modal compacto, a criação é dividida em três abas: **Dados gerais** (identificação e contato), **Endereço** e **Administrador da empresa**; na edição aparecem somente as duas primeiras, pois usuários são gerenciados separadamente. Cada aba combina ícone e texto no desktop e mantém apenas o ícone no mobile, com rótulo acessível e tooltip. Ao completar oito dígitos no CEP, a interface tenta preencher o endereço por BrasilAPI, ViaCEP e OpenCEP, nessa ordem, com timeout individual e fallback automático; os campos permanecem editáveis e uma resposta atrasada de um CEP anterior é ignorada. O cadastro reúne nome fantasia, razão social, CNPJ, inscrição estadual opcional, responsável, e-mail, telefone e endereço completo. CNPJ, telefone e CEP são normalizados; o CNPJ passa pela validação dos dígitos verificadores e não pode se repetir entre empresas não excluídas. Na mesma tela o `super_admin` edita esses dados, ativa/suspende o acesso (`PATCH /companies/:id/active` — suspender bloqueia login de todos os usuários daquela empresa imediatamente) e gerencia os demais usuários `super_admin` da plataforma (`/platform-users`). A própria conta autenticada não pode ser excluída.
 3. Clicar numa empresa ativa em `/selecionar-empresa` "entra" nela (`POST /companies/:id/impersonate`): passa a ver e editar os dados daquela empresa com permissão de admin, mantendo seu próprio nome/e-mail de super_admin.
 4. Uma faixa fixa no topo avisa que está em modo suporte, com botão pra voltar ao próprio perfil de super_admin sem logout (`POST /auth/exit-impersonation`).
+
+## Controle manual de cobranças
+
+Tela `/cobrancas`, exclusiva do `super_admin` fora do modo de impersonação. O módulo é um controle administrativo
+interno e não possui checkout, assinatura automática, emissão de boleto ou integração com gateway de pagamento.
+
+Cada registro vincula uma empresa-cliente a uma competência mensal e guarda vencimento, valor previsto, observações
+e, quando recebido, valor e data do pagamento. Uma empresa não pode ter duas cobranças da mesma competência. A
+listagem permite pesquisar por empresa e, pelo modal de filtros compartilhado do sistema, filtrar o vencimento por
+período e pelos estados `pago`, `pendente` e `atrasado`; o estado é calculado pela API com base na data de pagamento
+e no vencimento. Datas do filtro e dos formulários são apresentadas no padrão brasileiro `dd/mm/aaaa`; a competência
+usa seletores próprios de mês em português e ano, sem depender do seletor nativo do navegador.
+
+As rotas `GET/POST/PUT/DELETE /billings` exigem o papel `super_admin`. Marcar como pago exige data e valor pagos em
+conjunto; desmarcar limpa ambos. O sistema não suspende automaticamente uma empresa inadimplente: eventual suspensão
+continua sendo uma decisão manual na gestão de empresas.
+
+Diferente dos cadastros (produtos, categorias, unidades, usuários), excluir uma cobrança apaga a linha de verdade:
+o registro é digitado à mão pelo próprio `super_admin` e a exclusão serve pra corrigir um lançamento errado, não pra
+"arquivar" um histórico. Manter a linha escondida por `deleted_at` também travaria o índice único da competência, que
+impediria relançar o mesmo mês depois de apagar o engano.

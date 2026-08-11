@@ -17,6 +17,7 @@ import {
   Tag,
   Users,
   Warehouse,
+  WalletCards,
 } from '@lucide/vue'
 import ThemeToggle from '@/components/ui/ThemeToggle.vue'
 import AppUserMenu from '@/components/AppUserMenu.vue'
@@ -54,6 +55,7 @@ const navItems = computed(() => {
     return [
       { name: 'selecionar-empresa', label: 'Selecionar empresa', icon: Store },
       { name: 'empresas', label: 'Configurações', icon: Building2 },
+      { name: 'cobrancas', label: 'Cobranças', icon: WalletCards },
       { name: 'logs-tecnicos', label: 'Logs técnicos', icon: Bug },
     ]
   }
@@ -129,12 +131,13 @@ function isActive(name: string) {
         <span>Você está acessando como suporte em <strong>{{ auth.impersonatingCompanyName }}</strong></span>
         <button
           type="button"
-          class="inline-flex items-center gap-1.5 font-medium hover:underline disabled:opacity-60"
+          class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg hover:bg-amber-200/70 disabled:opacity-60 dark:hover:bg-amber-800/40"
           :disabled="exitingImpersonation"
+          :title="exitingImpersonation ? 'Saindo...' : 'Voltar ao super admin'"
+          :aria-label="exitingImpersonation ? 'Saindo...' : 'Voltar ao super admin'"
           @click="handleExitImpersonation"
         >
-          <LogOut :size="14" />
-          {{ exitingImpersonation ? 'Saindo...' : 'Voltar ao super admin' }}
+          <LogOut :size="18" />
         </button>
       </div>
       <header
