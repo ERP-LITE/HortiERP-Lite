@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { Eye, EyeOff } from '@lucide/vue'
+import { formatInputMask, type InputMask } from '@/lib/format'
 
 const props = defineProps<{
   modelValue: string | number | null | undefined
@@ -11,6 +12,7 @@ const props = defineProps<{
   error?: string
   step?: string
   decimalPlaces?: number
+  mask?: InputMask
 }>()
 
 const emit = defineEmits<{ 'update:modelValue': [value: string] }>()
@@ -18,6 +20,7 @@ const emit = defineEmits<{ 'update:modelValue': [value: string] }>()
 const showPassword = ref(false)
 const isPassword = computed(() => props.type === 'password')
 const isDecimal = computed(() => props.decimalPlaces !== undefined)
+const isMasked = computed(() => props.mask !== undefined)
 const resolvedType = computed(() => {
   if (isDecimal.value) return 'text'
   if (!isPassword.value) return props.type ?? 'text'
@@ -25,6 +28,7 @@ const resolvedType = computed(() => {
 })
 
 const displayValue = computed(() => {
+  if (isMasked.value) return formatInputMask(String(props.modelValue ?? ''), props.mask!)
   if (!isDecimal.value || props.modelValue === null || props.modelValue === undefined || props.modelValue === '') {
     return props.modelValue ?? ''
   }
@@ -40,6 +44,10 @@ const displayValue = computed(() => {
 
 function handleInput(event: Event) {
   const input = event.target as HTMLInputElement
+  if (isMasked.value) {
+    emit('update:modelValue', formatInputMask(input.value, props.mask!))
+    return
+  }
   if (!isDecimal.value) {
     emit('update:modelValue', input.value)
     return
@@ -66,7 +74,7 @@ function handleInput(event: Event) {
       <input
         :value="displayValue"
         :type="resolvedType"
-        :inputmode="isDecimal ? 'numeric' : undefined"
+        :inputmode="isDecimal || isMasked ? 'numeric' : undefined"
         :placeholder="placeholder"
         :required="required"
         :step="step"

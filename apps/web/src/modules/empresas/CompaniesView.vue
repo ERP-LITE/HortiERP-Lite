@@ -376,21 +376,21 @@ onMounted(loadCompanies)
           <div class="grid gap-4 sm:grid-cols-2">
             <BaseInput v-model="editForm.name" label="Nome fantasia" :error="fieldErrors.name" required />
             <BaseInput v-model="editForm.legalName" label="Razão social" :error="fieldErrors.legalName" required />
-            <BaseInput v-model="editForm.document" label="CNPJ" placeholder="00.000.000/0000-00" :error="fieldErrors.document" required />
+            <BaseInput v-model="editForm.document" mask="cnpj" label="CNPJ" placeholder="00.000.000/0000-00" :error="fieldErrors.document" required />
             <BaseInput v-model="editForm.stateRegistration" label="Inscrição estadual (opcional)" :error="fieldErrors.stateRegistration" />
           </div>
           <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Contato</p>
           <div class="grid gap-4 sm:grid-cols-2">
             <BaseInput v-model="editForm.contactName" label="Responsável" :error="fieldErrors.contactName" required />
             <BaseInput v-model="editForm.contactEmail" type="email" label="E-mail" :error="fieldErrors.contactEmail" required />
-            <BaseInput v-model="editForm.phone" label="Telefone / WhatsApp" :error="fieldErrors.phone" required />
+            <BaseInput v-model="editForm.phone" mask="phone" label="Telefone / WhatsApp" placeholder="(00) 00000-0000" :error="fieldErrors.phone" required />
           </div>
         </div>
         <div v-show="modalTab === 'address'" class="space-y-5">
           <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Endereço</p>
           <div class="grid gap-4 sm:grid-cols-2">
             <div>
-              <BaseInput v-model="editForm.postalCode" label="CEP" :error="fieldErrors.postalCode" required />
+              <BaseInput v-model="editForm.postalCode" mask="cep" label="CEP" placeholder="00000-000" :error="fieldErrors.postalCode" required />
               <span v-if="lookingUpCep" class="mt-1 block text-xs text-gray-500 dark:text-gray-400">Buscando endereço...</span>
             </div>
             <BaseInput v-model="editForm.street" label="Logradouro" :error="fieldErrors.street" required />
@@ -416,21 +416,21 @@ onMounted(loadCompanies)
           <div class="grid gap-4 sm:grid-cols-2">
             <BaseInput v-model="createForm.name" label="Nome fantasia" :error="fieldErrors.name" required />
             <BaseInput v-model="createForm.legalName" label="Razão social" :error="fieldErrors.legalName" required />
-            <BaseInput v-model="createForm.document" label="CNPJ" placeholder="00.000.000/0000-00" :error="fieldErrors.document" required />
+            <BaseInput v-model="createForm.document" mask="cnpj" label="CNPJ" placeholder="00.000.000/0000-00" :error="fieldErrors.document" required />
             <BaseInput v-model="createForm.stateRegistration" label="Inscrição estadual (opcional)" :error="fieldErrors.stateRegistration" />
           </div>
           <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Contato</p>
           <div class="grid gap-4 sm:grid-cols-2">
             <BaseInput v-model="createForm.contactName" label="Responsável" :error="fieldErrors.contactName" required />
             <BaseInput v-model="createForm.contactEmail" type="email" label="E-mail de contato" :error="fieldErrors.contactEmail" required />
-            <BaseInput v-model="createForm.phone" label="Telefone / WhatsApp" :error="fieldErrors.phone" required />
+            <BaseInput v-model="createForm.phone" mask="phone" label="Telefone / WhatsApp" placeholder="(00) 00000-0000" :error="fieldErrors.phone" required />
           </div>
         </div>
         <div v-show="modalTab === 'address'" class="space-y-5">
           <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Endereço</p>
           <div class="grid gap-4 sm:grid-cols-2">
             <div>
-              <BaseInput v-model="createForm.postalCode" label="CEP" :error="fieldErrors.postalCode" required />
+              <BaseInput v-model="createForm.postalCode" mask="cep" label="CEP" placeholder="00000-000" :error="fieldErrors.postalCode" required />
               <span v-if="lookingUpCep" class="mt-1 block text-xs text-gray-500 dark:text-gray-400">Buscando endereço...</span>
             </div>
             <BaseInput v-model="createForm.street" label="Logradouro" :error="fieldErrors.street" required />
