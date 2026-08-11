@@ -79,7 +79,7 @@ onBeforeUnmount(() => document.removeEventListener('click', handleOutsideClick))
 </script>
 
 <template>
-  <div ref="container" class="relative block">
+  <div ref="container" class="relative block" :class="{ 'z-30': open }">
     <span v-if="label" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{{ label }}</span>
     <div v-if="!searchable" class="relative">
       <select
@@ -129,7 +129,7 @@ onBeforeUnmount(() => document.removeEventListener('click', handleOutsideClick))
 
       <div
         v-if="open"
-        class="relative z-10 mt-1.5 w-full overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl ring-1 ring-black/5 dark:border-gray-600 dark:bg-gray-800 dark:ring-white/5"
+        class="absolute left-0 top-full z-50 mt-1.5 w-full overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl ring-1 ring-black/5 dark:border-gray-600 dark:bg-gray-800 dark:ring-white/5"
       >
         <div class="border-b border-gray-100 p-2 dark:border-gray-700">
           <div class="relative">
