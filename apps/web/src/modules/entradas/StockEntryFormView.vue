@@ -6,6 +6,7 @@ import PageHeader from '@/components/ui/PageHeader.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
 import BaseSelect from '@/components/ui/BaseSelect.vue'
+import DateInput from '@/components/ui/DateInput.vue'
 import { getApiErrorMessage } from '@/services/api'
 import { toastError, toastSuccess } from '@/lib/alerts'
 import { listAllProducts } from '@/services/productsService'
@@ -150,7 +151,7 @@ onMounted(loadProducts)
         <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <BaseInput v-model="invoiceNumber" label="Número da nota" />
           <BaseInput v-model="invoiceSeries" label="Série" />
-          <BaseInput v-model="invoiceIssuedAt" type="date" label="Data de emissão" />
+          <DateInput v-model="invoiceIssuedAt" label="Data de emissão" />
           <BaseInput v-model="invoiceTotal" :decimal-places="2" label="Valor total (R$)" />
           <div class="sm:col-span-2">
             <BaseInput

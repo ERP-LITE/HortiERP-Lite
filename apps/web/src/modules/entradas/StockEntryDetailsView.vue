@@ -6,9 +6,10 @@ import PageHeader from '@/components/ui/PageHeader.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseModal from '@/components/ui/BaseModal.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
+import DateInput from '@/components/ui/DateInput.vue'
 import ExpandableText from '@/components/ui/ExpandableText.vue'
 import SortableTableHeader from '@/components/ui/SortableTableHeader.vue'
-import { formatDate, formatDateTime } from '@/lib/format'
+import { formatCurrency, formatDate, formatDateTime } from '@/lib/format'
 import { confirmDelete, toastError, toastSuccess } from '@/lib/alerts'
 import { getApiErrorMessage } from '@/services/api'
 import {
@@ -54,11 +55,6 @@ const editForm = ref({
   invoiceTotal: '',
 })
 const entryId = computed(() => String(route.params.id))
-
-function formatCurrency(value: string | null) {
-  if (!value) return '—'
-  return Number(value).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
-}
 
 function formatFileSize(size: number) {
   return size >= 1024 * 1024 ? `${(size / 1024 / 1024).toFixed(2)} MB` : `${Math.ceil(size / 1024)} KB`
@@ -240,7 +236,7 @@ onBeforeUnmount(clearPreview)
         <div class="overflow-x-auto">
           <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
             <thead class="bg-gray-50 dark:bg-gray-900/60"><tr><SortableTableHeader field="product" :active-field="itemSort.sortBy.value" :order="itemSort.sortOrder.value" @sort="itemSort.toggleSort">Produto</SortableTableHeader><SortableTableHeader field="quantity" :active-field="itemSort.sortBy.value" :order="itemSort.sortOrder.value" align="right" @sort="itemSort.toggleSort">Quantidade</SortableTableHeader><SortableTableHeader field="unitCost" :active-field="itemSort.sortBy.value" :order="itemSort.sortOrder.value" align="right" @sort="itemSort.toggleSort">Custo unitário</SortableTableHeader></tr></thead>
-            <tbody class="divide-y divide-gray-100 dark:divide-gray-700"><tr v-for="item in itemSort.sortedItems.value" :key="item.id"><td class="max-w-80 px-4 py-3 text-sm font-medium dark:text-gray-100"><ExpandableText :text="item.product.name" /></td><td class="px-4 py-3 text-right text-sm whitespace-nowrap dark:text-gray-300">{{ Number(item.quantity) }} {{ item.product.unit.abbreviation }}</td><td class="px-4 py-3 text-right text-sm dark:text-gray-300">{{ formatCurrency(item.unitCost) }}</td></tr></tbody>
+            <tbody class="divide-y divide-gray-100 dark:divide-gray-700"><tr v-for="item in itemSort.sortedItems.value" :key="item.id"><td class="max-w-80 px-4 py-3 text-sm font-medium dark:text-gray-100"><ExpandableText :text="item.product.name" /></td><td class="px-4 py-3 text-right text-sm whitespace-nowrap dark:text-gray-300">{{ Number(item.quantity) }} {{ item.product.unit.abbreviation }}</td><td class="px-4 py-3 text-right text-sm dark:text-gray-300">{{ formatCurrency(item.unitCost, '—') }}</td></tr></tbody>
           </table>
         </div>
       </section>
@@ -257,7 +253,7 @@ onBeforeUnmount(clearPreview)
           <div><p class="text-xs text-gray-500 dark:text-gray-400">Número</p><p class="mt-1 break-all font-medium dark:text-gray-100">{{ entry.invoiceNumber || '—' }}</p></div>
           <div><p class="text-xs text-gray-500 dark:text-gray-400">Série</p><p class="mt-1 break-all font-medium dark:text-gray-100">{{ entry.invoiceSeries || '—' }}</p></div>
           <div><p class="text-xs text-gray-500 dark:text-gray-400">Emissão</p><p class="mt-1 font-medium dark:text-gray-100">{{ entry.invoiceIssuedAt ? formatDate(entry.invoiceIssuedAt) : '—' }}</p></div>
-          <div><p class="text-xs text-gray-500 dark:text-gray-400">Valor total</p><p class="mt-1 font-medium dark:text-gray-100">{{ formatCurrency(entry.invoiceTotal) }}</p></div>
+          <div><p class="text-xs text-gray-500 dark:text-gray-400">Valor total</p><p class="mt-1 font-medium dark:text-gray-100">{{ formatCurrency(entry.invoiceTotal, '—') }}</p></div>
           <div class="sm:col-span-2 lg:col-span-5"><p class="text-xs text-gray-500 dark:text-gray-400">Chave de acesso</p><p class="mt-1 break-all font-mono text-xs dark:text-gray-100">{{ entry.invoiceAccessKey || '—' }}</p></div>
         </div>
         <div class="border-t border-gray-200 p-5 dark:border-gray-700">
@@ -294,7 +290,7 @@ onBeforeUnmount(clearPreview)
           <BaseInput v-model="editForm.supplierName" label="Fornecedor" />
           <BaseInput v-model="editForm.invoiceNumber" label="Número da nota" />
           <BaseInput v-model="editForm.invoiceSeries" label="Série" />
-          <BaseInput v-model="editForm.invoiceIssuedAt" type="date" label="Data de emissão" />
+          <DateInput v-model="editForm.invoiceIssuedAt" label="Data de emissão" />
           <BaseInput v-model="editForm.invoiceTotal" :decimal-places="2" label="Valor total (R$)" />
           <div class="sm:col-span-2">
             <BaseInput v-model="editForm.invoiceAccessKey" label="Chave de acesso (44 dígitos)" />

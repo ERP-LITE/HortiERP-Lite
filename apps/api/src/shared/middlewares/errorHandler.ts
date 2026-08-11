@@ -45,6 +45,10 @@ export function errorHandler(error: FastifyError | Error, request: FastifyReques
       products_company_sku_active_unique: { field: 'sku', message: 'Já existe um produto com esse SKU' },
       companies_document_active_unique: { field: 'document', message: 'Já existe uma empresa com esse CNPJ' },
       users_email_unique: { field: 'email', message: 'Já existe um usuário com esse e-mail' },
+      company_billings_company_reference_unique: {
+        field: 'referenceMonth',
+        message: 'Já existe uma cobrança para essa empresa e competência',
+      },
     }
     const duplicate = duplicateByConstraint[constraint]
     const message = duplicate?.message ?? 'Já existe um registro com esses dados'
