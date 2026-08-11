@@ -10,6 +10,7 @@ const props = defineProps<{
   placeholder?: string
   required?: boolean
   error?: string
+  invalid?: boolean
   step?: string
   decimalPlaces?: number
   mask?: InputMask
@@ -18,6 +19,7 @@ const props = defineProps<{
 const emit = defineEmits<{ 'update:modelValue': [value: string] }>()
 
 const showPassword = ref(false)
+const inputElement = ref<HTMLInputElement | null>(null)
 const isPassword = computed(() => props.type === 'password')
 const isDecimal = computed(() => props.decimalPlaces !== undefined)
 const isMasked = computed(() => props.mask !== undefined)
@@ -65,6 +67,10 @@ function handleInput(event: Event) {
   const decimalPart = normalized.slice(-places)
   emit('update:modelValue', places > 0 ? `${integerPart}.${decimalPart}` : integerPart)
 }
+
+defineExpose({
+  focus: () => inputElement.value?.focus(),
+})
 </script>
 
 <template>
@@ -72,6 +78,7 @@ function handleInput(event: Event) {
     <span v-if="label" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{{ label }}</span>
     <div class="relative">
       <input
+        ref="inputElement"
         :value="displayValue"
         :type="resolvedType"
         :inputmode="isDecimal || isMasked ? 'numeric' : undefined"
@@ -79,7 +86,7 @@ function handleInput(event: Event) {
         :required="required"
         :step="step"
         class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-100 dark:placeholder:text-gray-500"
-        :class="[{ 'border-red-400': error }, isPassword ? 'pr-10' : '']"
+        :class="[{ 'border-red-400': error || invalid }, isPassword ? 'pr-10' : '']"
         @input="handleInput"
       />
       <button

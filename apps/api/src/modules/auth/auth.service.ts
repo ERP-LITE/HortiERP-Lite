@@ -11,17 +11,17 @@ export async function authenticateUser(email: string, password: string) {
   })
 
   if (!user || !user.active) {
-    throw AppError.unauthorized('Credenciais inválidas')
+    throw AppError.unauthorized('E-mail ou senha incorretos')
   }
 
   if (!user.company || !user.company.active || user.company.deletedAt) {
-    throw AppError.unauthorized('Credenciais inválidas')
+    throw AppError.unauthorized('E-mail ou senha incorretos')
   }
 
   const passwordMatches = await bcrypt.compare(password, user.passwordHash)
 
   if (!passwordMatches) {
-    throw AppError.unauthorized('Credenciais inválidas')
+    throw AppError.unauthorized('E-mail ou senha incorretos')
   }
 
   return user
