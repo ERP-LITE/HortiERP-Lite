@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import axios from 'axios'
+import { computed, nextTick, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import AuthLayout from '@/layouts/AuthLayout.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
@@ -12,6 +13,8 @@ const password = ref('')
 const loading = ref(false)
 const errorMessage = ref('')
 const fieldErrors = ref<Record<string, string>>({})
+const invalidCredentials = ref(false)
+const passwordInput = ref<{ focus: () => void } | null>(null)
 
 const auth = useAuthStore()
 const router = useRouter()
@@ -26,6 +29,7 @@ async function handleSubmit() {
   loading.value = true
   errorMessage.value = ''
   fieldErrors.value = {}
+  invalidCredentials.value = false
 
   try {
     await auth.login(email.value, password.value)
@@ -36,6 +40,12 @@ async function handleSubmit() {
     const resolved = resolveFormError(error, 'Não foi possível entrar. Verifique suas credenciais.')
     fieldErrors.value = resolved.fieldErrors
     errorMessage.value = resolved.message
+    if (axios.isAxiosError(error) && error.response?.status === 401) {
+      invalidCredentials.value = true
+      errorMessage.value = 'E-mail ou senha incorretos.'
+      await nextTick()
+      passwordInput.value?.focus()
+    }
   } finally {
     loading.value = false
   }
@@ -48,13 +58,15 @@ async function handleSubmit() {
       <p v-if="sessionMessage" class="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:bg-amber-900/30 dark:text-amber-200">
         {{ sessionMessage }}
       </p>
-      <BaseInput v-model="email" type="email" label="E-mail" placeholder="seu@email.com" :error="fieldErrors.email" />
+      <BaseInput v-model="email" type="email" label="E-mail" placeholder="seu@email.com" :error="fieldErrors.email" :invalid="invalidCredentials" />
       <BaseInput
+        ref="passwordInput"
         v-model="password"
         type="password"
         label="Senha"
         placeholder="••••••••"
         :error="fieldErrors.password"
+        :invalid="invalidCredentials"
       />
 
       <p v-if="errorMessage" class="text-sm text-red-600 dark:text-red-400">{{ errorMessage }}</p>
