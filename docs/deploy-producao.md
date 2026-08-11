@@ -123,12 +123,13 @@ Cadastre estes segredos no repositório em **Settings > Secrets and variables > 
 
 - `ORACLE_HOST`: IP público da VM, por exemplo `163.176.246.92`.
 - `ORACLE_USER`: usuário SSH, normalmente `ubuntu`.
-- `ORACLE_SSH_PRIVATE_KEY`: conteúdo completo de uma chave privada autorizada na VM.
+- `ORACLE_SSH_PRIVATE_KEY_BASE64`: chave privada autorizada na VM codificada em Base64, em uma única linha.
 - `ORACLE_SSH_KNOWN_HOSTS`: linha da chave pública do host retornada por `ssh-keyscan` e conferida antes do cadastro.
 
 Use de preferência uma chave SSH exclusiva para o GitHub Actions, sem senha, em vez da chave pessoal usada no
 terminal. Adicione apenas a chave pública correspondente ao arquivo `~/.ssh/authorized_keys` do usuário `ubuntu` na
-VM. O workflow nunca envia nem sobrescreve `.env.production`, `.env`, `apps/api/.env` ou `apps/web/.env`.
+VM. Gere o valor Base64 com `base64 -w 0 /caminho/da/chave_privada`. O workflow nunca envia nem sobrescreve
+`.env.production`, `.env`, `apps/api/.env` ou `apps/web/.env`.
 
 O código é sincronizado em `/home/ubuntu/ERP-LITE` e o `deploy/deploy.sh` é executado com o SHA do commit como tag
 das imagens. Os deploys da mesma branch não são executados simultaneamente. O resultado pode ser acompanhado na aba
