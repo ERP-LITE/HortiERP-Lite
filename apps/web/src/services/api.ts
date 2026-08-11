@@ -2,6 +2,16 @@ import axios from 'axios'
 import { ref } from 'vue'
 import type { ApiErrorPayload } from '@/types'
 
+declare module 'axios' {
+  export interface AxiosRequestConfig {
+    suppressSessionEndedRedirect?: boolean
+  }
+
+  export interface InternalAxiosRequestConfig {
+    suppressSessionEndedRedirect?: boolean
+  }
+}
+
 export const api = axios.create({
   baseURL: `${import.meta.env.VITE_API_URL}/api`,
   withCredentials: true,
@@ -26,7 +36,11 @@ api.interceptors.response.use(
   },
   (error) => {
     pendingApiRequests.value = Math.max(0, pendingApiRequests.value - 1)
-    if (error.response?.status === 401 && window.location.pathname !== '/login') {
+    if (
+      error.response?.status === 401 &&
+      !error.config?.suppressSessionEndedRedirect &&
+      window.location.pathname !== '/login'
+    ) {
       if (!redirectingToLogin) {
         redirectingToLogin = true
         window.location.replace('/login?reason=session-ended')
