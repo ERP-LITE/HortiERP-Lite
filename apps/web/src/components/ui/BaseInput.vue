@@ -101,6 +101,6 @@ defineExpose({
         <Eye v-else :size="16" />
       </button>
     </div>
-    <span v-if="error" class="block text-xs text-red-600 mt-1">{{ error }}</span>
+    <span v-if="error" class="mt-1 block text-xs text-red-600 dark:text-red-400">{{ error }}</span>
   </label>
 </template>

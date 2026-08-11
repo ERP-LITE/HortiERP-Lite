@@ -29,6 +29,10 @@
   table.mobile-accordion-table tbody tr > td {
     display: none;
     width: 100%;
+    /* As células usam max-w-* pra impedir que um texto longo estique a tabela no desktop.
+       Dentro do cartão do mobile esse teto deixaria a linha mais estreita que o próprio
+       cartão, cortando o separador antes da borda direita. */
+    max-width: none;
     padding: 0.75rem 1rem;
     white-space: normal;
   }

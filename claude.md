@@ -30,6 +30,7 @@ Criar um MVP funcional com:
 - Histórico de movimentações;
 - Dashboard inicial;
 - Relatórios básicos;
+- Controle manual das mensalidades das empresas-cliente pelo super administrador;
 - Estrutura modular para evolução futura.
 
 ---

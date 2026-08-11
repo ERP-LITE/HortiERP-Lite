@@ -11,7 +11,7 @@ aplicadas nunca devem ser apagadas, renomeadas ou reescritas; toda mudança pass
 
 - **`companyId` obrigatório** (`uuid` com FK para `companies.id`) — é o que garante o isolamento entre empresas-cliente (ver [decisões arquiteturais](./decisoes-arquiteturais.md)). Toda query de toda tabela de negócio filtra por esse campo.
 - **Soft delete** via `deletedAt` (timestamp nulável) — nada é apagado de fato, exceto os poucos casos explicitamente documentados. Helper `timestamps` em `columns.ts` (`createdAt`, `updatedAt`, `deletedAt`).
-- **Auditoria** via `createdBy`/`updatedBy` (`uuid`, sem FK — ver nota nas decisões arquiteturais sobre impersonação). Helper `auditBy` em `columns.ts`.
+- **Auditoria** via `createdBy`/`updatedBy` (`uuid`, sem FK — ver nota nas decisões arquiteturais sobre impersonação; a única exceção é `company_billings`, que declara a FK para `users`). Helper `auditBy` em `columns.ts`.
 - Exceções às duas convenções acima: `companies` (é a raiz, não tem `companyId`), `stock_entry_items` e `stock_movements` (não têm `auditBy` completo — `stock_movements` só tem `createdBy`).
 
 ## Diagrama
@@ -26,6 +26,7 @@ erDiagram
   COMPANIES ||--o{ LOSSES : ""
   COMPANIES ||--o{ STOCK_MOVEMENTS : ""
   COMPANIES ||--o{ SYSTEM_LOGS : ""
+  COMPANIES ||--o{ COMPANY_BILLINGS : recebe
   CATEGORIES ||--o{ PRODUCTS : classifica
   UNITS ||--o{ PRODUCTS : mede
   STOCK_ENTRIES ||--o{ STOCK_ENTRY_ITEMS : contem
@@ -52,6 +53,29 @@ Raiz do multiempresa — cada linha é um cliente (frutaria/hortifrúti) contrat
 | `createdAt`/`updatedAt`/`deletedAt` | timestamp | |
 
 Os campos cadastrais novos são nuláveis no banco para que empresas criadas antes da migration continuem legíveis. A API exige os dados essenciais ao criar uma empresa nova; editar um registro legado pela tela também solicita sua regularização. CNPJ, telefone e CEP são armazenados sem máscara, que é responsabilidade da interface.
+
+### `company_billings`
+
+Controle administrativo manual das mensalidades das empresas-cliente. Não representa cobrança bancária nem executa
+pagamentos: o `super_admin` registra o que foi combinado e marca o recebimento depois de confirmar o pagamento por
+fora do sistema.
+
+| Coluna | Tipo | Observação |
+|---|---|---|
+| `id` | uuid | PK |
+| `companyId` | uuid | FK `companies.id`; cliente ao qual a mensalidade pertence |
+| `referenceMonth` | date | competência persistida como o primeiro dia do mês |
+| `dueDate` | date | vencimento acordado |
+| `amount` | numeric(12,2) | valor previsto da mensalidade |
+| `paidAmount`, `paidAt` | numeric(12,2)/date | ambos nulos enquanto pendente e ambos preenchidos quando pago |
+| `notes` | text | observações administrativas opcionais |
+| `createdBy`, `updatedBy` | uuid | FKs opcionais para o usuário da plataforma responsável |
+| timestamps | | datas de criação e atualização (`deleted_at` vem do bloco compartilhado e não é usado aqui) |
+
+Existe no máximo uma cobrança por empresa e competência. O status não é persistido: a API deriva `pago` quando há
+data de pagamento, `atrasado` quando o vencimento já passou e `pendente` nos demais casos — sempre no `select`, para
+a badge da tela e o filtro por status nunca discordarem. Excluir uma cobrança apaga a linha (ver
+[fluxos de negócio](./fluxos-de-negocio.md#controle-manual-de-cobranças)).
 
 ### `users`
 | Coluna | Tipo | Observação |

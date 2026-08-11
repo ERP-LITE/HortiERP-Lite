@@ -6,11 +6,19 @@ export interface PeriodValue {
   to: string
 }
 
-function toISODate(date: Date) {
+export function toISODate(date: Date) {
   const year = date.getFullYear()
   const month = String(date.getMonth() + 1).padStart(2, '0')
   const day = String(date.getDate()).padStart(2, '0')
   return `${year}-${month}-${day}`
+}
+
+/**
+ * Data de hoje pelo relógio do usuário. Usar `toISOString()` traria a data em
+ * UTC, que a partir das 21h de Brasília já é o dia seguinte.
+ */
+export function todayIso() {
+  return toISODate(new Date())
 }
 
 function addDays(date: Date, days: number) {

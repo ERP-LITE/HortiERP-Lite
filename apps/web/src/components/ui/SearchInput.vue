@@ -30,7 +30,7 @@ onBeforeUnmount(() => clearTimeout(timer))
       v-model="local"
       type="text"
       :placeholder="placeholder ?? 'Buscar...'"
-      class="w-full sm:w-64 rounded-lg border border-gray-300 pl-9 pr-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-100 dark:placeholder:text-gray-500"
+      class="h-10 w-full sm:w-64 rounded-lg border border-gray-300 pl-9 pr-3 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-100 dark:placeholder:text-gray-500"
     />
   </div>
 </template>
