@@ -10,8 +10,8 @@ export async function logout() {
   await api.post('/auth/logout')
 }
 
-export async function fetchMe() {
-  const { data } = await api.get<SessionResponse>('/auth/me')
+export async function fetchMe(suppressSessionEndedRedirect = false) {
+  const { data } = await api.get<SessionResponse>('/auth/me', { suppressSessionEndedRedirect })
   return data
 }
 
