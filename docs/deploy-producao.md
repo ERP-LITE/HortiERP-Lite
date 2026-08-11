@@ -113,6 +113,27 @@ docker compose --env-file .env.production -f docker-compose.production.yml confi
 O container `migrate` deve aparecer como encerrado com código `0`; API, web, gateway, PostgreSQL e backup devem estar
 ativos/saudáveis. `config --volumes` deve listar `invoice_files` junto dos volumes já existentes.
 
+## Deploy automático pelo GitHub Actions
+
+O workflow `.github/workflows/ci.yml` publica automaticamente na Oracle Cloud depois que os builds, as migrations
+de teste e os testes de integração passam em um `push` para a branch `main`. Pull requests e outras branches executam
+somente o CI e nunca alteram a produção.
+
+Cadastre estes segredos no repositório em **Settings > Secrets and variables > Actions > New repository secret**:
+
+- `ORACLE_HOST`: IP público da VM, por exemplo `163.176.246.92`.
+- `ORACLE_USER`: usuário SSH, normalmente `ubuntu`.
+- `ORACLE_SSH_PRIVATE_KEY`: conteúdo completo de uma chave privada autorizada na VM.
+- `ORACLE_SSH_KNOWN_HOSTS`: linha da chave pública do host retornada por `ssh-keyscan` e conferida antes do cadastro.
+
+Use de preferência uma chave SSH exclusiva para o GitHub Actions, sem senha, em vez da chave pessoal usada no
+terminal. Adicione apenas a chave pública correspondente ao arquivo `~/.ssh/authorized_keys` do usuário `ubuntu` na
+VM. O workflow nunca envia nem sobrescreve `.env.production`, `.env`, `apps/api/.env` ou `apps/web/.env`.
+
+O código é sincronizado em `/home/ubuntu/ERP-LITE` e o `deploy/deploy.sh` é executado com o SHA do commit como tag
+das imagens. Os deploys da mesma branch não são executados simultaneamente. O resultado pode ser acompanhado na aba
+**Actions** do repositório; produção só é atualizada quando o job **Deploy to Oracle Cloud** termina com sucesso.
+
 Faça também um teste funcional autenticado:
 
 1. Abra uma entrada existente e confirme que produtos, quantidades e unidades continuam corretos.
