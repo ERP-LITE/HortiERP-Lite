@@ -113,6 +113,10 @@ docker compose --env-file .env.production -f docker-compose.production.yml confi
 O container `migrate` deve aparecer como encerrado com código `0`; API, web, gateway, PostgreSQL e backup devem estar
 ativos/saudáveis. `config --volumes` deve listar `invoice_files` junto dos volumes já existentes.
 
+A versão que introduz o controle de cobranças adiciona a migration incremental `0001_tiny_barracuda.sql`, responsável
+somente pela tabela `company_billings` e seus índices. Ela preserva todas as tabelas e dados anteriores e é compatível
+com a versão anterior da aplicação durante um rollback; a tabela nova apenas ficará sem uso até a versão atual voltar.
+
 ## Deploy automático pelo GitHub Actions
 
 O workflow `.github/workflows/ci.yml` publica automaticamente na Oracle Cloud depois que os builds, as migrations
@@ -146,6 +150,8 @@ Faça também um teste funcional autenticado:
 7. Cadastre uma empresa de teste com CNPJ, contato e endereço; confira validação de duplicidade e preenchimento do
    CEP. Se os provedores externos estiverem indisponíveis, confirme que o endereço ainda aceita digitação manual.
 8. Gere outro backup e execute o teste de restauração para incluir e validar o pacote de anexos.
+9. Entre como `super_admin`, abra `/cobrancas`, crie uma mensalidade de teste e valide os filtros e a marcação como
+   paga antes de remover o registro de teste.
 
 ```bash
 docker compose --env-file .env.production -f docker-compose.production.yml exec backup backup.sh once

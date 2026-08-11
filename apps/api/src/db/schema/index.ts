@@ -8,6 +8,7 @@ import { stockEntries, stockEntryAttachments, stockEntryItems } from './stockEnt
 import { losses } from './losses.js'
 import { stockMovements } from './stockMovements.js'
 import { systemLogs } from './systemLogs.js'
+import { companyBillings } from './companyBillings.js'
 
 export * from './enums.js'
 export * from './companies.js'
@@ -19,6 +20,7 @@ export * from './stockEntries.js'
 export * from './losses.js'
 export * from './stockMovements.js'
 export * from './systemLogs.js'
+export * from './companyBillings.js'
 
 export const companiesRelations = relations(companies, ({ many }) => ({
   users: many(users),
@@ -26,6 +28,13 @@ export const companiesRelations = relations(companies, ({ many }) => ({
   units: many(units),
   products: many(products),
   systemLogs: many(systemLogs),
+  billings: many(companyBillings),
+}))
+
+export const companyBillingsRelations = relations(companyBillings, ({ one }) => ({
+  company: one(companies, { fields: [companyBillings.companyId], references: [companies.id] }),
+  creator: one(users, { fields: [companyBillings.createdBy], references: [users.id] }),
+  updater: one(users, { fields: [companyBillings.updatedBy], references: [users.id] }),
 }))
 
 export const systemLogsRelations = relations(systemLogs, ({ one }) => ({

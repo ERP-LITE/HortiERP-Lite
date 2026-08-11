@@ -2,7 +2,7 @@
 
 Sistema web modular para controle de estoque, entradas de mercadorias, notas fiscais vinculadas e perdas voltado para hortifrutis, frutarias, verdureiras, sacolões e pequenos mercados.
 
-Multiempresa: cada empresa-cliente tem seus dados totalmente isolados (produtos, estoque, entradas, perdas, usuários). Empresas-cliente são cadastradas por um usuário `super_admin` pela tela `/empresas`, com identificação fiscal, contato, endereço e criação do primeiro administrador em uma única operação.
+Multiempresa: cada empresa-cliente tem seus dados totalmente isolados (produtos, estoque, entradas, perdas, usuários). Empresas-cliente são cadastradas por um usuário `super_admin` pela tela `/empresas`, com identificação fiscal, contato, endereço e criação do primeiro administrador em uma única operação. O `super_admin` também controla manualmente as mensalidades dos clientes pela tela `/cobrancas`, sem integração com meios de pagamento.
 
 Ver [claude.md](./claude.md) para a visão completa do projeto.
 
@@ -13,7 +13,7 @@ Ver [claude.md](./claude.md) para a visão completa do projeto.
 - **Banco de dados:** PostgreSQL, Drizzle ORM
 - **Infra:** Docker, Docker Compose
 
-## Estrutura
+## Estrutura 
 
 ```
 ERP-LITE/
@@ -45,6 +45,8 @@ ERP-LITE/
    docker compose exec api npm run db:migrate
    docker compose exec api npm run db:seed
    ```
+   Em atualizações normais, rode somente `docker compose exec api npm run db:migrate`; não repita os seeds para
+   aplicar uma migration nova.
 4. Crie a empresa da plataforma e o primeiro usuário `super_admin` (uma única vez, só para conseguir cadastrar empresas-cliente pela tela `/empresas`):
    ```bash
    docker compose exec -e PLATFORM_ADMIN_EMAIL=voce@exemplo.com -e PLATFORM_ADMIN_PASSWORD=senha-forte api npm run db:seed:platform
@@ -91,7 +93,7 @@ checks, migrations obrigatórias e backups criptografados com teste seguro de re
 
 A suíte de integração usa um PostgreSQL temporário e isolado na porta `5434`. Ela cobre isolamento multiempresa,
 permissões, invalidação de sessão, concorrência de estoque, busca/paginação, integridade de dados (índices únicos),
-identificação do usuário responsável pelas operações e impersonação.
+identificação do usuário responsável pelas operações, impersonação e controle manual de cobranças.
 
 Com Docker disponível, execute na raiz:
 

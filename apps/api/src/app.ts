@@ -23,6 +23,7 @@ import { dashboardRoutes } from './modules/dashboard/dashboard.routes.js'
 import { reportsRoutes } from './modules/reports/reports.routes.js'
 import { logsRoutes } from './modules/logs/logs.routes.js'
 import { registerSystemLogsHook } from './modules/logs/logs.hook.js'
+import { billingsRoutes } from './modules/billings/billings.routes.js'
 
 export function buildApp(options: { systemLogs?: boolean } = {}) {
   const app = Fastify({
@@ -97,6 +98,7 @@ export function buildApp(options: { systemLogs?: boolean } = {}) {
   app.register(dashboardRoutes, { prefix: '/api' })
   app.register(reportsRoutes, { prefix: '/api' })
   app.register(logsRoutes, { prefix: '/api' })
+  app.register(billingsRoutes, { prefix: '/api' })
 
   return app
 }
