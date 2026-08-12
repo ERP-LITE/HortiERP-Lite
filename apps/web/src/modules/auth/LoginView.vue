@@ -37,7 +37,7 @@ async function handleSubmit() {
     const redirect = (route.query.redirect as string) || fallback
     router.push(redirect)
   } catch (error) {
-    const resolved = resolveFormError(error, 'Não foi possível entrar. Verifique suas credenciais.')
+    const resolved = resolveFormError(error, 'Não foi possível entrar. Tente novamente.')
     fieldErrors.value = resolved.fieldErrors
     errorMessage.value = resolved.message
     if (axios.isAxiosError(error) && error.response?.status === 401) {

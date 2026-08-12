@@ -2,6 +2,37 @@
 @tailwind components;
 @tailwind utilities;
 
+
+@media screen and (pointer: coarse) {
+  input,
+  select,
+  textarea,
+  .app-field-trigger {
+    font-size: 16px !important;
+  }
+
+  button,
+  a,
+  label,
+  summary,
+  [role='button'] {
+    touch-action: manipulation;
+  }
+
+
+  @supports (min-height: 100dvh) {
+    .min-h-screen {
+      min-height: 100dvh;
+    }
+  }
+
+  @supports (max-height: 95dvh) {
+    .app-modal-panel {
+      max-height: 95dvh;
+    }
+  }
+}
+
 @media (max-width: 639px) {
   table.mobile-accordion-table,
   table.mobile-accordion-table tbody {

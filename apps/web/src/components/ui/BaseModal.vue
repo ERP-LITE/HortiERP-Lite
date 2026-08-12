@@ -80,7 +80,7 @@ onBeforeUnmount(() => {
         aria-modal="true"
         :aria-labelledby="titleId"
         tabindex="-1"
-        class="app-modal-scrollbar relative w-full max-h-[95vh] overflow-y-auto rounded-xl bg-white shadow-lg outline-none dark:bg-gray-800"
+        class="app-modal-scrollbar app-modal-panel relative w-full max-h-[95vh] overflow-y-auto rounded-xl bg-white shadow-lg outline-none dark:bg-gray-800"
         :class="sizeClass"
       >
         <div class="flex items-start justify-between gap-3 px-6 py-4 border-b border-gray-200 dark:border-gray-700">

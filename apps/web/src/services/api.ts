@@ -51,7 +51,15 @@ api.interceptors.response.use(
   },
 )
 
+export function isConnectionError(error: unknown): boolean {
+  return axios.isAxiosError(error) && !error.response && error.code !== 'ERR_CANCELED'
+}
+
 export function getApiErrorMessage(error: unknown, fallback = 'Ocorreu um erro inesperado'): string {
+  if (isConnectionError(error)) {
+    return 'Não foi possível se conectar ao servidor. Verifique sua conexão e tente novamente.'
+  }
+
   if (axios.isAxiosError(error)) {
     return error.response?.data?.error?.message ?? fallback
   }
