@@ -79,8 +79,7 @@ const router = createRouter({
     {
       path: '/logs/atividades',
       name: 'logs-atividades',
-      component: () => import('@/modules/logs/SystemLogsView.vue'),
-      props: { mode: 'activity' },
+      component: () => import('@/modules/logs/ActivityLogsView.vue'),
       meta: { roles: ['admin'] },
     },
     {

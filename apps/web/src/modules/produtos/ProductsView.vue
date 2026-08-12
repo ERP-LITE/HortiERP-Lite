@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { Pencil, Plus, Trash2 } from '@lucide/vue'
+import { Pencil, Plus, Trash2, Upload } from '@lucide/vue'
+import ProductImportModal from './ProductImportModal.vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
@@ -12,6 +13,7 @@ import BaseToggle from '@/components/ui/BaseToggle.vue'
 import Pagination from '@/components/ui/Pagination.vue'
 import FilterButton from '@/components/ui/FilterButton.vue'
 import PrintButton from '@/components/ui/PrintButton.vue'
+import ExportCsvButton from '@/components/ui/ExportCsvButton.vue'
 import SearchInput from '@/components/ui/SearchInput.vue'
 import BulkSelectionBar from '@/components/ui/BulkSelectionBar.vue'
 import TableCheckbox from '@/components/ui/TableCheckbox.vue'
@@ -20,7 +22,8 @@ import { getApiErrorMessage, resolveFormError } from '@/services/api'
 import { confirmDelete, toastError, toastSuccess } from '@/lib/alerts'
 import { listAllCategories } from '@/services/categoriesService'
 import { listAllUnits } from '@/services/unitsService'
-import { createProduct, deleteProduct, deleteProducts, listProducts, updateProduct } from '@/services/productsService'
+import { createProduct, deleteProduct, deleteProducts, listAllProducts, listProducts, updateProduct } from '@/services/productsService'
+import { csvNumber } from '@/lib/csv'
 import { useAuthStore } from '@/stores/auth'
 import { usePagination } from '@/composables/usePagination'
 import { useBulkSelection } from '@/composables/useBulkSelection'
@@ -62,6 +65,7 @@ const statusFilterOptions = [
 ]
 
 const modalOpen = ref(false)
+const importModalOpen = ref(false)
 const editingId = ref<string | null>(null)
 const saving = ref(false)
 const fieldErrors = ref<Record<string, string>>({})
@@ -120,6 +124,34 @@ async function loadFormOptions() {
     units.value = unitOptions
   } catch (error) {
     errorMessage.value = getApiErrorMessage(error)
+  }
+}
+
+async function exportCsv() {
+  const all = await listAllProducts({
+    search: search.value || undefined,
+    categoryId: filters.value.categoryId !== 'todas' ? filters.value.categoryId : undefined,
+    active: filters.value.active !== 'todos' ? filters.value.active === 'true' : undefined,
+    sortBy: sortBy.value,
+    sortOrder: sortOrder.value,
+  })
+  const categoryById = new Map(categories.value.map((item) => [item.id, item.name]))
+  const unitById = new Map(units.value.map((item) => [item.id, item.name]))
+
+  return {
+    headers: ['Nome', 'Categoria', 'Unidade', 'Codigo', 'Codigo de barras', 'Custo', 'Preco de venda', 'Estoque atual', 'Estoque minimo', 'Situacao'],
+    rows: all.map((item) => [
+      item.name,
+      categoryById.get(item.categoryId) ?? '',
+      unitById.get(item.unitId) ?? '',
+      item.sku ?? '',
+      item.barcode ?? '',
+      csvNumber(item.costPrice),
+      csvNumber(item.salePrice),
+      csvNumber(item.currentStock, 3),
+      csvNumber(item.minStock, 3),
+      item.active ? 'Ativo' : 'Inativo',
+    ]),
   }
 }
 
@@ -241,6 +273,17 @@ onMounted(loadAll)
         <SearchInput v-model="search" placeholder="Buscar por nome, SKU ou código de barras..." />
         <FilterButton :active="activeFilterCount" @click="openFilterModal" />
         <PrintButton />
+        <ExportCsvButton file-name="produtos" :load="exportCsv" />
+        <BaseButton
+          v-if="canManage"
+          variant="secondary"
+          class="!px-2.5 sm:!px-4"
+          title="Importar planilha"
+          aria-label="Importar planilha"
+          @click="importModalOpen = true"
+        >
+          <Upload :size="16" /> <span class="hidden sm:inline">Importar</span>
+        </BaseButton>
         <BaseButton v-if="canManage" class="!px-2.5 sm:!px-4" title="Novo produto" aria-label="Novo produto" @click="openCreateModal">
           <Plus :size="16" /> <span class="hidden sm:inline">Novo produto</span>
         </BaseButton>
@@ -404,5 +447,7 @@ onMounted(loadAll)
         </div>
       </form>
     </BaseModal>
+
+    <ProductImportModal :open="importModalOpen" @close="importModalOpen = false" @imported="loadAll" />
   </div>
 </template>

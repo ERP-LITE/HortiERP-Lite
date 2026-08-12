@@ -1,4 +1,5 @@
 import { api } from './api'
+import { fetchAllPages } from './paginatedOptions'
 import type { MovementType, PaginatedResult, ProductWithRelations, StockMovement } from '@/types'
 
 export interface ListCurrentStockParams {
@@ -31,6 +32,14 @@ export interface ListStockMovementsParams {
 export async function listStockMovements(params: ListStockMovementsParams) {
   const { data } = await api.get<PaginatedResult<StockMovement>>('/stock/movements', { params })
   return data
+}
+
+export function listAllCurrentStock(params: Omit<ListCurrentStockParams, 'page' | 'pageSize'> = {}) {
+  return fetchAllPages((page, pageSize) => listCurrentStock({ ...params, page, pageSize }))
+}
+
+export function listAllStockMovements(params: Omit<ListStockMovementsParams, 'page' | 'pageSize'> = {}) {
+  return fetchAllPages((page, pageSize) => listStockMovements({ ...params, page, pageSize }))
 }
 
 export interface AdjustStockItem {

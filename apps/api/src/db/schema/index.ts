@@ -8,6 +8,7 @@ import { stockEntries, stockEntryAttachments, stockEntryItems } from './stockEnt
 import { losses } from './losses.js'
 import { stockMovements } from './stockMovements.js'
 import { systemLogs } from './systemLogs.js'
+import { activityLogs } from './activityLogs.js'
 import { companyBillings } from './companyBillings.js'
 
 export * from './enums.js'
@@ -20,6 +21,7 @@ export * from './stockEntries.js'
 export * from './losses.js'
 export * from './stockMovements.js'
 export * from './systemLogs.js'
+export * from './activityLogs.js'
 export * from './companyBillings.js'
 
 export const companiesRelations = relations(companies, ({ many }) => ({
@@ -28,6 +30,7 @@ export const companiesRelations = relations(companies, ({ many }) => ({
   units: many(units),
   products: many(products),
   systemLogs: many(systemLogs),
+  activityLogs: many(activityLogs),
   billings: many(companyBillings),
 }))
 
@@ -40,6 +43,11 @@ export const companyBillingsRelations = relations(companyBillings, ({ one }) => 
 export const systemLogsRelations = relations(systemLogs, ({ one }) => ({
   company: one(companies, { fields: [systemLogs.companyId], references: [companies.id] }),
   actor: one(users, { fields: [systemLogs.actorId], references: [users.id] }),
+}))
+
+export const activityLogsRelations = relations(activityLogs, ({ one }) => ({
+  company: one(companies, { fields: [activityLogs.companyId], references: [companies.id] }),
+  actor: one(users, { fields: [activityLogs.actorId], references: [users.id] }),
 }))
 
 export const usersRelations = relations(users, ({ one }) => ({

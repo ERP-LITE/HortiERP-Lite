@@ -1,4 +1,5 @@
 import { api } from './api'
+import { fetchAllPages } from './paginatedOptions'
 import type { PaginatedResult, StockEntry, StockEntryAttachment, StockEntrySummary } from '@/types'
 
 export interface StockEntryItemInput {
@@ -42,6 +43,10 @@ export interface ListStockEntriesParams {
 export async function listStockEntries(params: ListStockEntriesParams) {
   const { data } = await api.get<PaginatedResult<StockEntrySummary>>('/stock-entries', { params })
   return data
+}
+
+export function listAllStockEntries(params: Omit<ListStockEntriesParams, 'page' | 'pageSize'> = {}) {
+  return fetchAllPages((page, pageSize) => listStockEntries({ ...params, page, pageSize }))
 }
 
 export async function createStockEntry(payload: StockEntryInput) {
