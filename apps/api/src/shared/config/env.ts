@@ -8,7 +8,22 @@ const envSchema = z
     DATABASE_URL: z.string().min(1, 'DATABASE_URL é obrigatório'),
     JWT_SECRET: z.string().min(1, 'JWT_SECRET é obrigatório'),
     JWT_EXPIRES_IN: z.string().default('8h'),
-    CORS_ORIGIN: z.string().url('CORS_ORIGIN deve ser uma URL válida').default('http://localhost:5173'),
+    // Aceita uma ou várias origens separadas por vírgula. Útil no desenvolvimento para
+    // atender ao mesmo tempo o desktop (localhost) e o celular (IP da máquina na rede).
+    CORS_ORIGIN: z
+      .string()
+      .default('http://localhost:5173')
+      .transform((value) =>
+        value
+          .split(',')
+          .map((origin) => origin.trim())
+          .filter(Boolean),
+      )
+      .pipe(
+        z
+          .array(z.string().url('CORS_ORIGIN deve conter apenas URLs válidas'))
+          .min(1, 'CORS_ORIGIN deve ter ao menos uma origem'),
+      ),
     TRUST_PROXY: z
       .enum(['true', 'false'])
       .default('false')
@@ -31,7 +46,7 @@ const envSchema = z
       })
     }
 
-    if (!value.CORS_ORIGIN.startsWith('https://')) {
+    if (value.CORS_ORIGIN.some((origin) => !origin.startsWith('https://'))) {
       context.addIssue({
         code: z.ZodIssueCode.custom,
         path: ['CORS_ORIGIN'],

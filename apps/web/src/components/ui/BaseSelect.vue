@@ -65,7 +65,8 @@ async function toggleDropdown() {
   )
   await nextTick()
   updateDropdownPosition()
-  searchInput.value?.focus()
+
+  if (!window.matchMedia('(pointer: coarse)').matches) searchInput.value?.focus()
 }
 
 function selectOption(value: string) {
@@ -139,7 +140,7 @@ onBeforeUnmount(() => {
       <button
         ref="trigger"
         type="button"
-        class="flex w-full items-center rounded-lg border border-gray-300 bg-white py-2.5 pl-3.5 pr-3 text-left text-sm text-gray-900 shadow-sm transition-colors hover:border-gray-400 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:hover:border-gray-500"
+        class="app-field-trigger flex w-full items-center rounded-lg border border-gray-300 bg-white py-2.5 pl-3.5 pr-3 text-left text-sm text-gray-900 shadow-sm transition-colors hover:border-gray-400 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:hover:border-gray-500"
         :class="{ 'border-red-400': error || invalid }"
         :aria-expanded="open"
         aria-haspopup="listbox"

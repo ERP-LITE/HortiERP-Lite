@@ -60,7 +60,7 @@ function updateTo(value: string) {
     <span class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Período</span>
     <button
       type="button"
-      class="flex w-full items-center gap-3 rounded-lg border border-gray-300 bg-white px-3.5 py-2.5 text-left text-sm text-gray-900 transition-colors hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:hover:border-gray-500"
+      class="app-field-trigger flex w-full items-center gap-3 rounded-lg border border-gray-300 bg-white px-3.5 py-2.5 text-left text-sm text-gray-900 transition-colors hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:hover:border-gray-500"
       :aria-expanded="expanded"
       aria-haspopup="listbox"
       @click="expanded = !expanded"
