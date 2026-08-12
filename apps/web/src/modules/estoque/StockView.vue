@@ -13,11 +13,13 @@ import BaseToggle from '@/components/ui/BaseToggle.vue'
 import Pagination from '@/components/ui/Pagination.vue'
 import FilterButton from '@/components/ui/FilterButton.vue'
 import PrintButton from '@/components/ui/PrintButton.vue'
+import ExportCsvButton from '@/components/ui/ExportCsvButton.vue'
 import SearchInput from '@/components/ui/SearchInput.vue'
 import SortableTableHeader from '@/components/ui/SortableTableHeader.vue'
 import { getApiErrorMessage, resolveFormError } from '@/services/api'
 import { toastSuccess } from '@/lib/alerts'
-import { adjustStock, listCurrentStock } from '@/services/stockService'
+import { adjustStock, listAllCurrentStock, listCurrentStock } from '@/services/stockService'
+import { csvNumber } from '@/lib/csv'
 import { listAllCategories } from '@/services/categoriesService'
 import { listAllProducts } from '@/services/productsService'
 import { useAuthStore } from '@/stores/auth'
@@ -214,6 +216,30 @@ async function handleBulkAdjustSubmit() {
 }
 
 watchSearch(search, loadStock)
+async function exportCsv() {
+  const all = await listAllCurrentStock({
+    search: search.value || undefined,
+    categoryId: filters.value.categoryId !== 'todas' ? filters.value.categoryId : undefined,
+    lowStockOnly: filters.value.lowStockOnly || undefined,
+    sortBy: sortBy.value,
+    sortOrder: sortOrder.value,
+  })
+
+  return {
+    headers: ['Produto', 'Categoria', 'Unidade', 'Estoque atual', 'Estoque minimo', 'Custo', 'Valor em estoque', 'Situacao'],
+    rows: all.map((item) => [
+      item.name,
+      item.category?.name ?? '',
+      item.unit?.abbreviation ?? '',
+      csvNumber(item.currentStock, 3),
+      csvNumber(item.minStock, 3),
+      csvNumber(item.costPrice),
+      csvNumber(Number(item.currentStock) * Number(item.costPrice ?? 0)),
+      Number(item.currentStock) <= Number(item.minStock) ? 'Estoque baixo' : 'Normal',
+    ]),
+  }
+}
+
 onMounted(() => {
   loadStock()
   loadCategoryOptions()
@@ -227,6 +253,7 @@ onMounted(() => {
         <SearchInput v-model="search" placeholder="Buscar por produto..." />
         <FilterButton :active="activeFilterCount" @click="openFilterModal" />
         <PrintButton />
+        <ExportCsvButton file-name="estoque" :load="exportCsv" />
         <BaseButton
           v-if="canManage"
           variant="secondary"

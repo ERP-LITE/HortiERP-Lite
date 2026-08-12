@@ -51,3 +51,38 @@ export async function deleteProducts(ids: string[]) {
   const { data } = await api.post<{ deleted: number }>('/products/bulk-delete', { ids })
   return data
 }
+
+export interface ImportProductRow {
+  line: number
+  name: string
+  categoryName: string
+  unitName: string
+  sku?: string
+  barcode?: string
+  costPrice?: string
+  salePrice?: string
+  minStock?: string
+  active?: string
+}
+
+export interface ImportProductsResult {
+  summary: {
+    total: number
+    valid: number
+    invalid: number
+    imported: number
+    omittedErrors: number
+    newCategories: string[]
+    newUnits: string[]
+  }
+  errors: { line: number; name: string; errors: string[] }[]
+}
+
+export async function importProducts(payload: {
+  rows: ImportProductRow[]
+  dryRun?: boolean
+  createMissingRefs?: boolean
+}) {
+  const { data } = await api.post<ImportProductsResult>('/products/import', payload)
+  return data
+}

@@ -8,6 +8,7 @@ import BaseModal from '@/components/ui/BaseModal.vue'
 import Pagination from '@/components/ui/Pagination.vue'
 import FilterButton from '@/components/ui/FilterButton.vue'
 import PrintButton from '@/components/ui/PrintButton.vue'
+import ExportCsvButton from '@/components/ui/ExportCsvButton.vue'
 import SearchInput from '@/components/ui/SearchInput.vue'
 import PeriodPicker from '@/components/ui/PeriodPicker.vue'
 import ExpandableText from '@/components/ui/ExpandableText.vue'
@@ -16,7 +17,8 @@ import SortableTableHeader from '@/components/ui/SortableTableHeader.vue'
 import type { PeriodValue } from '@/lib/period'
 import { formatDate } from '@/lib/format'
 import { getApiErrorMessage } from '@/services/api'
-import { listStockEntries } from '@/services/stockEntriesService'
+import { listAllStockEntries, listStockEntries } from '@/services/stockEntriesService'
+import { csvNumber } from '@/lib/csv'
 import { usePagination } from '@/composables/usePagination'
 import { useFilterModal } from '@/composables/useFilterModal'
 import { useTableSort } from '@/composables/useTableSort'
@@ -74,6 +76,35 @@ async function loadEntries() {
 }
 
 watchSearch(search, loadEntries)
+async function exportCsv() {
+  const all = await listAllStockEntries({
+    search: search.value || undefined,
+    from: filters.value.period.from || undefined,
+    to: filters.value.period.to || undefined,
+    sortBy: sortBy.value,
+    sortOrder: sortOrder.value,
+  })
+
+  // Uma linha por item da entrada: é o formato que o contador consegue conferir contra a nota.
+  return {
+    headers: ['Data', 'Fornecedor', 'Nota', 'Serie', 'Produto', 'Quantidade', 'Custo unitario', 'Total do item', 'Recebido por', 'Observacoes'],
+    rows: all.flatMap((entry) =>
+      (entry.items ?? []).map((item) => [
+        formatDate(entry.entryDate),
+        entry.supplierName ?? '',
+        entry.invoiceNumber ?? '',
+        entry.invoiceSeries ?? '',
+        item.product?.name ?? '',
+        csvNumber(item.quantity, 3),
+        csvNumber(item.unitCost),
+        csvNumber(Number(item.quantity) * Number(item.unitCost ?? 0)),
+        entry.createdByUser?.name ?? '',
+        entry.notes ?? '',
+      ]),
+    ),
+  }
+}
+
 onMounted(loadEntries)
 </script>
 
@@ -84,6 +115,7 @@ onMounted(loadEntries)
         <SearchInput v-model="search" placeholder="Buscar fornecedor, item ou nota..." />
         <FilterButton :active="activeFilterCount" @click="openFilterModal" />
         <PrintButton />
+        <ExportCsvButton file-name="entradas" :load="exportCsv" />
         <RouterLink :to="{ name: 'entradas-nova' }">
           <BaseButton class="!px-2.5 sm:!px-4" title="Nova entrada" aria-label="Nova entrada">
             <Plus :size="16" /> <span class="hidden sm:inline">Nova entrada</span>

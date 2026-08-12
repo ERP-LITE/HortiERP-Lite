@@ -135,6 +135,7 @@ export interface Loss {
   productId: string
   quantity: string
   reason: LossReason
+  unitCost: string | null
   notes: string | null
   lossDate: string
   createdAt: string
@@ -219,6 +220,25 @@ export interface DashboardProductQuantity {
 
 export type SystemLogLevel = 'info' | 'warning' | 'error'
 export type SystemLogMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
+
+export type ActivityAction = 'criou' | 'alterou' | 'excluiu' | 'importou' | 'ajustou'
+export type ActivityEntity = 'produto' | 'categoria' | 'unidade' | 'usuario' | 'entrada' | 'perda' | 'estoque'
+
+/** Histórico de negócio: diz QUAL registro foi mexido, diferente do log de requisições. */
+export interface ActivityLog {
+  id: string
+  action: ActivityAction
+  entity: ActivityEntity
+  entityId: string | null
+  /** Nome do registro no momento da ação — sobrevive à exclusão do registro. */
+  entityLabel: string
+  details: Record<string, unknown> | null
+  createdAt: string
+  actorId: string | null
+  actorName: string | null
+  actorEmail: string | null
+  actorRole: UserRole | null
+}
 
 export interface SystemLog {
   id: string

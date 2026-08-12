@@ -15,6 +15,13 @@
       "when": 1786470723146,
       "tag": "0001_tiny_barracuda",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1786561605885,
+      "tag": "0002_daily_senator_kelly",
+      "breakpoints": true
     }
   ]
 }
