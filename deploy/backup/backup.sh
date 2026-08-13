@@ -65,6 +65,16 @@ run_backup() {
     -mtime "+$retention_days" -delete
 
   date -u +%FT%TZ > "$backup_dir/.last-success"
+
+  # Sinal de vida para o monitor externo. Se o aviso deixar de chegar, o monitor
+  # alerta — o que cobre desde o rclone falhando até a máquina inteira morrer,
+  # justamente os casos em que nada aqui dentro conseguiria avisar. Uma falha ao
+  # notificar nunca derruba o backup: a essa altura ele já está feito e enviado.
+  if [ -n "${BACKUP_HEARTBEAT_URL:-}" ]; then
+    curl -fsS --max-time 10 --retry 2 -o /dev/null "$BACKUP_HEARTBEAT_URL" ||
+      echo "[$(date -u +%FT%TZ)] Aviso: backup concluído, mas não foi possível notificar o monitor" >&2
+  fi
+
   echo "[$(date -u +%FT%TZ)] Backup concluído: $filename"
   cleanup_files
   trap - EXIT INT TERM
@@ -78,6 +88,11 @@ fi
 while true; do
   if ! "$0" once; then
     echo "[$(date -u +%FT%TZ)] Falha no backup; nova tentativa em ${interval_seconds}s" >&2
+    # Avisa a falha na hora em vez de esperar o monitor perceber a ausência do
+    # sinal de vida, que só dispararia depois da janela de tolerância.
+    if [ -n "${BACKUP_HEARTBEAT_URL:-}" ]; then
+      curl -fsS --max-time 10 -o /dev/null "${BACKUP_HEARTBEAT_URL%/}/fail" || true
+    fi
   fi
   sleep "$interval_seconds" &
   wait $!

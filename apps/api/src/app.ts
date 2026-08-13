@@ -70,21 +70,27 @@ export function buildApp(options: { systemLogs?: boolean } = {}) {
   app.setErrorHandler(errorHandler)
   if (options.systemLogs !== false) registerSystemLogsHook(app)
 
-  app.get('/health', async (_request, reply) => {
-    try {
-      await db.execute(sql`select 1`)
-      // Confere permissão de escrita sem criar arquivo: um marcador ficaria
-      // misturado aos anexos e entraria no backup junto com eles. Volume não
-      // montado falha no mkdir; sistema somente-leitura ou permissão errada
-      // falha no access.
-      await mkdir(env.INVOICE_STORAGE_PATH, { recursive: true, mode: 0o700 })
-      await access(env.INVOICE_STORAGE_PATH, fsConstants.W_OK)
-      return { status: 'ok', checks: { database: 'ok', invoiceStorage: 'ok' } }
-    } catch (error) {
-      app.log.error({ error }, 'Health check de dependências falhou')
-      return reply.status(503).send({ status: 'error' })
-    }
-  })
+  // O healthcheck do container chama /health direto na porta da API, mas o Caddy
+  // só encaminha /api/* para cá. O mesmo teste responde nos dois caminhos para
+  // que um monitor externo consiga verificar banco e disco, e não apenas se o
+  // site está servindo HTML.
+  for (const healthPath of ['/health', '/api/health']) {
+    app.get(healthPath, async (_request, reply) => {
+      try {
+        await db.execute(sql`select 1`)
+        // Confere permissão de escrita sem criar arquivo: um marcador ficaria
+        // misturado aos anexos e entraria no backup junto com eles. Volume não
+        // montado falha no mkdir; sistema somente-leitura ou permissão errada
+        // falha no access.
+        await mkdir(env.INVOICE_STORAGE_PATH, { recursive: true, mode: 0o700 })
+        await access(env.INVOICE_STORAGE_PATH, fsConstants.W_OK)
+        return { status: 'ok', checks: { database: 'ok', invoiceStorage: 'ok' } }
+      } catch (error) {
+        app.log.error({ error }, 'Health check de dependências falhou')
+        return reply.status(503).send({ status: 'error' })
+      }
+    })
+  }
 
   app.register(authRoutes, { prefix: '/api' })
   app.register(companiesRoutes, { prefix: '/api' })
