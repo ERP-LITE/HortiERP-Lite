@@ -9,6 +9,7 @@ export const TEMPLATE_HEADERS = [
   'custo',
   'preco de venda',
   'estoque minimo',
+  'estoque atual',
   'ativo',
 ]
 
@@ -24,7 +25,8 @@ const HEADER_ALIASES: Record<Field, string[]> = {
   barcode: ['codigo de barras', 'barras', 'ean', 'gtin', 'cod barras'],
   costPrice: ['custo', 'preco de custo', 'valor de custo', 'custo unitario'],
   salePrice: ['preco de venda', 'venda', 'preco', 'valor de venda', 'preco venda'],
-  minStock: ['estoque minimo', 'minimo', 'estoque min', 'min', 'estoque'],
+  minStock: ['estoque minimo', 'minimo', 'estoque min', 'min'],
+  currentStock: ['estoque atual', 'estoque', 'quantidade', 'qtd', 'saldo', 'estoque inicial'],
   active: ['ativo', 'situacao', 'status'],
 }
 
@@ -39,6 +41,7 @@ export const FIELD_LABELS: Record<Field, string> = {
   costPrice: 'custo',
   salePrice: 'preço de venda',
   minStock: 'estoque mínimo',
+  currentStock: 'estoque atual',
   active: 'ativo',
 }
 
@@ -90,6 +93,7 @@ export function mapSpreadsheetToRows(table: string[][]): SpreadsheetMapping {
     costPrice: cell(row, 'costPrice'),
     salePrice: cell(row, 'salePrice'),
     minStock: cell(row, 'minStock'),
+    currentStock: cell(row, 'currentStock'),
     active: cell(row, 'active'),
   }))
 

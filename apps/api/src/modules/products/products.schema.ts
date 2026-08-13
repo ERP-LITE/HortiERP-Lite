@@ -44,6 +44,7 @@ export const importProductsSchema = z.object({
         costPrice: z.string().optional(),
         salePrice: z.string().optional(),
         minStock: z.string().optional(),
+        currentStock: z.string().optional(),
         active: z.string().optional(),
       }),
     )

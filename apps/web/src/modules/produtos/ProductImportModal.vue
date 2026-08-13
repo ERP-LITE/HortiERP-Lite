@@ -43,8 +43,8 @@ function reset() {
 
 function downloadTemplate() {
   const example = [
-    ['Tomate Italiano', 'Legumes', 'Quilograma', 'TOM001', '7891234567890', '7,49', '11,90', '10', 'sim'],
-    ['Alface Crespa', 'Verduras', 'Unidade', '', '', '2,30', '3,99', '5', 'sim'],
+    ['Tomate Italiano', 'Legumes', 'Quilograma', 'TOM001', '7891234567890', '7,49', '11,90', '10', '38,5', 'sim'],
+    ['Alface Crespa', 'Verduras', 'Unidade', '', '', '2,30', '3,99', '5', '12', 'sim'],
   ]
   downloadCsv('modelo-produtos', toCsv(TEMPLATE_HEADERS, example))
 }
@@ -137,7 +137,8 @@ function downloadErrors() {
         <p class="mb-2">
           Envie um arquivo <strong>.csv</strong> com uma linha por produto. As colunas
           <strong>nome</strong>, <strong>categoria</strong> e <strong>unidade</strong> são obrigatórias; as demais
-          podem ficar em branco.
+          podem ficar em branco. Se preencher <strong>estoque atual</strong>, a quantidade entra como um ajuste
+          registrado no histórico, com o motivo “carga inicial”.
         </p>
         <button
           type="button"
@@ -193,6 +194,18 @@ function downloadErrors() {
           </span>
           <span v-if="result.summary.newUnits.length">
             Serão criadas {{ result.summary.newUnits.length }} unidade(s): {{ result.summary.newUnits.join(', ') }}.
+          </span>
+        </p>
+
+        <p
+          v-if="result.summary.withInitialStock > 0"
+          class="rounded-lg bg-primary-50 p-3 text-sm text-primary-800 dark:bg-primary-900/30 dark:text-primary-200"
+        >
+          {{ result.summary.withInitialStock }} produto(s) entram com estoque inicial, registrado no histórico como
+          ajuste com o motivo “carga inicial”.
+          <span v-if="result.summary.initialStockWithoutCost > 0" class="block mt-1 font-medium">
+            Atenção: {{ result.summary.initialStockWithoutCost }} deles estão sem custo preenchido — esse estoque vai
+            valer R$ 0,00 nos relatórios e no painel até você informar o custo do produto.
           </span>
         </p>
 

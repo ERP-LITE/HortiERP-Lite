@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { describe, test } from 'node:test'
 import { and, eq, isNull } from 'drizzle-orm'
 import { db } from '../src/db/client.js'
-import { categories, products, units } from '../src/db/schema/index.js'
+import { categories, products, stockMovements, units } from '../src/db/schema/index.js'
 import { authCookie, createTenant, setupTestApp } from './helpers.js'
 
 const ctx = setupTestApp()
@@ -210,5 +210,105 @@ describe('importação de produtos por planilha', () => {
     assert.equal(body.summary.invalid, 1)
     assert.match(body.errors[0].errors.join(' '), /não existe/)
     assert.ok(tenantB.companyId)
+  })
+})
+
+describe('carga inicial de estoque pela planilha', () => {
+  test('o estoque entra como ajuste rastreável, não como saldo do nada', async () => {
+    const tenant = await createTenant('imp-estoque')
+
+    const response = await importRequest(
+      {
+        createMissingRefs: true,
+        rows: [
+          { line: 2, name: 'Tomate', categoryName: 'Legumes', unitName: 'Quilo', costPrice: '4,00', currentStock: '38,5' },
+          { line: 3, name: 'Alface', categoryName: 'Verduras', unitName: 'Unidade', costPrice: '2,00', currentStock: '12' },
+          { line: 4, name: 'Sem estoque', categoryName: 'Legumes', unitName: 'Quilo', costPrice: '1,00' },
+        ],
+      },
+      authCookie(ctx.app, tenant.admin),
+    )
+
+    const body = response.json<ImportResponse & { summary: { withInitialStock: number } }>()
+    assert.equal(body.summary.imported, 3, JSON.stringify(body.errors))
+    assert.equal(body.summary.withInitialStock, 2, 'só as linhas com quantidade contam')
+
+    const saldos = await db
+      .select({ name: products.name, currentStock: products.currentStock })
+      .from(products)
+      .where(and(eq(products.companyId, tenant.companyId), isNull(products.deletedAt)))
+    const porNome = new Map(saldos.map((item) => [item.name, Number(item.currentStock)]))
+    assert.equal(porNome.get('Tomate'), 38.5, 'aceita quantidade fracionada em formato brasileiro')
+    assert.equal(porNome.get('Alface'), 12)
+    assert.equal(porNome.get('Sem estoque'), 0)
+
+    // O ponto principal: o saldo precisa estar explicado no histórico
+    const movimentos = await db
+      .select({
+        type: stockMovements.type,
+        quantity: stockMovements.quantity,
+        balanceAfter: stockMovements.balanceAfter,
+        notes: stockMovements.notes,
+        createdBy: stockMovements.createdBy,
+      })
+      .from(stockMovements)
+      .where(eq(stockMovements.companyId, tenant.companyId))
+
+    assert.equal(movimentos.length, 2, 'um movimento por produto com estoque, e nenhum para os sem')
+    for (const movimento of movimentos) {
+      assert.equal(movimento.type, 'ajuste')
+      assert.match(movimento.notes ?? '', /[Cc]arga inicial/)
+      assert.equal(movimento.createdBy, tenant.admin.id, 'o histórico precisa dizer quem fez a carga')
+      assert.equal(
+        Number(movimento.quantity),
+        Number(movimento.balanceAfter),
+        'partindo de zero, a quantidade lançada e o saldo resultante coincidem',
+      )
+    }
+  })
+
+  test('quantidade sem custo é sinalizada mas não bloqueia', async () => {
+    const tenant = await createTenant('imp-sem-custo')
+
+    const response = await importRequest(
+      {
+        dryRun: true,
+        createMissingRefs: true,
+        rows: [
+          { line: 2, name: 'Cebola', categoryName: 'Legumes', unitName: 'Quilo', currentStock: '20' },
+          { line: 3, name: 'Alho', categoryName: 'Legumes', unitName: 'Quilo', currentStock: '5', costPrice: '30,00' },
+        ],
+      },
+      authCookie(ctx.app, tenant.admin),
+    )
+
+    const body = response.json<
+      ImportResponse & { summary: { withInitialStock: number; initialStockWithoutCost: number } }
+    >()
+    assert.equal(body.summary.invalid, 0, 'falta de custo não é erro')
+    assert.equal(body.summary.withInitialStock, 2)
+    assert.equal(body.summary.initialStockWithoutCost, 1, 'só a Cebola está sem custo')
+  })
+
+  test('quantidade inválida cancela tudo e não deixa movimentação órfã', async () => {
+    const tenant = await createTenant('imp-estoque-erro')
+
+    await importRequest(
+      {
+        createMissingRefs: true,
+        rows: [
+          { line: 2, name: 'Pepino', categoryName: 'Legumes', unitName: 'Quilo', currentStock: '10' },
+          { line: 3, name: 'Abobrinha', categoryName: 'Legumes', unitName: 'Quilo', currentStock: 'dez quilos' },
+        ],
+      },
+      authCookie(ctx.app, tenant.admin),
+    )
+
+    const movimentos = await db
+      .select({ id: stockMovements.id })
+      .from(stockMovements)
+      .where(eq(stockMovements.companyId, tenant.companyId))
+    assert.equal(movimentos.length, 0, 'nenhum movimento pode sobrar de uma importação cancelada')
+    assert.equal((await countProducts(tenant.companyId)).length, 1)
   })
 })
