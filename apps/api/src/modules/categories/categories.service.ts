@@ -1,4 +1,4 @@
-import { and, asc, count, eq, ilike, isNull, or } from 'drizzle-orm'
+import { and, asc, count, eq, ilike, inArray, isNull, or } from 'drizzle-orm'
 import { orderByColumn } from '../../shared/db/sorting.js'
 import { db } from '../../db/client.js'
 import { categories } from '../../db/schema/index.js'
@@ -6,6 +6,7 @@ import { AppError } from '../../shared/errors/AppError.js'
 import { assertUniqueField } from '../../shared/db/assertUniqueField.js'
 import { buildPaginatedResult } from '../../shared/db/paginate.js'
 import { softDeleteById, softDeleteByIds } from '../../shared/db/softDelete.js'
+import { recordActivitySafe } from '../../shared/db/recordActivity.js'
 import type { CreateCategoryInput, ListCategoriesQuery, UpdateCategoryInput } from './categories.schema.js'
 
 function assertUniqueName(companyId: string, name: string, excludeId?: string) {
@@ -64,6 +65,15 @@ export async function createCategory(companyId: string, userId: string, data: Cr
     .values({ ...data, companyId, createdBy: userId })
     .returning()
 
+  await recordActivitySafe({
+    companyId,
+    actorId: userId,
+    action: 'criou',
+    entity: 'categoria',
+    entityId: category.id,
+    entityLabel: category.name,
+  })
+
   return category
 }
 
@@ -77,14 +87,50 @@ export async function updateCategory(companyId: string, userId: string, id: stri
     .where(and(eq(categories.id, id), eq(categories.companyId, companyId)))
     .returning()
 
+  await recordActivitySafe({
+    companyId,
+    actorId: userId,
+    action: 'alterou',
+    entity: 'categoria',
+    entityId: category.id,
+    entityLabel: category.name,
+  })
+
   return category
 }
 
 export async function deleteCategory(companyId: string, userId: string, id: string) {
-  await getCategory(companyId, id)
+  const registro = await getCategory(companyId, id)
   await softDeleteById(categories, companyId, userId, id)
+  await recordActivitySafe({
+    companyId,
+    actorId: userId,
+    action: 'excluiu',
+    entity: 'categoria',
+    entityId: id,
+    entityLabel: registro.name,
+  })
 }
 
 export async function deleteCategories(companyId: string, userId: string, ids: string[]) {
-  return softDeleteByIds(categories, companyId, userId, ids)
+  // Os nomes são lidos antes da exclusão: depois o histórico não saberia dizer o que saiu.
+  const removidos = await db
+    .select({ id: categories.id, label: categories.name })
+    .from(categories)
+    .where(and(eq(categories.companyId, companyId), inArray(categories.id, ids), isNull(categories.deletedAt)))
+
+  const result = await softDeleteByIds(categories, companyId, userId, ids)
+
+  for (const item of removidos) {
+    await recordActivitySafe({
+      companyId,
+      actorId: userId,
+      action: 'excluiu',
+      entity: 'categoria',
+      entityId: item.id,
+      entityLabel: item.label,
+    })
+  }
+
+  return result
 }
