@@ -6,6 +6,7 @@ import { AppError } from '../../shared/errors/AppError.js'
 import { assertUniqueField } from '../../shared/db/assertUniqueField.js'
 import { buildPaginatedResult } from '../../shared/db/paginate.js'
 import { softDeleteById, softDeleteByIds } from '../../shared/db/softDelete.js'
+import { applyStockMovement } from '../../shared/db/applyStockMovement.js'
 import { recordActivity, recordActivitySafe } from '../../shared/db/recordActivity.js'
 import type {
   CreateProductInput,
@@ -279,6 +280,7 @@ export async function importProducts(companyId: string, userId: string, input: I
     costPrice?: number
     salePrice?: number
     minStock: number
+    initialStock: number
     active: boolean
   }[] = []
 
@@ -313,6 +315,8 @@ export async function importProducts(companyId: string, userId: string, input: I
     if (!salePrice.ok) rowErrors.push('Preço de venda inválido')
     const minStock = parseDecimal(row.minStock)
     if (!minStock.ok) rowErrors.push('Estoque mínimo inválido')
+    const initialStock = parseDecimal(row.currentStock)
+    if (!initialStock.ok) rowErrors.push('Estoque atual inválido')
     const active = parseActive(row.active)
     if (!active.ok) rowErrors.push('Situação inválida (use "sim" ou "não")')
 
@@ -335,15 +339,23 @@ export async function importProducts(companyId: string, userId: string, input: I
       costPrice: costPrice.value,
       salePrice: salePrice.value,
       minStock: minStock.value ?? 0,
+      initialStock: initialStock.value ?? 0,
       active: active.value,
     })
   }
+
+  const comEstoque = accepted.filter((item) => item.initialStock > 0)
 
   const summary = {
     total: input.rows.length,
     valid: accepted.length,
     invalid: input.rows.length - accepted.length,
     imported: 0,
+    withInitialStock: comEstoque.length,
+    // Quantidade sem custo entra no estoque valendo zero, e o painel mostraria a loja
+    // cheia com "valor em estoque: R$ 0,00". Não impede a importação, mas o usuário
+    // precisa ver isso antes de confirmar.
+    initialStockWithoutCost: comEstoque.filter((item) => !item.costPrice).length,
     omittedErrors: Math.max(0, input.rows.length - accepted.length - errors.length),
     newCategories: [...newCategories.values()],
     newUnits: [...newUnits.values()],
@@ -382,8 +394,31 @@ export async function importProducts(companyId: string, userId: string, input: I
       createdBy: userId,
     }))
 
+    const createdIdByName = new Map<string, string>()
     for (let index = 0; index < values.length; index += 500) {
-      await tx.insert(products).values(values.slice(index, index + 500))
+      const inserted = await tx
+        .insert(products)
+        .values(values.slice(index, index + 500))
+        .returning({ id: products.id, name: products.name })
+      for (const item of inserted) createdIdByName.set(lower(item.name), item.id)
+    }
+
+    // O estoque inicial entra como movimentação de ajuste, não como valor gravado direto
+    // no produto: assim a primeira linha do histórico explica de onde veio o saldo, e o
+    // gráfico de entradas x perdas do painel continua fechando com o estoque atual.
+    for (const item of comEstoque) {
+      const productId = createdIdByName.get(lower(item.name))
+      if (!productId) continue
+      await applyStockMovement(tx, {
+        companyId,
+        userId,
+        productId,
+        delta: item.initialStock,
+        type: 'ajuste',
+        referenceType: 'import',
+        referenceId: productId,
+        notes: 'Carga inicial de estoque por planilha',
+      })
     }
 
     await recordActivity(
@@ -395,6 +430,7 @@ export async function importProducts(companyId: string, userId: string, input: I
         entityLabel: `${accepted.length} produto(s) por planilha`,
         details: {
           produtos: accepted.length,
+          comEstoqueInicial: comEstoque.length,
           categoriasCriadas: [...newCategories.values()],
           unidadesCriadas: [...newUnits.values()],
         },

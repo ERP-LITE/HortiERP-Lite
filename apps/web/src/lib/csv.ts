@@ -94,7 +94,7 @@ export function parseCsv(input: string): string[][] {
 
 function escapeCell(value: unknown) {
   const text = value === null || value === undefined ? '' : String(value)
-  return /[";\n\r]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text
+  return /[";,\n\r]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text
 }
 
 /**

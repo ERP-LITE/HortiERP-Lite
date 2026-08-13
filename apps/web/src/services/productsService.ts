@@ -62,6 +62,7 @@ export interface ImportProductRow {
   costPrice?: string
   salePrice?: string
   minStock?: string
+  currentStock?: string
   active?: string
 }
 
@@ -72,6 +73,8 @@ export interface ImportProductsResult {
     invalid: number
     imported: number
     omittedErrors: number
+    withInitialStock: number
+    initialStockWithoutCost: number
     newCategories: string[]
     newUnits: string[]
   }
