@@ -117,6 +117,12 @@ services:
       RCLONE_CONFIG_STORAGE_SECRET_ACCESS_KEY: ${RCLONE_CONFIG_STORAGE_SECRET_ACCESS_KEY:-}
       RCLONE_CONFIG_STORAGE_ENDPOINT: ${RCLONE_CONFIG_STORAGE_ENDPOINT:-}
       RCLONE_CONFIG_STORAGE_ACL: private
+      # A chave de aplicação é restrita a um único bucket, então o rclone não
+      # consegue confirmar que ele existe e tenta criá-lo antes de enviar — o
+      # que a chave não permite (403 AccessDenied: not entitled). O bucket é
+      # criado à mão na configuração inicial, então essa verificação é
+      # dispensável.
+      RCLONE_CONFIG_STORAGE_NO_CHECK_BUCKET: "true"
     volumes:
       - backup_data:/backups
       - invoice_files:/invoice-files:ro
@@ -135,6 +141,11 @@ services:
       retries: 3
     networks:
       - backend
+      # A rede backend é internal, ou seja, não tem rota para fora. O envio do
+      # backup para o storage remoto precisa de saída para a internet, então o
+      # container entra também na egress — que existe só para isso e não é
+      # compartilhada com o banco nem com a API.
+      - egress
 
   restore-check:
     image: hortierp-backup:${IMAGE_TAG:-latest}
@@ -163,3 +174,7 @@ networks:
   backend:
     internal: true
   frontend:
+  # Saída para a internet, usada só pelo backup para enviar os arquivos ao
+  # storage remoto. Fica separada da frontend para o backup não dividir rede
+  # com o gateway e o site.
+  egress:
