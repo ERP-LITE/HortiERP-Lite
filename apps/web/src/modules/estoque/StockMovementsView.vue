@@ -8,6 +8,7 @@ import BaseModal from '@/components/ui/BaseModal.vue'
 import Pagination from '@/components/ui/Pagination.vue'
 import FilterButton from '@/components/ui/FilterButton.vue'
 import PrintButton from '@/components/ui/PrintButton.vue'
+import ExportCsvButton from '@/components/ui/ExportCsvButton.vue'
 import SearchInput from '@/components/ui/SearchInput.vue'
 import PeriodPicker from '@/components/ui/PeriodPicker.vue'
 import ExpandableText from '@/components/ui/ExpandableText.vue'
@@ -15,7 +16,8 @@ import SortableTableHeader from '@/components/ui/SortableTableHeader.vue'
 import type { PeriodValue } from '@/lib/period'
 import { formatDateTime } from '@/lib/format'
 import { getApiErrorMessage } from '@/services/api'
-import { listStockMovements } from '@/services/stockService'
+import { listAllStockMovements, listStockMovements } from '@/services/stockService'
+import { csvNumber } from '@/lib/csv'
 import { listAllProducts } from '@/services/productsService'
 import { usePagination } from '@/composables/usePagination'
 import { useFilterModal } from '@/composables/useFilterModal'
@@ -103,6 +105,31 @@ async function loadProductOptions() {
 }
 
 watchSearch(search, loadMovements)
+async function exportCsv() {
+  const all = await listAllStockMovements({
+    search: search.value || undefined,
+    productId: filters.value.productId !== 'todos' ? filters.value.productId : undefined,
+    type: filters.value.type !== 'todos' ? (filters.value.type as MovementType) : undefined,
+    from: filters.value.period.from || undefined,
+    to: filters.value.period.to || undefined,
+    sortBy: sortBy.value,
+    sortOrder: sortOrder.value,
+  })
+
+  return {
+    headers: ['Data', 'Produto', 'Tipo', 'Quantidade', 'Saldo apos', 'Usuario', 'Observacao'],
+    rows: all.map((item) => [
+      formatDateTime(item.createdAt),
+      item.product?.name ?? '',
+      typeLabels[item.type],
+      csvNumber(item.quantity, 3),
+      csvNumber(item.balanceAfter, 3),
+      item.createdByUser?.name ?? 'Usuário não identificado',
+      item.notes ?? '',
+    ]),
+  }
+}
+
 onMounted(() => {
   loadMovements()
   loadProductOptions()
@@ -116,6 +143,7 @@ onMounted(() => {
         <SearchInput v-model="search" placeholder="Buscar por produto..." />
         <FilterButton :active="activeFilterCount" @click="openFilterModal" />
         <PrintButton />
+        <ExportCsvButton file-name="movimentacoes" :load="exportCsv" />
       </template>
     </PageHeader>
 

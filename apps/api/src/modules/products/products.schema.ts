@@ -26,3 +26,31 @@ export const updateProductSchema = createProductSchema.partial()
 
 export type CreateProductInput = z.infer<typeof createProductSchema>
 export type UpdateProductInput = z.infer<typeof updateProductSchema>
+
+export const IMPORT_MAX_ROWS = 2000
+
+export const importProductsSchema = z.object({
+  dryRun: z.boolean().default(false),
+  createMissingRefs: z.boolean().default(false),
+  rows: z
+    .array(
+      z.object({
+        line: z.coerce.number().int().positive(),
+        name: z.string().default(''),
+        categoryName: z.string().default(''),
+        unitName: z.string().default(''),
+        sku: z.string().optional(),
+        barcode: z.string().optional(),
+        costPrice: z.string().optional(),
+        salePrice: z.string().optional(),
+        minStock: z.string().optional(),
+        currentStock: z.string().optional(),
+        active: z.string().optional(),
+      }),
+    )
+    .min(1, 'A planilha não tem nenhuma linha de produto')
+    .max(IMPORT_MAX_ROWS, `Importe no máximo ${IMPORT_MAX_ROWS} produtos por vez`),
+})
+
+export type ImportProductsInput = z.infer<typeof importProductsSchema>
+export type ImportProductRow = ImportProductsInput['rows'][number]

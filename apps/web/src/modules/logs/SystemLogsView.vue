@@ -17,7 +17,7 @@ import { usePagination } from '@/composables/usePagination'
 import { useTableSort } from '@/composables/useTableSort'
 import { getApiErrorMessage } from '@/services/api'
 import { listAllCompanies } from '@/services/companiesService'
-import { listActivityLogs, listTechnicalLogs } from '@/services/logsService'
+import { listTechnicalLogs } from '@/services/logsService'
 import type { PeriodValue } from '@/lib/period'
 import { formatDateTime } from '@/lib/format'
 import type { Company, SystemLog, SystemLogLevel, SystemLogMethod } from '@/types'
@@ -133,7 +133,7 @@ async function loadLogs() {
       sortBy: sortBy.value,
       sortOrder: sortOrder.value,
     }
-    const result = isTechnical.value ? await listTechnicalLogs(params) : await listActivityLogs(params)
+    const result = await listTechnicalLogs(params)
     logs.value = result.data
     applyMeta(result)
   } catch (error) {

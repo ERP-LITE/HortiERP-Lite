@@ -1,9 +1,9 @@
 import { and, count, desc, eq, gte, ilike, lte, ne, or } from 'drizzle-orm'
 import { orderByColumn } from '../../shared/db/sorting.js'
 import { db } from '../../db/client.js'
-import { companies, systemLogs, users } from '../../db/schema/index.js'
+import { activityLogs, companies, systemLogs, users } from '../../db/schema/index.js'
 import { buildPaginatedResult } from '../../shared/db/paginate.js'
-import type { ListLogsQuery } from './logs.schema.js'
+import type { ListActivityQuery, ListLogsQuery } from './logs.schema.js'
 
 const logColumns = {
   id: systemLogs.id,
@@ -105,13 +105,68 @@ export function listTechnicalLogs(query: ListLogsQuery) {
   return queryLogs(conditions, query, true)
 }
 
-export function listCompanyActivityLogs(companyId: string, query: ListLogsQuery) {
-  return queryLogs(
-    [
-      eq(systemLogs.companyId, companyId),
-      ne(systemLogs.method, 'GET'),
-    ],
-    query,
-    false,
-  )
+/**
+ * Histórico de negócio da empresa: quem criou, alterou ou excluiu qual registro. Lê a
+ * tabela de auditoria, e não os logs de requisição — estes só sabem método e rota, então
+ * respondiam "alterou Produtos" sem dizer qual produto.
+ */
+export async function listCompanyActivityLogs(companyId: string, query: ListActivityQuery) {
+  const conditions = [eq(activityLogs.companyId, companyId)]
+  if (query.action) conditions.push(eq(activityLogs.action, query.action))
+  if (query.entity) conditions.push(eq(activityLogs.entity, query.entity))
+  if (query.search) {
+    const term = `%${query.search}%`
+    conditions.push(or(ilike(activityLogs.entityLabel, term), ilike(users.name, term), ilike(users.email, term))!)
+  }
+  if (query.from) {
+    const from = new Date(query.from)
+    from.setHours(0, 0, 0, 0)
+    conditions.push(gte(activityLogs.createdAt, from))
+  }
+  if (query.to) {
+    const to = new Date(query.to)
+    to.setHours(23, 59, 59, 999)
+    conditions.push(lte(activityLogs.createdAt, to))
+  }
+
+  const where = and(...conditions)
+  const sortColumns = {
+    createdAt: activityLogs.createdAt,
+    actorName: users.name,
+    entity: activityLogs.entity,
+    action: activityLogs.action,
+  }
+  const orderBy = orderByColumn(query.sortBy ? sortColumns[query.sortBy] : activityLogs.createdAt, query.sortOrder, 'desc')
+
+  const columns = {
+    id: activityLogs.id,
+    action: activityLogs.action,
+    entity: activityLogs.entity,
+    entityId: activityLogs.entityId,
+    entityLabel: activityLogs.entityLabel,
+    details: activityLogs.details,
+    createdAt: activityLogs.createdAt,
+    actorId: activityLogs.actorId,
+    actorName: users.name,
+    actorEmail: users.email,
+    actorRole: users.role,
+  }
+
+  const [data, [{ total }]] = await Promise.all([
+    db
+      .select(columns)
+      .from(activityLogs)
+      .leftJoin(users, eq(activityLogs.actorId, users.id))
+      .where(where)
+      .orderBy(orderBy, desc(activityLogs.createdAt))
+      .limit(query.pageSize)
+      .offset((query.page - 1) * query.pageSize),
+    db
+      .select({ total: count() })
+      .from(activityLogs)
+      .leftJoin(users, eq(activityLogs.actorId, users.id))
+      .where(where),
+  ])
+
+  return buildPaginatedResult(data, total, query.page, query.pageSize)
 }

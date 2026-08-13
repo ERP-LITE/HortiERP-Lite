@@ -10,6 +10,7 @@ import BaseBadge from '@/components/ui/BaseBadge.vue'
 import Pagination from '@/components/ui/Pagination.vue'
 import FilterButton from '@/components/ui/FilterButton.vue'
 import PrintButton from '@/components/ui/PrintButton.vue'
+import ExportCsvButton from '@/components/ui/ExportCsvButton.vue'
 import SearchInput from '@/components/ui/SearchInput.vue'
 import PeriodPicker from '@/components/ui/PeriodPicker.vue'
 import ExpandableText from '@/components/ui/ExpandableText.vue'
@@ -19,7 +20,8 @@ import { formatDate } from '@/lib/format'
 import { getApiErrorMessage, resolveFormError } from '@/services/api'
 import { toastSuccess } from '@/lib/alerts'
 import { listAllProducts } from '@/services/productsService'
-import { createLoss, listLosses } from '@/services/lossesService'
+import { createLoss, listAllLosses, listLosses } from '@/services/lossesService'
+import { csvNumber } from '@/lib/csv'
 import { usePagination } from '@/composables/usePagination'
 import { useFilterModal } from '@/composables/useFilterModal'
 import { useTableSort } from '@/composables/useTableSort'
@@ -146,6 +148,32 @@ async function handleSubmit() {
 }
 
 watchSearch(search, loadLosses)
+async function exportCsv() {
+  const all = await listAllLosses({
+    search: search.value || undefined,
+    productId: filters.value.productId !== 'todos' ? filters.value.productId : undefined,
+    reason: filters.value.reason !== 'todos' ? (filters.value.reason as LossReason) : undefined,
+    from: filters.value.period.from || undefined,
+    to: filters.value.period.to || undefined,
+    sortBy: sortBy.value,
+    sortOrder: sortOrder.value,
+  })
+
+  return {
+    headers: ['Data', 'Produto', 'Motivo', 'Quantidade', 'Custo unitario', 'Valor perdido', 'Registrado por', 'Observacao'],
+    rows: all.map((item) => [
+      formatDate(item.lossDate),
+      item.product?.name ?? '',
+      reasonLabels[item.reason],
+      csvNumber(item.quantity, 3),
+      csvNumber(item.unitCost ?? item.product?.costPrice),
+      csvNumber(Number(item.quantity) * Number(item.unitCost ?? item.product?.costPrice ?? 0)),
+      item.createdByUser?.name ?? '',
+      item.notes ?? '',
+    ]),
+  }
+}
+
 onMounted(loadAll)
 </script>
 
@@ -156,6 +184,7 @@ onMounted(loadAll)
         <SearchInput v-model="search" placeholder="Buscar por produto ou observação..." />
         <FilterButton :active="activeFilterCount" @click="openFilterModal" />
         <PrintButton />
+        <ExportCsvButton file-name="perdas" :load="exportCsv" />
         <BaseButton class="!px-2.5 sm:!px-4" title="Registrar perda" aria-label="Registrar perda" @click="openCreateModal">
           <Plus :size="16" /> <span class="hidden sm:inline">Registrar perda</span>
         </BaseButton>

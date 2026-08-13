@@ -1,8 +1,21 @@
 import type { FastifyInstance } from 'fastify'
 import { authenticate, requireRole } from '../../shared/middlewares/auth.js'
 import { bulkDeleteSchema } from '../../shared/schemas/bulk-delete.schema.js'
-import { createProductSchema, listProductsQuerySchema, updateProductSchema } from './products.schema.js'
-import { createProduct, deleteProduct, deleteProducts, getProduct, listProducts, updateProduct } from './products.service.js'
+import {
+  createProductSchema,
+  importProductsSchema,
+  listProductsQuerySchema,
+  updateProductSchema,
+} from './products.schema.js'
+import {
+  createProduct,
+  deleteProduct,
+  deleteProducts,
+  getProduct,
+  importProducts,
+  listProducts,
+  updateProduct,
+} from './products.service.js'
 
 export async function productsRoutes(app: FastifyInstance) {
   app.addHook('preHandler', authenticate)
@@ -20,6 +33,11 @@ export async function productsRoutes(app: FastifyInstance) {
     const data = createProductSchema.parse(request.body)
     const product = await createProduct(request.user.companyId, request.user.sub, data)
     return reply.status(201).send(product)
+  })
+
+  app.post('/products/import', { preHandler: requireRole('admin', 'gerente') }, async (request) => {
+    const data = importProductsSchema.parse(request.body)
+    return importProducts(request.user.companyId, request.user.sub, data)
   })
 
   app.post('/products/bulk-delete', { preHandler: requireRole('admin', 'gerente') }, async (request) => {
