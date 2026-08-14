@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import { Eye } from '@lucide/vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import BaseBadge from '@/components/ui/BaseBadge.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
@@ -177,14 +178,15 @@ onMounted(loadLogs)
               <th class="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500 dark:text-gray-400">
                 Registro
               </th>
+              <th class="print:hidden px-4 py-3" />
             </tr>
           </thead>
           <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
             <tr v-if="loading">
-              <td colspan="4" class="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">Carregando...</td>
+              <td colspan="5" class="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">Carregando...</td>
             </tr>
             <tr v-else-if="logs.length === 0">
-              <td colspan="4" class="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">
+              <td colspan="5" class="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">
                 Nenhuma atividade registrada no período.
               </td>
             </tr>
@@ -193,6 +195,7 @@ onMounted(loadLogs)
               v-else
               :key="log.id"
               class="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/40"
+              title="Clique para ver os detalhes"
               @click="selectedLog = log"
             >
               <td class="whitespace-nowrap px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
@@ -206,6 +209,16 @@ onMounted(loadLogs)
               </td>
               <td class="px-4 py-3 text-sm font-medium text-gray-900 dark:text-gray-100">
                 <ExpandableText :text="log.entityLabel" />
+              </td>
+              <!-- `.stop` para o clique do olho não borbulhar até o clique da linha. -->
+              <td class="print:hidden whitespace-nowrap px-4 py-3 text-right" @click.stop>
+                <button
+                  class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-primary-600 hover:bg-primary-50 dark:text-primary-400 dark:hover:bg-primary-900/30"
+                  title="Ver detalhes"
+                  @click="selectedLog = log"
+                >
+                  <Eye :size="16" />
+                </button>
               </td>
             </tr>
           </tbody>

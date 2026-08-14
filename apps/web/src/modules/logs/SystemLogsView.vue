@@ -227,7 +227,14 @@ onMounted(() => {
               Nenhum log encontrado.
             </td>
           </tr>
-          <tr v-for="log in logs" v-else :key="log.id" class="hover:bg-gray-50 dark:hover:bg-gray-700/40">
+          <tr
+            v-for="log in logs"
+            v-else
+            :key="log.id"
+            class="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/40"
+            title="Clique para ver os detalhes"
+            @click="selectedLog = log"
+          >
             <td class="whitespace-nowrap px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
               {{ formatDateTime(log.createdAt) }}
             </td>
@@ -250,7 +257,7 @@ onMounted(() => {
             <td v-if="isTechnical" class="whitespace-nowrap px-4 py-3">
               <BaseBadge :variant="levelVariants[log.level]">{{ levelLabels[log.level] }}</BaseBadge>
             </td>
-            <td class="print:hidden whitespace-nowrap px-4 py-3 text-right">
+            <td class="print:hidden whitespace-nowrap px-4 py-3 text-right" @click.stop>
               <button
                 class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-primary-600 hover:bg-primary-50 dark:text-primary-400 dark:hover:bg-primary-900/30"
                 title="Ver detalhes"
