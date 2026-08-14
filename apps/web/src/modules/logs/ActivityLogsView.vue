@@ -15,6 +15,7 @@ import PeriodPicker from '@/components/ui/PeriodPicker.vue'
 import SearchInput from '@/components/ui/SearchInput.vue'
 import SortableTableHeader from '@/components/ui/SortableTableHeader.vue'
 import { getApiErrorMessage } from '@/services/api'
+import { useIsMobile } from '@/composables/useIsMobile'
 import { formatDateTime } from '@/lib/format'
 import type { PeriodValue } from '@/lib/period'
 import { listActivityLogs, listAllActivityLogs } from '@/services/logsService'
@@ -97,6 +98,12 @@ const activeFilterCount = computed(
 
 const selectedLog = ref<ActivityLog | null>(null)
 
+/**
+ * No mobile a linha virou cartão de acordeão: o toque nela precisa abrir/fechar o cartão,
+ * não o modal. Lá os detalhes saem pelo ícone do olho.
+ */
+const isMobile = useIsMobile()
+
 function queryParams() {
   return {
     search: search.value || undefined,
@@ -163,7 +170,7 @@ onMounted(loadLogs)
 
     <div class="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800">
       <div class="overflow-x-auto">
-        <table class="w-full">
+        <table v-mobile-accordion class="mobile-accordion-table w-full">
           <thead class="bg-gray-50 dark:bg-gray-900">
             <tr>
               <SortableTableHeader field="createdAt" :active-field="sortBy" :order="sortOrder" @sort="toggleSort">
@@ -194,9 +201,9 @@ onMounted(loadLogs)
               v-for="log in logs"
               v-else
               :key="log.id"
-              class="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/40"
-              title="Clique para ver os detalhes"
-              @click="selectedLog = log"
+              class="hover:bg-gray-50 sm:cursor-pointer dark:hover:bg-gray-700/40"
+              :title="isMobile ? '' : 'Clique para ver os detalhes'"
+              @click="!isMobile && (selectedLog = log)"
             >
               <td class="whitespace-nowrap px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
                 {{ formatDateTime(log.createdAt) }}

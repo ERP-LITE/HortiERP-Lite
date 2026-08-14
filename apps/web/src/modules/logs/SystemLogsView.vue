@@ -16,6 +16,7 @@ import SortableTableHeader from '@/components/ui/SortableTableHeader.vue'
 import { usePagination } from '@/composables/usePagination'
 import { useTableSort } from '@/composables/useTableSort'
 import { getApiErrorMessage } from '@/services/api'
+import { useIsMobile } from '@/composables/useIsMobile'
 import { listAllCompanies } from '@/services/companiesService'
 import { listTechnicalLogs } from '@/services/logsService'
 import type { PeriodValue } from '@/lib/period'
@@ -33,6 +34,12 @@ const loading = ref(true)
 const errorMessage = ref('')
 const search = ref('')
 const selectedLog = ref<SystemLog | null>(null)
+
+/**
+ * No mobile a linha virou cartão de acordeão: o toque nela precisa abrir/fechar o cartão,
+ * não o modal. Lá os detalhes saem pelo ícone do olho.
+ */
+const isMobile = useIsMobile()
 
 function emptyFilters() {
   return {
@@ -231,9 +238,9 @@ onMounted(() => {
             v-for="log in logs"
             v-else
             :key="log.id"
-            class="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/40"
-            title="Clique para ver os detalhes"
-            @click="selectedLog = log"
+            class="hover:bg-gray-50 sm:cursor-pointer dark:hover:bg-gray-700/40"
+            :title="isMobile ? '' : 'Clique para ver os detalhes'"
+            @click="!isMobile && (selectedLog = log)"
           >
             <td class="whitespace-nowrap px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
               {{ formatDateTime(log.createdAt) }}
