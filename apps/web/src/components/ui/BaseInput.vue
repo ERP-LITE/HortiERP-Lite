@@ -89,11 +89,14 @@ defineExpose({
         :class="[{ 'border-red-400': error || invalid }, isPassword ? 'pr-10' : '']"
         @input="handleInput"
       />
+      <!-- O ícone tem 16px, pequeno demais para o dedo. O botão vai a 36px centrado em
+           `right-0`, o que deixa o centro do ícone nos mesmos 18px da borda de antes:
+           cresce só a área de toque, a aparência não muda. Cabe no `pr-10` do campo. -->
       <button
         v-if="isPassword"
         type="button"
         tabindex="-1"
-        class="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
+        class="absolute right-0 top-1/2 inline-flex h-9 w-9 -translate-y-1/2 items-center justify-center text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
         :title="showPassword ? 'Ocultar senha' : 'Mostrar senha'"
         @click="showPassword = !showPassword"
       >

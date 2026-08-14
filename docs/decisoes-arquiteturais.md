@@ -93,6 +93,27 @@ Os detalhamentos dos relatórios de perdas e entradas também seguem esse contra
 
 Campos textuais potencialmente extensos nas tabelas usam o componente compartilhado `ExpandableText`: a célula mantém largura limitada, exibe uma prévia e permite expandir pelo chevron sem provocar overflow horizontal. O componente força a quebra de sequências sem espaços e libera o conteúdo completo para impressão. Esse comportamento é independente do `v-mobile-accordion`, responsável por transformar linhas de tabela em cartões expansíveis em telas pequenas.
 
+### Tabelas em telas pequenas
+
+Toda listagem precisa de um tratamento explícito abaixo do breakpoint `sm` (640px) — sem ele a tabela fica mais larga
+que a tela e o usuário passa a arrastar na horizontal para ler qualquer coisa. Há dois caminhos aceitos:
+
+- **`v-mobile-accordion`** (padrão, usado pela maioria das listagens): a diretiva converte cada `<tr>` em cartão,
+  esconde o `<thead>` e prefixa cada célula com o rótulo da coluna correspondente. A primeira célula com rótulo vira o
+  resumo clicável; as demais aparecem ao expandir. A célula de ações só é reconhecida como tal se o `<th>`
+  correspondente estiver **vazio** — daí a ausência de um cabeçalho "Ações" nas tabelas.
+- **Cartões próprios** (`StockView`, `StockMovementsView`): um bloco `sm:hidden` com `<article>` por registro e a
+  tabela marcada como `hidden sm:table`. Vale quando o cartão precisa de um arranjo diferente da ordem das colunas.
+
+**Clique na linha não pode competir com o acordeão.** Onde a linha inteira abre um detalhe no desktop, o `@click` do
+`<tr>` tem que ser guardado por `useIsMobile()`. Sem isso o mesmo toque dispara os dois comportamentos — o modal abre e
+o cartão alterna atrás dele, tornando impossível expandir o cartão para ler as outras colunas. No mobile o caminho para
+o detalhe é o botão de ação (ícone de olho), que continua funcionando nos dois tamanhos de tela. É a regra que
+`ActivityLogsView` e `SystemLogsView` seguem.
+
+**Alvo de toque.** Botões que só existem no mobile precisam de área clicável de ~44px mesmo que o ícone seja menor —
+caso do botão que abre o menu lateral no `AppLayout`, onde o ícone tem 22px e o botão, 44px.
+
 Datas escolhidas na interface usam o `DateInput` compartilhado, com calendário próprio em português, compatível com
 tema claro/escuro e renderizado acima de modais. Isso evita diferenças de idioma e aparência dos seletores nativos
 de cada navegador, mantendo o valor técnico enviado à API no formato ISO `AAAA-MM-DD`.
