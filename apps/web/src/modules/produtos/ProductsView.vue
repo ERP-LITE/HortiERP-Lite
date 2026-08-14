@@ -200,10 +200,13 @@ async function handleSubmit() {
       categoryId: form.value.categoryId,
       unitId: form.value.unitId,
       name: form.value.name,
-      sku: form.value.sku || undefined,
-      barcode: form.value.barcode || undefined,
-      costPrice: form.value.costPrice ? Number(form.value.costPrice) : undefined,
-      salePrice: form.value.salePrice ? Number(form.value.salePrice) : undefined,
+      // `null` e não `undefined`: campo apagado precisa chegar à API como pedido de
+      // limpeza. Com `undefined` a chave saía do JSON, a API entendia "não mexe" e o
+      // valor antigo permanecia — a tela dizia que salvou e o SKU continuava lá.
+      sku: form.value.sku || null,
+      barcode: form.value.barcode || null,
+      costPrice: form.value.costPrice ? Number(form.value.costPrice) : null,
+      salePrice: form.value.salePrice ? Number(form.value.salePrice) : null,
       minStock: Number(form.value.minStock),
       active: form.value.active,
     }

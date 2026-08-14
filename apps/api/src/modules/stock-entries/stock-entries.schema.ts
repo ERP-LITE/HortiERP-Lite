@@ -1,10 +1,10 @@
 import { z } from 'zod'
+import { periodQueryFields } from '../../shared/schemas/period.schema.js'
 import { paginationQuerySchema } from '../../shared/schemas/pagination.schema.js'
 
 export const listStockEntriesQuerySchema = paginationQuerySchema.extend({
   search: z.string().trim().min(1).optional(),
-  from: z.coerce.date().optional(),
-  to: z.coerce.date().optional(),
+  ...periodQueryFields,
   sortBy: z.enum(['entryDate', 'supplierName', 'invoiceStatus', 'invoiceTotal']).optional(),
 })
 

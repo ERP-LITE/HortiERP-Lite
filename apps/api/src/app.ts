@@ -8,6 +8,7 @@ import { access, mkdir } from 'node:fs/promises'
 import { constants as fsConstants } from 'node:fs'
 import { sql } from 'drizzle-orm'
 import { env } from './shared/config/env.js'
+import { HEALTH_PATHS } from './shared/config/health.js'
 import { db } from './db/client.js'
 import { errorHandler } from './shared/middlewares/errorHandler.js'
 import { authRoutes } from './modules/auth/auth.routes.js'
@@ -70,11 +71,9 @@ export function buildApp(options: { systemLogs?: boolean } = {}) {
   app.setErrorHandler(errorHandler)
   if (options.systemLogs !== false) registerSystemLogsHook(app)
 
-  // O healthcheck do container chama /health direto na porta da API, mas o Caddy
-  // só encaminha /api/* para cá. O mesmo teste responde nos dois caminhos para
-  // que um monitor externo consiga verificar banco e disco, e não apenas se o
-  // site está servindo HTML.
-  for (const healthPath of ['/health', '/api/health']) {
+  // Os dois caminhos existem para que um monitor externo consiga verificar banco e
+  // disco, e não apenas se o site está servindo HTML — ver shared/config/health.ts.
+  for (const healthPath of HEALTH_PATHS) {
     app.get(healthPath, async (_request, reply) => {
       try {
         await db.execute(sql`select 1`)

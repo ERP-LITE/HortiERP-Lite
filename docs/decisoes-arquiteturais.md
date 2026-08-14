@@ -57,7 +57,9 @@ A consulta de CEP é uma conveniência do frontend, não uma fonte autoritativa 
 
 `super_admin` nunca é criável pela tela de cadastro de usuários de uma empresa-cliente (o Zod schema de `users` deliberadamente só aceita os outros 3 papéis). O primeiro acesso nasce pelo bootstrap; depois disso, um `super_admin` pode gerenciar outros usuários da plataforma na seção de configurações gerais. As rotas dedicadas sempre fixam `role: super_admin` e `companyId` na empresa Plataforma, e impedem que o usuário autenticado exclua a própria conta.
 
-`companies` ganhou a coluna `active` (independente do `deletedAt` de soft-delete já existente) especificamente pra dar ao `super_admin` um jeito de **suspender/reativar** o acesso de um cliente sem apagar nada — login de qualquer usuário de uma empresa suspensa é bloqueado com a mesma mensagem genérica de credenciais inválidas (não revela o motivo). `setCompanyActive` espelha o mesmo valor de `active` em todos os usuários da empresa (numa transação junto com a empresa) — suspender desativa todo mundo, reativar reativa todo mundo. **Trade-off consciente**: um usuário que já estivesse desativado manualmente (por razão própria, sem relação com a suspensão) antes da empresa ser suspensa volta ativo junto com o resto ao reativar — hoje não existe uma coluna de rastreio pra distinguir "desativado pela suspensão" de "desativado por outro motivo".
+`companies` ganhou a coluna `active` (independente do `deletedAt` de soft-delete já existente) especificamente pra dar ao `super_admin` um jeito de **suspender/reativar** o acesso de um cliente sem apagar nada — login de qualquer usuário de uma empresa suspensa é bloqueado com a mesma mensagem genérica de credenciais inválidas (não revela o motivo).
+
+`setCompanyActive` mexe **somente** na linha da empresa. `users.active` guarda a decisão individual do admin (funcionário desligado, por exemplo) e não é sobrescrito pela suspensão. A versão anterior espelhava o valor em todos os usuários da empresa, e isso tinha um efeito indesejado: quem tivesse sido desativado à mão *antes* da suspensão voltava ativo junto com o resto na reativação, recuperando acesso que ninguém quis devolver. Não é preciso coluna de rastreio para distinguir os dois motivos — o espelhamento simplesmente não é necessário, porque tanto o login (`authenticateUser`) quanto toda requisição autenticada (`authenticate`) já exigem `companies.active`. Suspender continua invalidando na hora os JWTs em circulação.
 
 Como a empresa "Plataforma" nunca deve ser suspensa nem aparecer misturada com empresas-cliente reais, `listCompanies` a exclui de toda listagem (via subquery que acha a `companyId` de qualquer usuário `super_admin`), e `setCompanyActive` rejeita explicitamente qualquer tentativa de suspendê-la (mesmo chamando o endpoint direto pelo id) — isso corrigiu um incidente real onde a Plataforma apareceu na tela de gestão de empresas e foi suspensa por engano, travando o próprio login do super_admin.
 
@@ -100,6 +102,26 @@ dia seguinte — uma cobrança venceria hoje e apareceria como atrasada no fim d
 (`lib/period.ts`), com o relógio local do usuário, e a API usa `todayIsoDate()` (`shared/utils/date.ts`), fixado em
 `America/Sao_Paulo` porque os containers rodam em UTC.
 
+### Filtro de período nas listagens
+
+O front manda a data civil escolhida pelo usuário, sem hora. `from` e `to` **nunca** são lidos com
+`z.coerce.date()`: essa função coloca a string na meia-noite **UTC**, então `to=2026-08-14` significava "até as 21h
+de 13/08 em Brasília" — o preset "hoje" devolvia zero mesmo com lançamento feito pela manhã, e todo preset perdia o
+dia final inteiro. Em vez disso, todo módulo com filtro de data estende `periodQueryFields`
+(`shared/schemas/period.schema.ts`), que expande cada ponta para a borda correta do dia no fuso do negócio: `from`
+vira `00:00:00.000` e `to` vira `23:59:59.999` locais. Um `AAAA-MM-DDTHH:MM:SSZ` completo continua aceito e é usado
+como veio; uma data impossível (`2026-13-45`) é recusada com 422 em vez de rolar silenciosamente para outro mês.
+
+As bordas saem de `startOfBusinessDay`/`endOfBusinessDay` (`shared/utils/date.ts`), que descobrem o deslocamento do
+fuso via `Intl` em duas passadas em vez de assumir -03:00 fixo — o Brasil já teve horário de verão e pode ter de novo.
+Nenhum service ajusta hora na mão: fazer isso com `setHours` usa o relógio do container (UTC) e reintroduz o bug.
+
+A timeline diária do dashboard agrupa por `date_trunc('day', created_at at time zone 'America/Sao_Paulo')`, e não pelo
+`created_at` cru: sem a conversão, uma perda registrada às 22h aparecia no gráfico no dia seguinte. O fuso entra na
+consulta como literal (`sql.raw`) e não como parâmetro, porque a mesma expressão precisa sair idêntica no `select` e no
+`group by` — dois placeholders distintos fariam o Postgres tratá-los como expressões diferentes. Os limites do período
+também são resolvidos em datas civis (`resolvePeriod`), o que de passagem fez o teto de 90 dias render 90 dias, e não 91.
+
 Os controles da barra de ações das listagens (busca, filtro, impressão e o botão de novo registro) têm todos `h-10`.
 A altura mora nos componentes compartilhados (`BaseButton`, `SearchInput`, `FilterButton`, `PrintButton`), não nas
 telas — ajustar tamanho por view era o que fazia os botões saírem desalinhados entre si.
@@ -131,3 +153,6 @@ Um hook global `onResponse` registra em `system_logs` as requisições da API, s
 - `GET /logs/technical`: exclusivo de `super_admin`, permite consultar todas as empresas e expõe contexto técnico (rota, status, duração, IP, navegador e erro).
 - `GET /logs/activity`: exclusivo de `admin`, força o `companyId` da sessão no backend e retorna somente operações de escrita da própria empresa. Campos técnicos sensíveis são removidos da resposta.
 - As próprias rotas de consulta de logs não geram novos registros, evitando ruído e crescimento recursivo.
+- **Healthcheck também não gera registro.** Os caminhos ficam em `shared/config/health.ts` (`HEALTH_PATHS`), lista consumida tanto por quem registra as rotas (`app.ts`) quanto por quem as ignora no hook (`logs.hook.ts`). Quando `/api/health` nasceu, o hook continuou ignorando apenas `/health` e um monitor externo batendo de minuto em minuto passou a gravar cerca de 43 mil linhas por mês em `system_logs` — a lista compartilhada existe para que acrescentar um caminho de saúde não dependa de lembrar do segundo arquivo.
+
+`system_logs` e `activity_logs` **não têm política de retenção automática**. Em instalação de longa duração são as tabelas que mais crescem e dominam o tamanho do backup; a limpeza é hoje uma decisão manual do operador. Ver [deploy-producao.md](./deploy-producao.md).

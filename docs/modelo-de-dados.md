@@ -49,7 +49,7 @@ Raiz do multiempresa — cada linha é um cliente (frutaria/hortifrúti) contrat
 | `contactName`, `contactEmail`, `phone` | text | responsável e canais de contato; telefone é persistido apenas com dígitos |
 | `postalCode`, `street`, `addressNumber` | text | CEP normalizado, logradouro e número |
 | `complement`, `district`, `city`, `state` | text | complemento opcional, bairro, cidade e UF com duas letras |
-| `active` | boolean | default `true` — `false` = empresa suspensa, bloqueia login de todos os usuários dela |
+| `active` | boolean | default `true` — `false` = empresa suspensa, bloqueia login e requisições de todos os usuários dela sem alterar `users.active` |
 | `createdAt`/`updatedAt`/`deletedAt` | timestamp | |
 
 Os campos cadastrais novos são nuláveis no banco para que empresas criadas antes da migration continuem legíveis. A API exige os dados essenciais ao criar uma empresa nova; editar um registro legado pela tela também solicita sua regularização. CNPJ, telefone e CEP são armazenados sem máscara, que é responsabilidade da interface.
@@ -84,8 +84,10 @@ a badge da tela e o filtro por status nunca discordarem. Excluir uma cobrança a
 | `companyId` | uuid | FK `companies.id`, obrigatório |
 | `name`, `email`, `passwordHash` | text | `email` é **único globalmente** (não escopado por empresa) |
 | `role` | enum `user_role` | `admin` \| `gerente` \| `operador` \| `super_admin` |
-| `active` | boolean | default `true` |
+| `active` | boolean | default `true` — decisão individual do admin; **não** é sobrescrito por suspensão de empresa |
 | `createdAt`/`updatedAt`/`deletedAt`, `createdBy`/`updatedBy` | | |
+
+O bloqueio de uma empresa suspensa vem de `companies.active`, verificado no login e em toda requisição autenticada — `users.active` não espelha esse valor, para que reativar a empresa não devolva acesso a quem foi desativado à mão.
 
 ### `categories`
 Classificação de produtos (ex: Frutas, Verduras). `id`, `companyId`, `name`, `description?`, timestamps, auditBy.
@@ -101,8 +103,8 @@ Unidade de medida (ex: kg, un, dz). `id`, `companyId`, `name`, `abbreviation`, t
 | `categoryId` | uuid | FK `categories.id`, obrigatório |
 | `unitId` | uuid | FK `units.id`, obrigatório |
 | `name` | text | único por empresa |
-| `sku`, `barcode` | text | opcionais, `sku` único por empresa quando informado |
-| `costPrice`, `salePrice` | numeric(12,2) | opcionais |
+| `sku`, `barcode` | text | opcionais, `sku` único por empresa quando informado; campo em branco é gravado como `null`, nunca `''` (o índice único parcial só ignora nulos) |
+| `costPrice`, `salePrice` | numeric(12,2) | opcionais, podem ser limpos de volta para `null` pela edição |
 | `minStock` | numeric(12,3) | default `0` — limite pra alerta de "estoque baixo" |
 | `currentStock` | numeric(12,3) | default `0` — atualizado pelos fluxos de entrada, perda e ajuste manual; nunca editado direto no cadastro do produto |
 | `active` | boolean | default `true` |
@@ -156,6 +158,8 @@ Registro append-only das requisições processadas pela API, usado para diagnós
 | `createdAt` | timestamp | momento do evento |
 
 Índices por data, nível e empresa/data sustentam os filtros das telas. A tabela não possui edição ou exclusão pela aplicação.
+
+As rotas de consulta de log e os caminhos de healthcheck (`/health` e `/api/health`) **não** geram registro — sem isso, um monitor externo batendo de minuto em minuto acrescentaria cerca de 43 mil linhas por mês só de verificação de saúde. Ainda assim, `system_logs` e `activity_logs` crescem sem teto: não existe expurgo automático, e em instalação de longa duração são as tabelas que mais pesam no backup.
 
 ## Enums (`apps/api/src/db/schema/enums.ts`)
 

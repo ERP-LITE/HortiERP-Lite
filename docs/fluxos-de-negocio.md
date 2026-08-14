@@ -8,6 +8,10 @@ Pré-requisito dos fluxos de estoque: **categoria** e **unidade de medida** exis
 
 As listagens de categorias, unidades, produtos e usuários permitem selecionar os registros visíveis por checkbox e excluí-los em lote. A exclusão é lógica e auditada; está disponível para `admin` e `gerente` nos cadastros gerais e somente para `admin` em usuários. Históricos operacionais (entradas, perdas e movimentações) não oferecem exclusão.
 
+Os campos opcionais do produto (SKU, código de barras, custo e preço de venda) podem ser **apagados** depois de preenchidos: a tela envia `null` e a API grava vazio. Omitir a chave no payload continua significando "não mexe neste campo", o que mantém atualizações parciais possíveis pela API. Campo em branco é normalizado para `null` em vez de `''` — dois produtos sem SKU guardando string vazia colidiriam no índice único parcial, que só ignora nulos, e a tela receberia um 409 dizendo que o SKU já existe.
+
+Nenhum `admin` consegue rebaixar o próprio perfil de acesso nem desativar a própria conta (`409`); alterar **outros** usuários segue liberado. Sem essa trava a empresa podia ficar com zero admins ativos, e aí só um `super_admin` em impersonação conseguiria devolver o acesso à gestão de usuários. É a mesma proteção que já impedia excluir a própria conta.
+
 ## Entrada de mercadoria
 
 Tela `/entradas` → `/entradas/nova`. Rota `POST /stock-entries`, service `stock-entries.service.ts::createStockEntry`. Qualquer usuário autenticado pode registrar (sem restrição de papel — ver decisões arquiteturais).
@@ -78,6 +82,16 @@ Cada agrupamento também traz um detalhamento por produto, limitado aos maiores 
 
 Contagens, somas e agrupamentos são calculados no PostgreSQL; produtos e perdas completos não são carregados em memória apenas para produzir os totais. Categorias excluídas logicamente não participam dos agrupamentos.
 
+O período é resolvido em **datas civis de `America/Sao_Paulo`**, e o dia da timeline também: uma perda registrada às 22h conta no dia em que o usuário a lançou, não no dia seguinte. Sem período informado, o padrão são os últimos 30 dias; o teto é de 90 dias cheios, aplicado a partir do fim do intervalo. Ver [decisoes-arquiteturais.md](./decisoes-arquiteturais.md#filtro-de-período-nas-listagens).
+
+### Filtro de período (perdas, entradas, movimentações, relatórios e logs)
+
+Todas as telas com filtro de data recebem a data civil escolhida pelo usuário e cobrem o **dia inteiro no fuso do
+negócio**: escolher "hoje" traz o que foi lançado às 8h e o que foi lançado às 23h30, e não traz a madrugada seguinte.
+Antes as bordas eram interpretadas em UTC e o dia final ficava de fora — o preset "hoje" devolvia lista vazia mesmo com
+lançamentos feitos pela manhã. Detalhes em
+[decisoes-arquiteturais.md](./decisoes-arquiteturais.md#filtro-de-período-nas-listagens).
+
 ## Relatórios
 
 Os detalhamentos de perdas e entradas são paginados e pesquisados no backend, mantendo os agregados por motivo sobre todo o período selecionado. Isso evita respostas sem limite conforme o histórico da empresa cresce.
@@ -120,6 +134,11 @@ usa seletores próprios de mês em português e ano, sem depender do seletor nat
 As rotas `GET/POST/PUT/DELETE /billings` exigem o papel `super_admin`. Marcar como pago exige data e valor pagos em
 conjunto; desmarcar limpa ambos. O sistema não suspende automaticamente uma empresa inadimplente: eventual suspensão
 continua sendo uma decisão manual na gestão de empresas.
+
+Criar ou editar uma cobrança confere que a empresa é uma **empresa-cliente viva**: empresa excluída responde `404` e a
+própria empresa "Plataforma" responde `403`. A chave estrangeira sozinha só garante que o id existe, e como
+`listCompanies` esconde a Plataforma de toda tela, uma cobrança apontando pra ela apareceria em `/cobrancas` vinculada a
+uma empresa que o `super_admin` não consegue abrir.
 
 Diferente dos cadastros (produtos, categorias, unidades, usuários), excluir uma cobrança apaga a linha de verdade:
 o registro é digitado à mão pelo próprio `super_admin` e a exclusão serve pra corrigir um lançamento errado, não pra

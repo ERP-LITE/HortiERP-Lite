@@ -79,6 +79,21 @@ export async function createUser(companyId: string, requesterId: string, data: C
 
 export async function updateUser(companyId: string, requesterId: string, id: string, data: UpdateUserInput) {
   await getUser(companyId, id)
+
+  // A tela de usuários exige `admin`, então quem edita é sempre o admin da empresa.
+  // Deixar que ele se rebaixe ou se desative zerava os admins e trancava a empresa
+  // fora da própria gestão de usuários — só um super_admin em impersonação
+  // conseguiria reverter. Alterar OUTRO usuário nunca chega nesse estado, porque o
+  // próprio solicitante continua admin ativo.
+  if (id === requesterId) {
+    if (data.role && data.role !== 'admin') {
+      throw AppError.conflict('Você não pode alterar o seu próprio perfil de acesso')
+    }
+    if (data.active === false) {
+      throw AppError.conflict('Você não pode desativar a própria conta')
+    }
+  }
+
   if (data.email) await assertUniqueUserEmail(data.email, id)
 
   const passwordHash = data.password ? await bcrypt.hash(data.password, 10) : undefined

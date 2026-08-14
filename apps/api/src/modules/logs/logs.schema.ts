@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { periodQueryFields } from '../../shared/schemas/period.schema.js'
 import { paginationQuerySchema } from '../../shared/schemas/pagination.schema.js'
 
 const methodSchema = z.enum(['GET', 'POST', 'PUT', 'PATCH', 'DELETE'])
@@ -9,8 +10,7 @@ export const listLogsQuerySchema = paginationQuerySchema.extend({
   method: methodSchema.optional(),
   level: levelSchema.optional(),
   companyId: z.string().uuid().optional(),
-  from: z.coerce.date().optional(),
-  to: z.coerce.date().optional(),
+  ...periodQueryFields,
   sortBy: z.enum(['createdAt', 'companyName', 'actorName', 'level', 'statusCode']).optional(),
 })
 
@@ -23,8 +23,7 @@ export const listActivityQuerySchema = paginationQuerySchema.extend({
   search: z.string().trim().min(1).optional(),
   action: activityActionSchema.optional(),
   entity: activityEntitySchema.optional(),
-  from: z.coerce.date().optional(),
-  to: z.coerce.date().optional(),
+  ...periodQueryFields,
   sortBy: z.enum(['createdAt', 'actorName', 'entity', 'action']).optional(),
 })
 

@@ -1,10 +1,11 @@
 import type { FastifyInstance } from 'fastify'
 import { db } from '../../db/client.js'
 import { systemLogs } from '../../db/schema/index.js'
+import { isHealthPath } from '../../shared/config/health.js'
 
 export function registerSystemLogsHook(app: FastifyInstance) {
   app.addHook('onResponse', async (request, reply) => {
-    if (request.routeOptions.url === '/health' || request.routeOptions.url?.includes('/logs/')) return
+    if (isHealthPath(request.routeOptions.url) || request.routeOptions.url?.includes('/logs/')) return
 
     const user = request.user
     const statusCode = reply.statusCode
