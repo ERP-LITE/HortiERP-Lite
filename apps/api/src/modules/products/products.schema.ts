@@ -10,14 +10,36 @@ export const listProductsQuerySchema = paginationQuerySchema.extend({
 
 export type ListProductsQuery = z.infer<typeof listProductsQuerySchema>
 
+/**
+ * Campo de texto opcional do produto. Aceita `null` e converte branco em `null`
+ * para que apagar o campo na tela realmente limpe o valor. Guardar `''` faria dois
+ * produtos sem SKU colidirem no índice único parcial (que só ignora `null`),
+ * devolvendo um 409 dizendo que o SKU já existe.
+ *
+ * Ausência da chave continua significando "não mexe neste campo" — só `''` e `null`
+ * limpam.
+ */
+const clearableText = z
+  .string()
+  .trim()
+  .transform((value) => value || null)
+  .nullable()
+  .optional()
+
+/** Valor monetário opcional; branco e `null` limpam o campo. */
+const clearableMoney = z.preprocess(
+  (value) => (value === '' ? null : value),
+  z.coerce.number().nonnegative().nullable().optional(),
+)
+
 export const createProductSchema = z.object({
   categoryId: z.string().uuid('Categoria inválida'),
   unitId: z.string().uuid('Unidade de medida inválida'),
   name: z.string().min(1, 'Nome é obrigatório'),
-  sku: z.string().optional(),
-  barcode: z.string().optional(),
-  costPrice: z.coerce.number().nonnegative().optional(),
-  salePrice: z.coerce.number().nonnegative().optional(),
+  sku: clearableText,
+  barcode: clearableText,
+  costPrice: clearableMoney,
+  salePrice: clearableMoney,
   minStock: z.coerce.number().nonnegative().default(0),
   active: z.boolean().default(true),
 })

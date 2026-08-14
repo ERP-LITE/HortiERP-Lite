@@ -30,7 +30,7 @@ function assertUniqueName(companyId: string, name: string, excludeId?: string) {
   })
 }
 
-function assertUniqueSku(companyId: string, sku: string | undefined, excludeId?: string) {
+function assertUniqueSku(companyId: string, sku: string | null | undefined, excludeId?: string) {
   if (!sku) return
 
   return assertUniqueField({
@@ -160,8 +160,9 @@ export async function updateProduct(companyId: string, userId: string, id: strin
       ...(data.name && { name: data.name }),
       ...(data.sku !== undefined && { sku: data.sku }),
       ...(data.barcode !== undefined && { barcode: data.barcode }),
-      ...(data.costPrice !== undefined && { costPrice: data.costPrice.toString() }),
-      ...(data.salePrice !== undefined && { salePrice: data.salePrice.toString() }),
+      // `null` limpa o campo; `?.toString()` viraria `undefined` e o Drizzle ignoraria a coluna.
+      ...(data.costPrice !== undefined && { costPrice: data.costPrice === null ? null : data.costPrice.toString() }),
+      ...(data.salePrice !== undefined && { salePrice: data.salePrice === null ? null : data.salePrice.toString() }),
       ...(data.minStock !== undefined && { minStock: data.minStock.toString() }),
       ...(data.active !== undefined && { active: data.active }),
       updatedBy: userId,

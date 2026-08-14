@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { periodQueryFields } from '../../shared/schemas/period.schema.js'
 import { booleanQueryParam, paginationQuerySchema } from '../../shared/schemas/pagination.schema.js'
 
 export const listStockQuerySchema = paginationQuerySchema.extend({
@@ -14,8 +15,7 @@ export const listStockMovementsQuerySchema = paginationQuerySchema.extend({
   search: z.string().trim().min(1).optional(),
   productId: z.string().uuid().optional(),
   type: z.enum(['entrada', 'perda', 'ajuste']).optional(),
-  from: z.coerce.date().optional(),
-  to: z.coerce.date().optional(),
+  ...periodQueryFields,
   sortBy: z.enum(['createdAt', 'type', 'quantity', 'balanceAfter']).optional(),
 })
 

@@ -6,10 +6,10 @@ export interface ProductInput {
   categoryId: string
   unitId: string
   name: string
-  sku?: string
-  barcode?: string
-  costPrice?: number
-  salePrice?: number
+  sku?: string | null
+  barcode?: string | null
+  costPrice?: number | null
+  salePrice?: number | null
   minStock: number
   active: boolean
 }

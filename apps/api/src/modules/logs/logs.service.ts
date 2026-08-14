@@ -1,4 +1,4 @@
-import { and, count, desc, eq, gte, ilike, lte, ne, or } from 'drizzle-orm'
+import { and, count, desc, eq, gte, ilike, lte, or } from 'drizzle-orm'
 import { orderByColumn } from '../../shared/db/sorting.js'
 import { db } from '../../db/client.js'
 import { activityLogs, companies, systemLogs, users } from '../../db/schema/index.js'
@@ -26,18 +26,12 @@ const logColumns = {
   createdAt: systemLogs.createdAt,
 }
 
+// `from`/`to` já chegam nas bordas do dia pelo fuso do negócio (period.schema.ts);
+// o ajuste de hora que existia aqui usava o relógio do container, que roda em UTC.
 function periodConditions(query: ListLogsQuery) {
   const conditions = []
-  if (query.from) {
-    const from = new Date(query.from)
-    from.setHours(0, 0, 0, 0)
-    conditions.push(gte(systemLogs.createdAt, from))
-  }
-  if (query.to) {
-    const to = new Date(query.to)
-    to.setHours(23, 59, 59, 999)
-    conditions.push(lte(systemLogs.createdAt, to))
-  }
+  if (query.from) conditions.push(gte(systemLogs.createdAt, query.from))
+  if (query.to) conditions.push(lte(systemLogs.createdAt, query.to))
   return conditions
 }
 
@@ -118,16 +112,8 @@ export async function listCompanyActivityLogs(companyId: string, query: ListActi
     const term = `%${query.search}%`
     conditions.push(or(ilike(activityLogs.entityLabel, term), ilike(users.name, term), ilike(users.email, term))!)
   }
-  if (query.from) {
-    const from = new Date(query.from)
-    from.setHours(0, 0, 0, 0)
-    conditions.push(gte(activityLogs.createdAt, from))
-  }
-  if (query.to) {
-    const to = new Date(query.to)
-    to.setHours(23, 59, 59, 999)
-    conditions.push(lte(activityLogs.createdAt, to))
-  }
+  if (query.from) conditions.push(gte(activityLogs.createdAt, query.from))
+  if (query.to) conditions.push(lte(activityLogs.createdAt, query.to))
 
   const where = and(...conditions)
   const sortColumns = {

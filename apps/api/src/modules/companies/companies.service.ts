@@ -46,7 +46,7 @@ function platformCompanyIdsSubquery() {
   return db.select({ id: users.companyId }).from(users).where(eq(users.role, 'super_admin'))
 }
 
-async function isPlatformCompany(companyId: string): Promise<boolean> {
+export async function isPlatformCompany(companyId: string): Promise<boolean> {
   const [row] = await db
     .select({ id: users.id })
     .from(users)
@@ -181,15 +181,11 @@ export async function setCompanyActive(id: string, active: boolean) {
     throw AppError.forbidden('Não é possível suspender a empresa da plataforma')
   }
 
-  return db.transaction(async (tx) => {
-    const [company] = await tx
-      .update(companies)
-      .set({ active, updatedAt: new Date() })
-      .where(eq(companies.id, id))
-      .returning()
+  const [company] = await db
+    .update(companies)
+    .set({ active, updatedAt: new Date() })
+    .where(eq(companies.id, id))
+    .returning()
 
-    await tx.update(users).set({ active, updatedAt: new Date() }).where(and(eq(users.companyId, id), isNull(users.deletedAt)))
-
-    return company
-  })
+  return company
 }

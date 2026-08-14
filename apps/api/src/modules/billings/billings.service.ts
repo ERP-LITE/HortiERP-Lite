@@ -4,6 +4,7 @@ import { companies, companyBillings } from '../../db/schema/index.js'
 import { AppError } from '../../shared/errors/AppError.js'
 import { buildPaginatedResult } from '../../shared/db/paginate.js'
 import { orderByColumn } from '../../shared/db/sorting.js'
+import { getCompany, isPlatformCompany } from '../companies/companies.service.js'
 import { todayIsoDate } from '../../shared/utils/date.js'
 import type { BillingStatus, CreateBillingInput, ListBillingsQuery, UpdateBillingInput } from './billings.schema.js'
 
@@ -81,7 +82,23 @@ export async function listBillings(query: ListBillingsQuery) {
   return buildPaginatedResult(data, total, query.page, query.pageSize)
 }
 
+/**
+ * Só empresa-cliente viva recebe cobrança. A FK já garante que o id existe, mas não
+ * impede faturar uma empresa excluída nem a própria empresa "Plataforma" — que
+ * `listCompanies` esconde de toda tela, então a cobrança apareceria em `/cobrancas`
+ * apontando para uma empresa que o super_admin não consegue abrir.
+ */
+async function assertBillableCompany(companyId: string) {
+  await getCompany(companyId)
+
+  if (await isPlatformCompany(companyId)) {
+    throw AppError.forbidden('A empresa da plataforma não recebe cobranças')
+  }
+}
+
 export async function createBilling(data: CreateBillingInput, actorId: string) {
+  await assertBillableCompany(data.companyId)
+
   const [billing] = await db.insert(companyBillings).values({
     ...normalizedValues(data, actorId),
     createdBy: actorId,
@@ -90,6 +107,8 @@ export async function createBilling(data: CreateBillingInput, actorId: string) {
 }
 
 export async function updateBilling(id: string, data: UpdateBillingInput, actorId: string) {
+  await assertBillableCompany(data.companyId)
+
   const [billing] = await db.update(companyBillings).set(normalizedValues(data, actorId)).where(eq(companyBillings.id, id)).returning()
   if (!billing) throw AppError.notFound('Cobrança não encontrada')
   return billing

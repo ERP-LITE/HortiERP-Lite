@@ -1,10 +1,26 @@
 import { and, asc, count, desc, eq, gte, isNull, lte, sql } from 'drizzle-orm'
 import { db } from '../../db/client.js'
 import { categories, losses, products, stockMovements, units } from '../../db/schema/index.js'
+import {
+  APP_TIME_ZONE,
+  addDaysToIsoDate,
+  businessDate,
+  daysBetweenIsoDates,
+  endOfBusinessDay,
+  startOfBusinessDay,
+  todayIsoDate,
+} from '../../shared/utils/date.js'
 
 const DEFAULT_SPAN_DAYS = 30
 const MAX_SPAN_DAYS = 90
-const DAY_MS = 24 * 60 * 60 * 1000
+
+/**
+ * Fuso do negócio embutido como literal, e não como parâmetro do driver: a mesma
+ * expressão precisa sair idêntica no `select` e no `group by`, e dois placeholders
+ * distintos (`$1`/`$2`) fariam o Postgres tratá-los como expressões diferentes.
+ * O valor é uma constante nossa, nunca entrada do usuário.
+ */
+const BUSINESS_TIME_ZONE_SQL = sql.raw(`'${APP_TIME_ZONE}'`)
 
 /**
  * Quantos produtos cada agrupamento do painel devolve. O detalhamento por
@@ -15,34 +31,31 @@ const DAY_MS = 24 * 60 * 60 * 1000
  */
 const TOP_PRODUCTS_PER_GROUP = 5
 
-function formatDay(date: Date) {
-  return date.toISOString().slice(0, 10)
-}
-
+/**
+ * Resolve o período em **datas civis** do fuso do negócio, e não em instantes do
+ * relógio do servidor. O gráfico é por dia: decidir os limites em UTC empurrava
+ * tudo que acontece depois das 21h de Brasília para o dia seguinte da timeline.
+ */
 function resolvePeriod(range: { from?: Date; to?: Date }) {
-  const periodEnd = range.to ? new Date(range.to) : new Date()
-  periodEnd.setHours(23, 59, 59, 999)
+  const endDate = range.to ? businessDate(range.to) : todayIsoDate()
+  let startDate = range.from ? businessDate(range.from) : addDaysToIsoDate(endDate, -(DEFAULT_SPAN_DAYS - 1))
 
-  let periodStart: Date
-  if (range.from) {
-    periodStart = new Date(range.from)
-  } else {
-    periodStart = new Date(periodEnd)
-    periodStart.setDate(periodStart.getDate() - (DEFAULT_SPAN_DAYS - 1))
-  }
-  periodStart.setHours(0, 0, 0, 0)
-
-  const maxSpanMs = MAX_SPAN_DAYS * DAY_MS
-  if (periodEnd.getTime() - periodStart.getTime() > maxSpanMs) {
-    periodStart = new Date(periodEnd.getTime() - maxSpanMs)
-    periodStart.setHours(0, 0, 0, 0)
+  // Período invertido produziria `dayCount` negativo e uma timeline vazia.
+  if (startDate > endDate) startDate = endDate
+  if (daysBetweenIsoDates(startDate, endDate) + 1 > MAX_SPAN_DAYS) {
+    startDate = addDaysToIsoDate(endDate, -(MAX_SPAN_DAYS - 1))
   }
 
-  return { periodStart, periodEnd }
+  return {
+    startDate,
+    endDate,
+    periodStart: startOfBusinessDay(startDate),
+    periodEnd: endOfBusinessDay(endDate),
+  }
 }
 
 export async function getDashboardSummary(companyId: string, range: { from?: Date; to?: Date }) {
-  const { periodStart, periodEnd } = resolvePeriod(range)
+  const { startDate, endDate, periodStart, periodEnd } = resolvePeriod(range)
 
   const activeProductConditions = and(
     eq(products.companyId, companyId),
@@ -106,9 +119,10 @@ export async function getDashboardSummary(companyId: string, range: { from?: Dat
     limit: 10,
   })
 
+  const movementDay = sql`date_trunc('day', ${stockMovements.createdAt} at time zone ${BUSINESS_TIME_ZONE_SQL})`
   const timelineRows = await db
     .select({
-      day: sql<string>`to_char(date_trunc('day', ${stockMovements.createdAt}), 'YYYY-MM-DD')`,
+      day: sql<string>`to_char(${movementDay}, 'YYYY-MM-DD')`,
       type: stockMovements.type,
       productId: products.id,
       productName: products.name,
@@ -129,7 +143,7 @@ export async function getDashboardSummary(companyId: string, range: { from?: Dat
       ),
     )
     .groupBy(
-      sql`date_trunc('day', ${stockMovements.createdAt})`,
+      movementDay,
       stockMovements.type,
       products.id,
       products.name,
@@ -234,11 +248,9 @@ export async function getDashboardSummary(companyId: string, range: { from?: Dat
     timelineByDay.set(row.day, bucket)
   }
 
-  const dayCount = Math.round((periodEnd.getTime() - periodStart.getTime()) / DAY_MS) + 1
+  const dayCount = daysBetweenIsoDates(startDate, endDate) + 1
   const movementsTimeline = Array.from({ length: dayCount }, (_, index) => {
-    const date = new Date(periodStart)
-    date.setDate(date.getDate() + index)
-    const key = formatDay(date)
+    const key = addDaysToIsoDate(startDate, index)
     const bucket = timelineByDay.get(key) ?? emptyTimelineBucket()
     const entrada = topProducts(bucket.entradaProducts)
     const perda = topProducts(bucket.perdaProducts)
@@ -369,8 +381,8 @@ export async function getDashboardSummary(companyId: string, range: { from?: Dat
     lowStockCount,
     lowStockProducts,
     stockValue: productSummary.stockValue,
-    periodFrom: formatDay(periodStart),
-    periodTo: formatDay(periodEnd),
+    periodFrom: startDate,
+    periodTo: endDate,
     lossesInPeriod: {
       lossesCount: lossSummary.lossesCount,
       lossValue: lossSummary.lossValue,

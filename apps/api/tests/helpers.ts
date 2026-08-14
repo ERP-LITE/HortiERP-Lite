@@ -90,12 +90,14 @@ export async function createTenant(suffix: string, initialStock = '0'): Promise<
  * (sobe o app uma vez, trunca as tabelas entre testes, fecha app+pool no final)
  * e devolve um objeto que expõe a instância do app assim que `before` terminar.
  */
-export function setupTestApp() {
+export function setupTestApp(options: { systemLogs?: boolean } = {}) {
   const ctx: { app: FastifyInstance } = { app: undefined as unknown as FastifyInstance }
 
   before(async () => {
     assertTestDatabase()
-    ctx.app = buildApp({ systemLogs: false })
+    // O hook de log fica desligado por padrão (ruído em toda requisição de teste);
+    // quem testa o próprio hook liga explicitamente.
+    ctx.app = buildApp({ systemLogs: options.systemLogs ?? false })
     await ctx.app.ready()
   })
 

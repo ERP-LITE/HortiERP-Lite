@@ -270,6 +270,25 @@ O script só apaga arquivos que não têm registro correspondente **e** foram mo
 carência evita remover um upload em andamento. Comece sempre pelo `--dry-run`, que lista os candidatos sem tocar em
 nada. Agende mensalmente — a frequência não precisa ser alta, já que só quedas no meio de um upload geram órfãos.
 
+## Crescimento dos logs
+
+`system_logs` (uma linha por requisição da API) e `activity_logs` (auditoria de negócio) **não têm expurgo
+automático**. Requisições de healthcheck e as próprias telas de consulta de log já são ignoradas pelo hook, então o
+crescimento acompanha o uso real do sistema — mas numa instalação de longa duração essas são as tabelas que mais
+pesam no dump.
+
+Para dimensionar antes de decidir qualquer limpeza:
+
+```bash
+docker compose --env-file .env.production -f docker-compose.production.yml exec postgres \
+  psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c \
+  "select relname, pg_size_pretty(pg_total_relation_size(relid)) from pg_catalog.pg_statio_user_tables order by pg_total_relation_size(relid) desc limit 10;"
+```
+
+A retenção é uma decisão do operador, não do sistema: `activity_logs` é o histórico que responde "quem excluiu o
+produto Tomate" e costuma valer a pena guardar por muito mais tempo que o log técnico. Se optar por apagar, comece
+pelo `system_logs` antigo e faça o backup antes.
+
 ## Teste de restauração
 
 O teste usa o dump mais recente, cria o banco temporário de nome fixo `hortierp_restore_test`, restaura o conteúdo,
