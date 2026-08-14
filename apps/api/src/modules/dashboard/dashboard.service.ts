@@ -65,6 +65,9 @@ export async function getDashboardSummary(companyId: string, range: { from?: Dat
   const lowStockConditions = and(activeProductConditions, lte(products.currentStock, products.minStock))
   const lossPeriodConditions = and(
     eq(losses.companyId, companyId),
+    // Perda cancelada foi estornada ao estoque: não é desperdício e não pode inflar o
+    // "valor perdido no período" nem a distribuição por motivo.
+    isNull(losses.cancelledAt),
     gte(losses.lossDate, periodStart),
     lte(losses.lossDate, periodEnd),
   )

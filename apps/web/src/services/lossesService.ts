@@ -10,6 +10,12 @@ export interface LossInput {
   lossDate?: string
 }
 
+/** Correção de perda: só campos descritivos. Produto, quantidade e data são imutáveis. */
+export interface UpdateLossInput {
+  reason?: LossReason
+  notes?: string | null
+}
+
 export interface ListLossesParams {
   sortBy?: string
   sortOrder?: 'asc' | 'desc'
@@ -20,6 +26,7 @@ export interface ListLossesParams {
   reason?: LossReason
   from?: string
   to?: string
+  includeCancelled?: boolean
 }
 
 export async function listLosses(params: ListLossesParams) {
@@ -33,5 +40,15 @@ export function listAllLosses(params: Omit<ListLossesParams, 'page' | 'pageSize'
 
 export async function createLoss(payload: LossInput) {
   const { data } = await api.post<Loss>('/losses', payload)
+  return data
+}
+
+export async function updateLoss(id: string, payload: UpdateLossInput) {
+  const { data } = await api.patch<Loss>(`/losses/${id}`, payload)
+  return data
+}
+
+export async function cancelLoss(id: string, cancelReason: string) {
+  const { data } = await api.post<Loss>(`/losses/${id}/cancel`, { cancelReason })
   return data
 }

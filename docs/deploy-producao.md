@@ -221,6 +221,26 @@ O volume `invoice_files` e todas as migrations aplicadas devem permanecer durant
 migration, documente se a versão anterior da aplicação continua compatível com o schema novo; se não continuar, o
 rollback exige restauração coordenada do backup e não apenas a troca da imagem.
 
+### Compatibilidade das migrations
+
+| Migration | Versão anterior roda no schema novo? | Observação |
+|---|---|---|
+| `0003` — `losses.cancelled_at`, `cancelled_by`, `cancel_reason` | **Sim** | Três colunas nuláveis. O Drizzle lista as colunas explicitamente no `select`, então a versão anterior simplesmente não as enxerga, e o `insert` antigo as deixa nulas. Rollback por troca de imagem é seguro, sem tocar no banco. |
+
+O sentido inverso **não** é compatível e vale para qualquer migration: restaurar um dump anterior à migration e apontar
+o código **atual** para ele quebra toda consulta que use as colunas novas. Depois de restaurar um backup antigo, rode as
+migrations antes de subir a aplicação:
+
+```bash
+IMAGE_TAG=<tag_em_producao> docker compose --env-file .env.production \
+  -f docker-compose.production.yml run --rm migrate
+```
+
+O `IMAGE_TAG` é obrigatório aqui: sem ele o Compose assume `latest`, que pode não existir porque o deploy versiona as
+imagens pelo hash curto do Git. Na dúvida, o caminho mais simples é redeployar — um deploy normal já aplica as
+migrations sozinho (o container `migrate` roda antes de a API subir). O `restore-test.sh` não cobre esse ponto de propósito: ele valida a **integridade do backup**, não a
+compatibilidade com a versão de código em execução — por isso passa mesmo com um dump antigo.
+
 ## Atualização segura
 
 Antes de cada deploy:

@@ -123,9 +123,11 @@ Entrada de mercadoria (cabeçalho + itens), ver [fluxo de entrada](./fluxos-de-n
 Metadados dos arquivos privados associados à nota fiscal. Cada registro contém `id`, `companyId`, `stockEntryId`, `originalName`, `storedName` único e aleatório, `mimeType`, `size`, `createdAt` e `createdBy`. O arquivo binário não fica no PostgreSQL: é armazenado no volume persistente da API, e `storedName` faz a ligação com o disco. `companyId` é duplicado intencionalmente para permitir que download, pré-visualização e exclusão validem isolamento multiempresa sem depender apenas da rota pai. Campos internos como `storedName` e `companyId` não são expostos nas respostas públicas de anexos.
 
 ### `losses`
-Registro de perda de estoque. `id`, `companyId`, `productId` (FK), `quantity` numeric(12,3), `unitCost?` numeric(12,2), `reason` (enum `loss_reason`: `vencido` \| `avariado` \| `roubo_furto` \| `erro_operacional` \| `outro`), `notes?`, `lossDate`, timestamps, auditBy.
+Registro de perda de estoque. `id`, `companyId`, `productId` (FK), `quantity` numeric(12,3), `unitCost?` numeric(12,2), `reason` (enum `loss_reason`: `vencido` \| `avariado` \| `roubo_furto` \| `erro_operacional` \| `outro`), `notes?`, `lossDate`, `cancelledAt?`, `cancelledBy?`, `cancelReason?`, timestamps, auditBy.
 
 `unitCost` é uma cópia do `products.costPrice` no instante do registro, não uma FK viva: o valor perdido de um período fechado não pode mudar porque alguém reajustou o custo do produto depois. É nulo nas perdas anteriores à coluna, e o dashboard cai no `costPrice` atual nesses casos.
+
+`cancelledAt` nulo significa perda válida — é a condição que separa desperdício real de lançamento estornado. As três colunas de cancelamento são próprias em vez de reaproveitarem o `deletedAt` do soft-delete: uma perda cancelada **não é** um registro excluído, ela continua consultável na tela e precisa guardar quem cancelou e por quê. Quem consulta `losses` para somar ou contar perdas tem que filtrar `cancelledAt is null` — hoje isso está em `buildLossesConditions` (listagem e relatórios) e no `lossPeriodConditions` do dashboard. Ver [fluxo de correção de perda](./fluxos-de-negocio.md#corrigir-uma-perda-lançada-errado).
 
 ### `stock_movements`
 Histórico append-only de toda variação de estoque — nunca é editado ou apagado, só inserido pelos fluxos de entrada, perda e ajuste manual por meio de `applyStockMovement`.
@@ -137,7 +139,7 @@ Histórico append-only de toda variação de estoque — nunca é editado ou apa
 | `type` | enum `movement_type` | `entrada` \| `perda` \| `ajuste` |
 | `quantity` | numeric(12,3) | positiva em entradas, **negativa** em perdas, positiva ou negativa em ajustes (diferença entre saldo novo e antigo) |
 | `balanceAfter` | numeric(12,3) | saldo do produto após o movimento (snapshot, não recalculado) |
-| `referenceType`, `referenceId` | text/uuid | em `entrada`/`perda`, aponta pra `stock_entry`/`loss` que originou o movimento; em `ajuste`, não existe entidade própria, então `referenceType: 'adjustment'` e `referenceId` é o próprio `productId` |
+| `referenceType`, `referenceId` | text/uuid | em `entrada`/`perda`, aponta pra `stock_entry`/`loss` que originou o movimento; em `ajuste`, depende da origem: `'adjustment'` (ajuste manual) e `'import'` (carga inicial por planilha) usam o próprio `productId` como referência, porque não existe entidade própria; `'loss_cancellation'` (estorno de perda cancelada) aponta pra `loss` estornada, de modo que a perda e o estorno ficam localizáveis pelo mesmo `referenceId` |
 | `notes` | text | nulável; só preenchido em `ajuste`, com o motivo digitado pelo usuário (ver [fluxo de ajuste manual](./fluxos-de-negocio.md#ajuste-manual-de-estoque)) |
 | `createdAt`, `createdBy` | timestamp/uuid | sem `updatedBy`/`deletedAt` — registro imutável; `createdBy` identifica o usuário responsável quando informado |
 

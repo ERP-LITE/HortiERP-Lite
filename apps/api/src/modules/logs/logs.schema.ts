@@ -16,7 +16,7 @@ export const listLogsQuerySchema = paginationQuerySchema.extend({
 
 export type ListLogsQuery = z.infer<typeof listLogsQuerySchema>
 
-export const activityActionSchema = z.enum(['criou', 'alterou', 'excluiu', 'importou', 'ajustou'])
+export const activityActionSchema = z.enum(['criou', 'alterou', 'excluiu', 'importou', 'ajustou', 'cancelou'])
 export const activityEntitySchema = z.enum(['produto', 'categoria', 'unidade', 'usuario', 'entrada', 'perda', 'estoque'])
 
 export const listActivityQuerySchema = paginationQuerySchema.extend({
