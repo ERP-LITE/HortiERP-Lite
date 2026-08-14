@@ -138,6 +138,8 @@ export interface Loss {
   unitCost: string | null
   notes: string | null
   lossDate: string
+  cancelledAt: string | null
+  cancelReason: string | null
   createdAt: string
   createdByUser: { id: string; name: string } | null
   product: Product
@@ -221,7 +223,7 @@ export interface DashboardProductQuantity {
 export type SystemLogLevel = 'info' | 'warning' | 'error'
 export type SystemLogMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
 
-export type ActivityAction = 'criou' | 'alterou' | 'excluiu' | 'importou' | 'ajustou'
+export type ActivityAction = 'criou' | 'alterou' | 'excluiu' | 'importou' | 'ajustou' | 'cancelou'
 export type ActivityEntity = 'produto' | 'categoria' | 'unidade' | 'usuario' | 'entrada' | 'perda' | 'estoque'
 
 /** Histórico de negócio: diz QUAL registro foi mexido, diferente do log de requisições. */

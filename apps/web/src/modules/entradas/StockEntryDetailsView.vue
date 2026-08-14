@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ArrowLeft, Download, Eye, File, FileUp, Pencil, Trash2 } from '@lucide/vue'
+import { ArrowLeft, Download, ExternalLink, Eye, File, FileUp, Pencil, Trash2 } from '@lucide/vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseModal from '@/components/ui/BaseModal.vue'
@@ -22,10 +22,12 @@ import {
 import type { StockEntry, StockEntryAttachment } from '@/types'
 import { useAuthStore } from '@/stores/auth'
 import { useLocalTableSort } from '@/composables/useTableSort'
+import { useIsMobile } from '@/composables/useIsMobile'
 
 const route = useRoute()
 const router = useRouter()
 const auth = useAuthStore()
+const isMobile = useIsMobile()
 const canDeleteAttachments = computed(() => auth.user?.role === 'admin' || auth.user?.role === 'gerente')
 const canEditDetails = canDeleteAttachments
 const entry = ref<StockEntry | null>(null)
@@ -138,6 +140,20 @@ async function openPreview(attachment: StockEntryAttachment) {
   }
 }
 
+/**
+ * Abre o arquivo já carregado no visualizador nativo do sistema.
+ *
+ * Só existe no mobile: nenhum navegador de celular renderiza PDF dentro de `<iframe>`
+ * (o Chrome do Android não tem visualizador embutido para iframe e o Safari do iOS
+ * mostra em branco), então lá a pré-visualização abria vazia. O clique aqui é um gesto
+ * novo do usuário sobre um blob já baixado — não passa por bloqueio de pop-up, que
+ * barraria um `window.open` disparado depois do `await` do download.
+ */
+function openPreviewInNewTab() {
+  if (!previewUrl.value) return
+  window.open(previewUrl.value, '_blank', 'noopener')
+}
+
 async function downloadAttachment(attachment: StockEntryAttachment) {
   try {
     const blob = await getStockEntryAttachmentBlob(entryId.value, attachment.id)
@@ -145,7 +161,11 @@ async function downloadAttachment(attachment: StockEntryAttachment) {
     const link = document.createElement('a')
     link.href = url
     link.download = attachment.originalName
+    // O elemento precisa estar no documento para o clique valer: fora do DOM, Firefox e
+    // Safari do iOS ignoram o `click()` e o download simplesmente não acontecia.
+    document.body.appendChild(link)
     link.click()
+    link.remove()
     setTimeout(() => URL.revokeObjectURL(url), 1000)
   } catch (error) {
     errorMessage.value = getApiErrorMessage(error, 'Não foi possível baixar o anexo')
@@ -279,8 +299,43 @@ onBeforeUnmount(clearPreview)
 
     <BaseModal :open="!!previewAttachment" :title="previewAttachment?.originalName || 'Pré-visualização'" size="lg" @close="clearPreview">
       <p v-if="previewLoading" class="py-12 text-center text-sm text-gray-500">Carregando arquivo...</p>
-      <img v-else-if="previewUrl && previewAttachment?.mimeType.startsWith('image/')" :src="previewUrl" :alt="previewAttachment.originalName" class="mx-auto max-h-[70vh] max-w-full object-contain" />
-      <iframe v-else-if="previewUrl" :src="previewUrl" class="h-[70vh] w-full rounded border border-gray-200 dark:border-gray-700" title="Pré-visualização do PDF" />
+      <div v-else-if="previewUrl" class="space-y-4">
+        <!-- Imagem funciona igual nos dois: o <img> renderiza em qualquer navegador. -->
+        <img
+          v-if="previewAttachment?.mimeType.startsWith('image/')"
+          :src="previewUrl"
+          :alt="previewAttachment.originalName"
+          class="mx-auto max-h-[70vh] max-w-full object-contain"
+        />
+        <!--
+          PDF: iframe só no desktop. No mobile ele abriria em branco, então lá a opção é
+          o visualizador nativo do celular, que ainda dá zoom e rolagem de verdade.
+        -->
+        <iframe
+          v-else-if="!isMobile"
+          :src="previewUrl"
+          class="h-[70vh] w-full rounded border border-gray-200 dark:border-gray-700"
+          title="Pré-visualização do PDF"
+        />
+        <p v-else class="text-sm text-gray-600 dark:text-gray-400">
+          O celular não exibe PDF dentro da página. Abra no visualizador do aparelho ou baixe o arquivo.
+        </p>
+
+        <!-- No mobile, o arquivo já está baixado: estes cliques são gesto novo do usuário. -->
+        <div v-if="isMobile" class="flex flex-col gap-2 sm:flex-row sm:justify-end">
+          <BaseButton type="button" @click="openPreviewInNewTab">
+            <ExternalLink :size="16" /> Abrir no aparelho
+          </BaseButton>
+          <BaseButton
+            v-if="previewAttachment"
+            variant="secondary"
+            type="button"
+            @click="downloadAttachment(previewAttachment)"
+          >
+            <Download :size="16" /> Baixar
+          </BaseButton>
+        </div>
+      </div>
     </BaseModal>
 
     <BaseModal :open="editOpen" title="Editar dados da entrada" size="lg" @close="editOpen = false">

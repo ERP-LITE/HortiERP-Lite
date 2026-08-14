@@ -40,6 +40,7 @@ const actionOptions = [
   { value: 'excluiu', label: 'Excluiu' },
   { value: 'importou', label: 'Importou' },
   { value: 'ajustou', label: 'Ajustou' },
+  { value: 'cancelou', label: 'Cancelou' },
 ]
 const entityOptions = [
   { value: 'todos', label: 'Todos os registros' },
@@ -58,6 +59,7 @@ const actionLabels: Record<ActivityAction, string> = {
   excluiu: 'Excluiu',
   importou: 'Importou',
   ajustou: 'Ajustou',
+  cancelou: 'Cancelou',
 }
 const entityLabels: Record<ActivityEntity, string> = {
   produto: 'produto',
@@ -74,6 +76,8 @@ const actionVariant: Record<ActivityAction, 'success' | 'warning' | 'danger' | '
   excluiu: 'danger',
   importou: 'success',
   ajustou: 'warning',
+  // Estorno mexeu no estoque: mais relevante que uma alteração comum, sem ser exclusão.
+  cancelou: 'warning',
 }
 
 const { filters, draftFilters, filterModalOpen, openFilterModal, applyFilters, clearFilters } = useFilterModal(

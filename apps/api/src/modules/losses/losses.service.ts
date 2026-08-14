@@ -6,13 +6,18 @@ import { AppError } from '../../shared/errors/AppError.js'
 import { applyStockMovement } from '../../shared/db/applyStockMovement.js'
 import { buildPaginatedResult } from '../../shared/db/paginate.js'
 import { matchingProductIds } from '../../shared/db/matchingProductIds.js'
-import type { CreateLossInput, ListLossesQuery } from './losses.schema.js'
+import { recordActivity, recordActivitySafe } from '../../shared/db/recordActivity.js'
+import type { CancelLossInput, CreateLossInput, ListLossesQuery, UpdateLossInput } from './losses.schema.js'
 
 export function buildLossesConditions(
   companyId: string,
-  query: Pick<ListLossesQuery, 'search' | 'productId' | 'reason' | 'from' | 'to'>,
+  query: Pick<ListLossesQuery, 'search' | 'productId' | 'reason' | 'from' | 'to'> & { includeCancelled?: boolean },
 ) {
   const conditions = [eq(losses.companyId, companyId)]
+  // Perda cancelada foi estornada ao estoque, então não é mais desperdício: fica fora
+  // de qualquer contagem ou soma. Relatórios não passam `includeCancelled`, o que os
+  // mantém sempre limpos.
+  if (!query.includeCancelled) conditions.push(isNull(losses.cancelledAt))
   if (query.search) {
     conditions.push(
       or(ilike(losses.notes, `%${query.search}%`), inArray(losses.productId, matchingProductIds(companyId, query.search)))!,
@@ -99,4 +104,120 @@ export async function createLoss(companyId: string, userId: string, data: Create
 
     return loss
   })
+}
+
+export async function updateLoss(companyId: string, userId: string, id: string, data: UpdateLossInput) {
+  const current = await getLoss(companyId, id)
+
+  if (current.cancelledAt) {
+    throw AppError.conflict('Esta perda foi cancelada e não pode mais ser alterada')
+  }
+
+  await db
+    .update(losses)
+    .set({
+      ...(data.reason !== undefined && { reason: data.reason }),
+      ...(data.notes !== undefined && { notes: data.notes }),
+      updatedBy: userId,
+      updatedAt: new Date(),
+    })
+    .where(and(eq(losses.id, id), eq(losses.companyId, companyId)))
+
+  await recordActivitySafe({
+    companyId,
+    actorId: userId,
+    action: 'alterou',
+    entity: 'perda',
+    entityId: id,
+    entityLabel: current.product?.name ?? 'Perda',
+    details: {
+      ...(data.reason !== undefined && { motivo: data.reason }),
+      ...(data.notes !== undefined && { observacoes: data.notes }),
+    },
+  })
+
+  return getLoss(companyId, id)
+}
+
+/**
+ * Cancela (estorna) uma perda lançada por engano.
+ *
+ * Nada é apagado: a perda ganha `cancelledAt` e sai dos relatórios, e a quantidade
+ * volta ao estoque como movimento de `ajuste` — assim o histórico explica de onde
+ * veio o saldo de volta. É o caminho para erro de produto ou de quantidade, que a
+ * edição não cobre justamente porque mexeriam no estoque.
+ *
+ * Devolver estoque é sempre seguro (é incremento, nunca deixa saldo negativo), então
+ * não existe o risco que impediria estornar uma entrada de mercadoria.
+ */
+export async function cancelLoss(companyId: string, userId: string, id: string, data: CancelLossInput) {
+  await db.transaction(async (tx) => {
+    // `for('update')` serializa cancelamentos concorrentes da mesma perda: sem o lock,
+    // dois cliques simultâneos passariam os dois pela checagem e devolveriam a
+    // quantidade ao estoque em dobro.
+    const [loss] = await tx
+      .select({
+        id: losses.id,
+        productId: losses.productId,
+        quantity: losses.quantity,
+        cancelledAt: losses.cancelledAt,
+      })
+      .from(losses)
+      .where(and(eq(losses.id, id), eq(losses.companyId, companyId)))
+      .for('update')
+
+    if (!loss) throw AppError.notFound('Registro de perda não encontrado')
+    if (loss.cancelledAt) throw AppError.conflict('Esta perda já foi cancelada')
+
+    const cancelledAt = new Date()
+    await tx
+      .update(losses)
+      .set({
+        cancelledAt,
+        cancelledBy: userId,
+        cancelReason: data.cancelReason,
+        updatedBy: userId,
+        updatedAt: cancelledAt,
+      })
+      .where(eq(losses.id, id))
+
+    await applyStockMovement(tx, {
+      companyId,
+      userId,
+      productId: loss.productId,
+      delta: Number(loss.quantity),
+      type: 'ajuste',
+      referenceType: 'loss_cancellation',
+      referenceId: loss.id,
+      notes: `Estorno de perda cancelada: ${data.cancelReason}`,
+      // A perda pode ser de um produto excluído depois do lançamento. O estorno
+      // continua valendo: sem isso, o cancelamento respondia "Produto não
+      // encontrado" e o usuário ficava sem como tirar a perda dos relatórios.
+      allowDeletedProduct: true,
+    })
+
+    // Nome lido dentro da transação e gravado no histórico como texto: se o produto
+    // for excluído depois, a auditoria continua dizendo o que foi estornado.
+    const [product] = await tx
+      .select({ name: products.name })
+      .from(products)
+      .where(eq(products.id, loss.productId))
+
+    await recordActivity(
+      {
+        companyId,
+        actorId: userId,
+        action: 'cancelou',
+        entity: 'perda',
+        entityId: loss.id,
+        entityLabel: product?.name ?? 'Perda',
+        details: { quantidadeEstornada: loss.quantity, motivo: data.cancelReason },
+      },
+      tx,
+    )
+  })
+
+  // Fora da transação: `getLoss` usa outra conexão do pool e não veria a alteração
+  // antes do commit.
+  return getLoss(companyId, id)
 }

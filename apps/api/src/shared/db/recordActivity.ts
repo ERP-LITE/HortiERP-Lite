@@ -1,7 +1,7 @@
 import { db } from '../../db/client.js'
 import { activityLogs } from '../../db/schema/index.js'
 
-export type ActivityAction = 'criou' | 'alterou' | 'excluiu' | 'importou' | 'ajustou'
+export type ActivityAction = 'criou' | 'alterou' | 'excluiu' | 'importou' | 'ajustou' | 'cancelou'
 
 export type ActivityEntity =
   | 'produto'

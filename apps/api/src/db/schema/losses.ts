@@ -17,6 +17,13 @@ export const losses = pgTable('losses', {
   reason: lossReasonEnum('reason').notNull(),
   notes: text('notes'),
   lossDate: timestamp('loss_date', { withTimezone: true }).notNull().defaultNow(),
+  // Cancelamento (estorno) da perda. Colunas próprias em vez de reaproveitar o
+  // `deletedAt`: uma perda cancelada não é um registro excluído — ela continua
+  // visível e auditável, e o histórico precisa guardar quem cancelou e por quê.
+  // Enquanto `cancelledAt` for nulo a perda conta normalmente nos relatórios.
+  cancelledAt: timestamp('cancelled_at', { withTimezone: true }),
+  cancelledBy: uuid('cancelled_by'),
+  cancelReason: text('cancel_reason'),
   ...timestamps,
   ...auditBy,
 }, (table) => ({

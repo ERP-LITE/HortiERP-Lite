@@ -15,16 +15,39 @@ interface ApplyStockMovementInput {
   referenceId: string
   notes?: string
   requireSufficientStock?: boolean
+  /**
+   * Permite movimentar um produto excluído logicamente. Use apenas para **estornar**
+   * uma operação já registrada: a linha do produto continua existindo com seu
+   * `currentStock`, e recusar o estorno só porque o produto foi excluído depois
+   * deixaria o usuário sem como corrigir o lançamento. Registrar operação nova em
+   * produto excluído continua bloqueado (o padrão).
+   */
+  allowDeletedProduct?: boolean
 }
 
 export async function applyStockMovement(tx: Transaction, input: ApplyStockMovementInput) {
-  const { companyId, userId, productId, delta, type, referenceType, referenceId, notes, requireSufficientStock } =
-    input
+  const {
+    companyId,
+    userId,
+    productId,
+    delta,
+    type,
+    referenceType,
+    referenceId,
+    notes,
+    requireSufficientStock,
+    allowDeletedProduct,
+  } = input
   const deltaStr = delta.toString()
 
-  const conditions = [eq(products.id, productId), eq(products.companyId, companyId), isNull(products.deletedAt)]
+  const productConditions = [eq(products.id, productId), eq(products.companyId, companyId)]
+  if (!allowDeletedProduct) productConditions.push(isNull(products.deletedAt))
+
+  // O `where` do update acrescenta a checagem de saldo; a busca do erro abaixo usa
+  // só as condições do produto, para distinguir "não existe" de "sem saldo".
+  const updateConditions = [...productConditions]
   if (requireSufficientStock && delta < 0) {
-    conditions.push(gte(products.currentStock, (-delta).toString()))
+    updateConditions.push(gte(products.currentStock, (-delta).toString()))
   }
 
   const [updatedProduct] = await tx
@@ -34,14 +57,14 @@ export async function applyStockMovement(tx: Transaction, input: ApplyStockMovem
       updatedAt: new Date(),
       updatedBy: userId,
     })
-    .where(and(...conditions))
+    .where(and(...updateConditions))
     .returning({ currentStock: products.currentStock })
 
   if (!updatedProduct) {
     const [product] = await tx
       .select({ currentStock: products.currentStock })
       .from(products)
-      .where(and(eq(products.id, productId), eq(products.companyId, companyId), isNull(products.deletedAt)))
+      .where(and(...productConditions))
 
     if (!product) throw AppError.notFound(`Produto não encontrado: ${productId}`)
 

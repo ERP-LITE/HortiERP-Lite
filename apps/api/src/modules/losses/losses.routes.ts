@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify'
-import { authenticate } from '../../shared/middlewares/auth.js'
-import { createLossSchema, listLossesQuerySchema } from './losses.schema.js'
-import { createLoss, getLoss, listLosses } from './losses.service.js'
+import { authenticate, requireRole } from '../../shared/middlewares/auth.js'
+import { cancelLossSchema, createLossSchema, listLossesQuerySchema, updateLossSchema } from './losses.schema.js'
+import { cancelLoss, createLoss, getLoss, listLosses, updateLoss } from './losses.service.js'
 
 export async function lossesRoutes(app: FastifyInstance) {
   app.addHook('preHandler', authenticate)
@@ -20,4 +20,24 @@ export async function lossesRoutes(app: FastifyInstance) {
     const loss = await createLoss(request.user.companyId, request.user.sub, data)
     return reply.status(201).send(loss)
   })
+
+  // Corrigir e cancelar exigem admin/gerente — mesmo contrato da correção de
+  // entradas. Registrar segue aberto a qualquer papel, inclusive operador.
+  app.patch<{ Params: { id: string } }>(
+    '/losses/:id',
+    { preHandler: requireRole('admin', 'gerente') },
+    async (request) => {
+      const data = updateLossSchema.parse(request.body)
+      return updateLoss(request.user.companyId, request.user.sub, request.params.id, data)
+    },
+  )
+
+  app.post<{ Params: { id: string } }>(
+    '/losses/:id/cancel',
+    { preHandler: requireRole('admin', 'gerente') },
+    async (request) => {
+      const data = cancelLossSchema.parse(request.body)
+      return cancelLoss(request.user.companyId, request.user.sub, request.params.id, data)
+    },
+  )
 }

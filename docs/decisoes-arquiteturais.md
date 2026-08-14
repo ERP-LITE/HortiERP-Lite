@@ -155,4 +155,20 @@ Um hook global `onResponse` registra em `system_logs` as requisições da API, s
 - As próprias rotas de consulta de logs não geram novos registros, evitando ruído e crescimento recursivo.
 - **Healthcheck também não gera registro.** Os caminhos ficam em `shared/config/health.ts` (`HEALTH_PATHS`), lista consumida tanto por quem registra as rotas (`app.ts`) quanto por quem as ignora no hook (`logs.hook.ts`). Quando `/api/health` nasceu, o hook continuou ignorando apenas `/health` e um monitor externo batendo de minuto em minuto passou a gravar cerca de 43 mil linhas por mês em `system_logs` — a lista compartilhada existe para que acrescentar um caminho de saúde não dependa de lembrar do segundo arquivo.
 
+As ações registradas em `activity_logs` são `criou`, `alterou`, `excluiu`, `importou`, `ajustou` e `cancelou`. A coluna é `text` livre no banco, mas o conjunto é fechado em três lugares que precisam andar juntos: o tipo `ActivityAction` (backend), o `activityActionSchema` do filtro e os mapas de rótulo e cor da tela de auditoria (`ActivityLogsView.vue`) — o `vue-tsc` acusa se algum ficar para trás, porque os mapas são `Record<ActivityAction, …>`.
+
 `system_logs` e `activity_logs` **não têm política de retenção automática**. Em instalação de longa duração são as tabelas que mais crescem e dominam o tamanho do backup; a limpeza é hoje uma decisão manual do operador. Ver [deploy-producao.md](./deploy-producao.md).
+
+## Correção de lançamentos operacionais
+
+Entradas, perdas e movimentações são históricos: nenhuma delas oferece exclusão. Mas errar o lançamento é normal, e a resposta é a mesma nos dois fluxos que têm correção — **separar o que é descritivo do que mexe no estoque**:
+
+- **Campos descritivos** (fornecedor, dados fiscais, motivo, observações) são editáveis por `admin`/`gerente`. Não afetam saldo nem período.
+- **Produto, quantidade e data** são imutáveis. Editá-los alteraria o estoque retroativamente e moveria o registro entre períodos já conferidos, além de reabrir a mutabilidade do custo congelado em `unitCost`.
+
+A diferença entre os dois fluxos está no que se faz quando é justamente a quantidade ou o produto que está errado:
+
+- **Perda** tem cancelamento (`POST /losses/:id/cancel`): marca `cancelledAt`, devolve a quantidade ao estoque como `ajuste` com `referenceType: 'loss_cancellation'` e tira o registro dos relatórios. Isso é possível porque devolver estoque é incremento — nunca falha por saldo insuficiente.
+- **Entrada** não tem: estornar uma entrada é decremento e poderia deixar o saldo negativo se a mercadoria já saiu. Ali a correção continua sendo o ajuste manual de estoque.
+
+O cancelamento de perda existe porque o ajuste manual, embora conserte o **saldo**, deixa o registro da perda intacto — e portanto o "valor perdido no período" do painel e o relatório de perdas seguiriam inflados. Num sistema cujo propósito é medir desperdício, esse número errado é o dano principal, não o saldo.

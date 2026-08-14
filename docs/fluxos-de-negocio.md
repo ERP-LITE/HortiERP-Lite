@@ -30,6 +30,10 @@ A ordem das etapas do upload é deliberada: a transferência e a validação do 
 
 A rota de upload tem rate limit próprio de **10 requisições por minuto**, bem abaixo do teto global de 300: cada chamada aqui pode gravar até `INVOICE_MAX_FILE_SIZE` em disco, e o limite global permitiria encher o volume em poucos minutos. Anexar nota é uma ação manual, então o teto baixo não atrapalha o uso real.
 
+**Pré-visualização no celular.** O arquivo é sempre buscado por `fetch` autenticado e transformado em `blob:` — nunca é apontado direto pela `src` de uma tag, porque a URL da API exige o cookie de sessão. Imagem é exibida por `<img>` e funciona em qualquer tela. PDF, porém, só é exibido em `<iframe>` **no desktop**: nenhum navegador de celular renderiza PDF dentro de iframe (o Chrome do Android não tem visualizador embutido para esse caso e o Safari do iOS mostra em branco), então a pré-visualização abria vazia no mobile. Abaixo do breakpoint `sm` a tela oferece **Abrir no aparelho** — um `window.open` no blob já carregado, entregando o arquivo ao visualizador nativo — e **Baixar**. O clique tem que ser um gesto novo do usuário: disparar o `window.open` logo após o `await` do download cairia no bloqueio de pop-up. O desktop segue exatamente como era.
+
+Como o blob é criado a partir dos bytes em memória, os cabeçalhos da resposta (`Content-Disposition`, `Content-Security-Policy`, `nosniff`) não interferem na exibição — eles valem para o acesso direto à URL da API, e é por isso que continuam sendo testados no contrato de entrega.
+
 Sobra um caso que nenhuma dessas proteções cobre: se a API cair entre a gravação do arquivo e o insert, o arquivo fica no disco sem dono, e nada no fluxo normal o remove. O comando `npm run invoices:cleanup` varre o diretório, compara com `stock_entry_attachments` e apaga o que não tem registro há mais de 24 horas (a carência protege uploads em andamento). Aceita `--dry-run`. Vale agendar mensalmente em produção — sem isso os restos só acumulam, ocupando volume e entrando nos backups criptografados junto com os anexos legítimos.
 
 Se um upload falhar depois do registro da entrada, o lançamento de estoque permanece válido e a tela de detalhes permite adicionar novamente o anexo ausente. Essa separação evita manter uma transação de banco aberta durante transferência de arquivo.
@@ -47,6 +51,42 @@ Tela `/perdas`. Rota `POST /losses`, service `losses.service.ts::createLoss`. Me
 
 Tudo em uma transação — perda só é registrada se o estoque puder de fato ser decrementado.
 O histórico e o relatório de perdas exibem o nome do usuário de `createdBy` como **Registrado por**.
+
+### Corrigir uma perda lançada errado
+
+Duas saídas, conforme o que está errado. Ambas exigem `admin` ou `gerente` — registrar continua liberado a qualquer
+papel, corrigir e cancelar não.
+
+**Correção (`PATCH /losses/:id`)** — só **motivo** e **observações**. Produto, quantidade e data ficam imutáveis, pelo
+mesmo motivo das entradas de mercadoria: alterá-los mudaria o estoque retroativamente, e mexer na data moveria o
+registro entre períodos já conferidos. A tela mostra produto, quantidade e data como leitura no modal de correção, com
+a orientação de cancelar quando um deles é que está errado. Perda já cancelada não aceita mais correção (`409`).
+
+A correção abre pelo ícone de lápis ou por **duplo clique na linha**, como nos demais cadastros. Linha de perda
+cancelada não responde ao duplo clique e não exibe os ícones — a API recusaria a alteração de todo modo, e abrir o
+modal para depois falhar seria pior que não abrir.
+
+**Cancelamento (`POST /losses/:id/cancel`)** — é o caminho para erro de produto ou de quantidade, justamente o que a
+correção não cobre. Exige um motivo do cancelamento e, numa única transação:
+
+1. Marca `cancelledAt`, `cancelledBy` e `cancelReason` na perda. **Nada é apagado** — o registro continua consultável.
+2. Devolve a quantidade ao estoque como `stock_movements` de `type: 'ajuste'` e `referenceType: 'loss_cancellation'`,
+   então o histórico explica de onde veio o saldo de volta. A perda original permanece no histórico: ficam as duas
+   linhas, e é isso que se quer auditar.
+3. Registra a ação `cancelou` na auditoria de negócio, com quem cancelou, o motivo e a quantidade estornada.
+
+Depois de cancelar, o lançamento correto é feito como uma perda nova. Devolver estoque é sempre seguro (é incremento,
+nunca deixa saldo negativo), diferente do que aconteceria ao estornar uma entrada de mercadoria — por isso o
+cancelamento existe para perdas e não para entradas.
+
+Cancelar duas vezes responde `409`, e um `select ... for update` na linha da perda serializa cliques simultâneos: o
+estoque é devolvido uma única vez mesmo com várias requisições concorrentes.
+
+**Onde a perda cancelada deixa de contar:** relatório de perdas (inclusive os agregados por motivo) e todos os
+indicadores do dashboard — valor perdido, contagem e distribuição por motivo. Ela também sai da listagem `/perdas` por
+padrão; o filtro "Mostrar perdas canceladas" a traz de volta, exibida com badge **Cancelada**, quantidade riscada e o
+motivo do cancelamento no lugar das observações. No CSV a coluna **Situacao** distingue as duas, e o valor perdido de
+uma cancelada sai em branco para não ser somado por engano na planilha.
 
 ## Consulta de estoque
 
