@@ -182,6 +182,74 @@ describe('importação de produtos por planilha', () => {
     assert.equal(saved.unitId, tenant.unitId)
   })
 
+  test('estoque inicial vira saldo do produto e movimentação de ajuste', async () => {
+    const tenant = await createTenant('imp-estoque')
+
+    const response = await importRequest(
+      {
+        rows: [
+          {
+            line: 2,
+            name: 'Abacaxi',
+            categoryName: 'Categoria imp-estoque',
+            unitName: 'Unidade imp-estoque',
+            costPrice: '4,50',
+            currentStock: '12,5',
+          },
+          {
+            line: 3,
+            name: 'Melão',
+            categoryName: 'Categoria imp-estoque',
+            unitName: 'Unidade imp-estoque',
+            currentStock: '0',
+          },
+        ],
+      },
+      authCookie(ctx.app, tenant.admin),
+    )
+
+    const body = response.json<ImportResponse>()
+    assert.equal(body.summary.imported, 2, JSON.stringify(body.errors))
+
+    const [comEstoque] = await db
+      .select({ id: products.id, currentStock: products.currentStock })
+      .from(products)
+      .where(and(eq(products.companyId, tenant.companyId), eq(products.name, 'Abacaxi')))
+    assert.equal(Number(comEstoque.currentStock), 12.5, 'o saldo informado na planilha vira o estoque do produto')
+
+    const movimentos = await db
+      .select({
+        type: stockMovements.type,
+        quantity: stockMovements.quantity,
+        balanceAfter: stockMovements.balanceAfter,
+        referenceType: stockMovements.referenceType,
+        referenceId: stockMovements.referenceId,
+        createdBy: stockMovements.createdBy,
+      })
+      .from(stockMovements)
+      .where(eq(stockMovements.productId, comEstoque.id))
+
+    assert.equal(movimentos.length, 1, 'o histórico precisa explicar de onde veio o saldo')
+    assert.equal(movimentos[0].type, 'ajuste')
+    assert.equal(Number(movimentos[0].quantity), 12.5)
+    assert.equal(Number(movimentos[0].balanceAfter), 12.5)
+    assert.equal(movimentos[0].referenceType, 'import')
+    assert.equal(movimentos[0].referenceId, comEstoque.id)
+    assert.equal(movimentos[0].createdBy, tenant.admin.id)
+
+    const [semEstoque] = await db
+      .select({ id: products.id, currentStock: products.currentStock })
+      .from(products)
+      .where(and(eq(products.companyId, tenant.companyId), eq(products.name, 'Melão')))
+    assert.equal(Number(semEstoque.currentStock), 0)
+
+    const semMovimento = await db
+      .select({ id: stockMovements.id })
+      .from(stockMovements)
+      .where(eq(stockMovements.productId, semEstoque.id))
+    assert.equal(semMovimento.length, 0)
+  })
+
   test('operador não pode importar produtos', async () => {
     const tenant = await createTenant('imp-papel')
 

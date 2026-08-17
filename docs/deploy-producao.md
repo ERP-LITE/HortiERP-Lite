@@ -30,6 +30,10 @@ openssl rand -base64 48
 
 O backend recusa iniciar em produção quando o JWT tem menos de 32 caracteres ou o CORS não usa HTTPS.
 
+`CORS_ORIGIN` aceita **uma ou várias origens separadas por vírgula**. Em produção normalmente é só o domínio público;
+no desenvolvimento a lista atende ao mesmo tempo o desktop (`http://localhost:5173`) e o celular no IP da máquina na
+rede local. Cada entrada é validada como URL, e em produção todas precisam ser HTTPS.
+
 Evite caracteres reservados de URL na senha do PostgreSQL porque o Compose monta `DATABASE_URL` a partir dela.
 
 ## Primeiro deploy e atualizações
@@ -116,6 +120,32 @@ ativos/saudáveis. `config --volumes` deve listar `invoice_files` junto dos volu
 A versão que introduz o controle de cobranças adiciona a migration incremental `0001_tiny_barracuda.sql`, responsável
 somente pela tabela `company_billings` e seus índices. Ela preserva todas as tabelas e dados anteriores e é compatível
 com a versão anterior da aplicação durante um rollback; a tabela nova apenas ficará sem uso até a versão atual voltar.
+
+### `0004_lethal_demogoblin.sql` — e-mail de usuário sem depender de maiúsculas
+
+Esta migration troca a restrição `users_email_unique` (sensível à caixa) pelo índice parcial
+`users_email_active_unique`, sobre `lower(email)` e restrito a `deleted_at is null`. Ela também **regrava os e-mails
+existentes em minúsculas**, que é a forma que a aplicação passa a usar para gravar e para procurar no login.
+
+Ela é a única migration até aqui que pode **falhar por causa dos dados** — e falha de propósito. Se duas contas não
+excluídas diferirem apenas pela caixa (`Maria@Loja.com` e `maria@loja.com`), o índice não pode ser criado, a migration
+inteira é revertida (roda em transação) e o container `migrate` encerra com código diferente de `0`, sem liberar a API
+nova. Fundir ou renomear duas contas distintas é decisão de negócio, não de migration.
+
+Antes de atualizar, verifique se o caso existe:
+
+```bash
+docker compose --env-file .env.production -f docker-compose.production.yml exec postgres \
+  psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c \
+  "select lower(email) as email, count(*) from users where deleted_at is null group by 1 having count(*) > 1;"
+```
+
+Zero linhas significa que a migration aplica sem intervenção. Havendo linhas, decida por conta qual delas fica antes de
+seguir, ajuste o e-mail da outra e rode a atualização novamente.
+
+**No rollback**, a versão anterior continua funcionando com o índice novo: ela grava e-mails sem normalizar, e o índice
+apenas passa a recusar duplicatas que diferem só pela caixa — que a versão antiga também já recusava na aplicação. Os
+e-mails regravados em minúsculas permanecem assim, e é justamente com eles que os usuários passam a entrar.
 
 ## Deploy automático pelo GitHub Actions
 

@@ -20,8 +20,6 @@ export function useSessionMonitor() {
     try {
       await auth.validateSession()
     } catch {
-      // O interceptor HTTP trata 401 e redireciona. Falhas de rede não devem
-      // encerrar uma sessão válida; a próxima verificação tentará novamente.
     } finally {
       checking = false
     }

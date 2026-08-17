@@ -10,7 +10,6 @@ export interface LossInput {
   lossDate?: string
 }
 
-/** Correção de perda: só campos descritivos. Produto, quantidade e data são imutáveis. */
 export interface UpdateLossInput {
   reason?: LossReason
   notes?: string | null

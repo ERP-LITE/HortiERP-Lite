@@ -15,13 +15,6 @@ interface ApplyStockMovementInput {
   referenceId: string
   notes?: string
   requireSufficientStock?: boolean
-  /**
-   * Permite movimentar um produto excluído logicamente. Use apenas para **estornar**
-   * uma operação já registrada: a linha do produto continua existindo com seu
-   * `currentStock`, e recusar o estorno só porque o produto foi excluído depois
-   * deixaria o usuário sem como corrigir o lançamento. Registrar operação nova em
-   * produto excluído continua bloqueado (o padrão).
-   */
   allowDeletedProduct?: boolean
 }
 

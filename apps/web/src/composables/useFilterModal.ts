@@ -1,10 +1,5 @@
 import { ref } from 'vue'
 
-/**
- * Lógica compartilhada de abrir/aplicar/limpar com estado rascunho por trás de todo
- * modal de filtro do sistema. `onApply` roda depois que filters/clearFilters commitam
- * — quem chama é responsável por resetar página + recarregar, já que isso varia por tela.
- */
 export function useFilterModal<T>(createDefault: () => T, onApply: () => void) {
   const filters = ref<T>(createDefault())
   const draftFilters = ref<T>(createDefault())

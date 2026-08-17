@@ -122,14 +122,16 @@ export async function createStockEntry(companyId: string, userId: string, data: 
         referenceType: 'stock_entry',
         referenceId: entry.id,
       })
+    }
 
-      await tx.insert(stockEntryItems).values({
+    await tx.insert(stockEntryItems).values(
+      data.items.map((item) => ({
         stockEntryId: entry.id,
         productId: item.productId,
         quantity: item.quantity.toString(),
         unitCost: item.unitCost?.toString(),
-      })
-    }
+      })),
+    )
 
     return entry
   })

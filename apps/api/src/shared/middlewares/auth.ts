@@ -11,6 +11,10 @@ export async function authenticate(request: FastifyRequest) {
     throw AppError.unauthorized('Token inválido ou expirado')
   }
 
+  if (request.user.realCompanyId && request.user.realCompanyId === request.user.companyId) {
+    throw AppError.unauthorized('Sessão inválida ou acesso desativado')
+  }
+
   const realCompanyId = request.user.realCompanyId ?? request.user.companyId
   const [user] = await db
     .select({ role: users.role })

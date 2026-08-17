@@ -143,8 +143,6 @@ function isActive(name: string) {
       <header
         class="print:hidden h-16 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between px-4 lg:px-6"
       >
-        <!-- O ícone continua com 22px, mas a área de toque vai a 44px: no celular esse
-             botão é o único caminho para o menu e 22px é menor que a ponta do dedo. -->
         <button
           class="lg:hidden -ml-2 inline-flex h-11 w-11 items-center justify-center rounded-lg text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
           title="Abrir menu"

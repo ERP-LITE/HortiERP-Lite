@@ -140,15 +140,6 @@ async function openPreview(attachment: StockEntryAttachment) {
   }
 }
 
-/**
- * Abre o arquivo já carregado no visualizador nativo do sistema.
- *
- * Só existe no mobile: nenhum navegador de celular renderiza PDF dentro de `<iframe>`
- * (o Chrome do Android não tem visualizador embutido para iframe e o Safari do iOS
- * mostra em branco), então lá a pré-visualização abria vazia. O clique aqui é um gesto
- * novo do usuário sobre um blob já baixado — não passa por bloqueio de pop-up, que
- * barraria um `window.open` disparado depois do `await` do download.
- */
 function openPreviewInNewTab() {
   if (!previewUrl.value) return
   window.open(previewUrl.value, '_blank', 'noopener')
@@ -253,8 +244,29 @@ onBeforeUnmount(clearPreview)
 
       <section class="rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800">
         <div class="border-b border-gray-200 px-5 py-4 dark:border-gray-700"><h2 class="font-semibold text-gray-800 dark:text-gray-100">Itens recebidos</h2></div>
+        <div class="divide-y divide-gray-100 dark:divide-gray-700 sm:hidden">
+          <article v-for="item in itemSort.sortedItems.value" :key="item.id" class="space-y-3 p-4">
+            <ExpandableText
+              :text="item.product.name"
+              :max-length="45"
+              class="text-sm font-semibold text-gray-900 dark:text-gray-100"
+            />
+            <dl class="grid grid-cols-2 gap-3 rounded-lg bg-gray-50 p-3 dark:bg-gray-900/50">
+              <div>
+                <dt class="text-xs text-gray-500 dark:text-gray-400">Quantidade</dt>
+                <dd class="mt-0.5 text-sm font-semibold text-gray-900 dark:text-gray-100">
+                  {{ Number(item.quantity) }} {{ item.product.unit.abbreviation }}
+                </dd>
+              </div>
+              <div>
+                <dt class="text-xs text-gray-500 dark:text-gray-400">Custo unitário</dt>
+                <dd class="mt-0.5 text-sm text-gray-700 dark:text-gray-300">{{ formatCurrency(item.unitCost, '—') }}</dd>
+              </div>
+            </dl>
+          </article>
+        </div>
         <div class="overflow-x-auto">
-          <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+          <table class="hidden min-w-full divide-y divide-gray-200 dark:divide-gray-700 sm:table">
             <thead class="bg-gray-50 dark:bg-gray-900/60"><tr><SortableTableHeader field="product" :active-field="itemSort.sortBy.value" :order="itemSort.sortOrder.value" @sort="itemSort.toggleSort">Produto</SortableTableHeader><SortableTableHeader field="quantity" :active-field="itemSort.sortBy.value" :order="itemSort.sortOrder.value" align="right" @sort="itemSort.toggleSort">Quantidade</SortableTableHeader><SortableTableHeader field="unitCost" :active-field="itemSort.sortBy.value" :order="itemSort.sortOrder.value" align="right" @sort="itemSort.toggleSort">Custo unitário</SortableTableHeader></tr></thead>
             <tbody class="divide-y divide-gray-100 dark:divide-gray-700"><tr v-for="item in itemSort.sortedItems.value" :key="item.id"><td class="max-w-80 px-4 py-3 text-sm font-medium dark:text-gray-100"><ExpandableText :text="item.product.name" /></td><td class="px-4 py-3 text-right text-sm whitespace-nowrap dark:text-gray-300">{{ Number(item.quantity) }} {{ item.product.unit.abbreviation }}</td><td class="px-4 py-3 text-right text-sm dark:text-gray-300">{{ formatCurrency(item.unitCost, '—') }}</td></tr></tbody>
           </table>
@@ -300,17 +312,12 @@ onBeforeUnmount(clearPreview)
     <BaseModal :open="!!previewAttachment" :title="previewAttachment?.originalName || 'Pré-visualização'" size="lg" @close="clearPreview">
       <p v-if="previewLoading" class="py-12 text-center text-sm text-gray-500">Carregando arquivo...</p>
       <div v-else-if="previewUrl" class="space-y-4">
-        <!-- Imagem funciona igual nos dois: o <img> renderiza em qualquer navegador. -->
         <img
           v-if="previewAttachment?.mimeType.startsWith('image/')"
           :src="previewUrl"
           :alt="previewAttachment.originalName"
           class="mx-auto max-h-[70vh] max-w-full object-contain"
         />
-        <!--
-          PDF: iframe só no desktop. No mobile ele abriria em branco, então lá a opção é
-          o visualizador nativo do celular, que ainda dá zoom e rolagem de verdade.
-        -->
         <iframe
           v-else-if="!isMobile"
           :src="previewUrl"
@@ -321,7 +328,6 @@ onBeforeUnmount(clearPreview)
           O celular não exibe PDF dentro da página. Abra no visualizador do aparelho ou baixe o arquivo.
         </p>
 
-        <!-- No mobile, o arquivo já está baixado: estes cliques são gesto novo do usuário. -->
         <div v-if="isMobile" class="flex flex-col gap-2 sm:flex-row sm:justify-end">
           <BaseButton type="button" @click="openPreviewInNewTab">
             <ExternalLink :size="16" /> Abrir no aparelho

@@ -89,9 +89,6 @@ defineExpose({
         :class="[{ 'border-red-400': error || invalid }, isPassword ? 'pr-10' : '']"
         @input="handleInput"
       />
-      <!-- O ícone tem 16px, pequeno demais para o dedo. O botão vai a 36px centrado em
-           `right-0`, o que deixa o centro do ícone nos mesmos 18px da borda de antes:
-           cresce só a área de toque, a aparência não muda. Cabe no `pr-10` do campo. -->
       <button
         v-if="isPassword"
         type="button"

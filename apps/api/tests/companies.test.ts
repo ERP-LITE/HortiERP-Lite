@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { describe, test } from 'node:test'
 import { eq } from 'drizzle-orm'
 import { db } from '../src/db/client.js'
-import { companies } from '../src/db/schema/index.js'
+import { companies, users } from '../src/db/schema/index.js'
 import { authCookie, createTenant, createUser, setupTestApp } from './helpers.js'
 
 const ctx = setupTestApp()
@@ -109,5 +109,62 @@ describe('cadastro de empresas', () => {
     })
     assert.equal(duplicate.statusCode, 409)
     assert.match(duplicate.body, /CNPJ/)
+  })
+})
+
+describe('proteção da empresa Plataforma', () => {
+  async function plataforma(suffix: string) {
+    const [platform] = await db.insert(companies).values({ name: 'Plataforma' }).returning({ id: companies.id })
+    const dono = await createUser(platform.id, 'super_admin', `dono-${suffix}`)
+    const socio = await createUser(platform.id, 'super_admin', `socio-${suffix}`)
+    return { platformId: platform.id, dono, socio }
+  }
+
+  test('não pode ser acessada como suporte', async () => {
+    const { platformId, dono } = await plataforma('bloqueio')
+
+    const response = await ctx.app.inject({
+      method: 'POST',
+      url: `/api/companies/${platformId}/impersonate`,
+      headers: { cookie: authCookie(ctx.app, dono) },
+    })
+
+    assert.equal(response.statusCode, 403)
+    assert.match(response.body, /plataforma/i)
+  })
+
+  test('nenhum super_admin fica exposto na tela de usuários por essa via', async () => {
+    const { platformId, dono, socio } = await plataforma('sem-rebaixar')
+
+    const cookieForjado = authCookie(ctx.app, dono, {
+      companyId: platformId,
+      realCompanyId: platformId,
+      role: 'admin',
+    })
+
+    const response = await ctx.app.inject({
+      method: 'PUT',
+      url: `/api/users/${socio.id}`,
+      headers: { cookie: cookieForjado },
+      payload: { role: 'operador' },
+    })
+
+    assert.equal(response.statusCode, 401, 'a sessão forjada não deve ser aceita')
+
+    const [depois] = await db.select({ role: users.role }).from(users).where(eq(users.id, socio.id))
+    assert.equal(depois.role, 'super_admin')
+  })
+
+  test('empresa-cliente comum continua acessível como suporte', async () => {
+    const { dono } = await plataforma('cliente-ok')
+    const cliente = await createTenant('suporte-ok')
+
+    const response = await ctx.app.inject({
+      method: 'POST',
+      url: `/api/companies/${cliente.companyId}/impersonate`,
+      headers: { cookie: authCookie(ctx.app, dono) },
+    })
+
+    assert.equal(response.statusCode, 200)
   })
 })

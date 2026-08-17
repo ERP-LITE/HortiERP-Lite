@@ -1,7 +1,8 @@
 import { z } from 'zod'
+import { emailSchema } from '../../shared/schemas/email.schema.js'
 
 export const loginSchema = z.object({
-  email: z.string().email('E-mail inválido'),
+  email: emailSchema,
   password: z.string().min(6, 'Senha deve ter ao menos 6 caracteres'),
 })
 

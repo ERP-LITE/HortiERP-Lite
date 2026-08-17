@@ -11,14 +11,15 @@ export const userPublicColumns = {
   updatedAt: users.updatedAt,
 }
 
-export function assertUniqueUserEmail(email: string, excludeId?: string) {
+export function assertUniqueUserEmail(email: string, options: { excludeId?: string; field?: string } = {}) {
   return assertUniqueField({
     table: users,
     idColumn: users.id,
     valueColumn: users.email,
+    deletedAtColumn: users.deletedAt,
     value: email,
-    excludeId,
-    field: 'email',
+    excludeId: options.excludeId,
+    field: options.field ?? 'email',
     message: 'Já existe um usuário com esse e-mail',
   })
 }

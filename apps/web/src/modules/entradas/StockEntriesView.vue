@@ -85,7 +85,6 @@ async function exportCsv() {
     sortOrder: sortOrder.value,
   })
 
-  // Uma linha por item da entrada: é o formato que o contador consegue conferir contra a nota.
   return {
     headers: ['Data', 'Fornecedor', 'Nota', 'Serie', 'Produto', 'Quantidade', 'Custo unitario', 'Total do item', 'Recebido por', 'Observacoes'],
     rows: all.flatMap((entry) =>

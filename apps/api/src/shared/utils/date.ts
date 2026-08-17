@@ -7,24 +7,10 @@ export function businessDate(instant: Date, timeZone = APP_TIME_ZONE) {
   return new Intl.DateTimeFormat('en-CA', { timeZone }).format(instant)
 }
 
-/**
- * Data de hoje no fuso do negócio, no formato `AAAA-MM-DD` das colunas `date`.
- *
- * Os containers rodam em UTC, então `new Date().toISOString()` já devolve o dia
- * seguinte a partir das 21h de Brasília — uma cobrança que vence hoje apareceria
- * como atrasada no fim da tarde. O front monta os períodos com a data local do
- * usuário (`lib/period.ts`), e este helper mantém o servidor no mesmo dia.
- */
 export function todayIsoDate(timeZone = APP_TIME_ZONE) {
   return businessDate(new Date(), timeZone)
 }
 
-/**
- * Quanto o relógio do fuso está adiantado em relação ao UTC no instante dado,
- * em milissegundos. Sai de `Intl` em vez de um valor fixo de -3h para que fusos
- * com horário de verão continuem certos (e para não travar a regra num offset
- * que o Brasil já mudou no passado).
- */
 function timeZoneOffsetMs(instant: Date, timeZone: string) {
   const parts = new Intl.DateTimeFormat('en-US', {
     timeZone,
@@ -61,9 +47,6 @@ function zonedWallClockToInstant(
   const [year, month, day] = isoDate.split('-').map(Number)
   const wallClockAsUtc = Date.UTC(year, month - 1, day, time.hours, time.minutes, time.seconds, time.ms)
 
-  // Duas passadas: a primeira estima o deslocamento pelo próprio horário de parede,
-  // a segunda confirma já a partir do instante corrigido — necessário porque o
-  // deslocamento pode mudar dentro do dia em fusos com horário de verão.
   const firstGuess = wallClockAsUtc - timeZoneOffsetMs(new Date(wallClockAsUtc), timeZone)
   return new Date(wallClockAsUtc - timeZoneOffsetMs(new Date(firstGuess), timeZone))
 }
@@ -78,11 +61,6 @@ export function endOfBusinessDay(isoDate: string, timeZone = APP_TIME_ZONE) {
   return zonedWallClockToInstant(isoDate, { hours: 23, minutes: 59, seconds: 59, ms: 999 }, timeZone)
 }
 
-/**
- * Aritmética de calendário sobre a string `AAAA-MM-DD`, sem passar por fuso
- * nenhum: somar 24h a um instante erraria justamente no dia em que o
- * deslocamento do fuso muda.
- */
 export function addDaysToIsoDate(isoDate: string, days: number) {
   const [year, month, day] = isoDate.split('-').map(Number)
   const shifted = new Date(Date.UTC(year, month - 1, day))

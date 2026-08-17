@@ -29,6 +29,13 @@
       "when": 1786727362943,
       "tag": "0003_greedy_lilandra",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1786971414006,
+      "tag": "0004_lethal_demogoblin",
+      "breakpoints": true
     }
   ]
 }

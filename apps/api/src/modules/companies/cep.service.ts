@@ -52,7 +52,6 @@ export async function findAddressByCep(rawCep: string): Promise<CepAddress> {
       const address = await queryProvider(provider, cep)
       if (address) return address
     } catch {
-      // Falhas e timeouts passam automaticamente ao próximo provedor.
     }
   }
 

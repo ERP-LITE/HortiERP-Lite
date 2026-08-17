@@ -45,8 +45,6 @@ export const useAuthStore = defineStore('auth', () => {
     }
 
     if (!sessionPromise) {
-      // Uma resposta 401 nesta primeira consulta significa apenas que o
-      // visitante ainda não entrou; não é uma sessão que acabou de expirar.
       sessionPromise = fetchMe(true)
         .then((session) => applySession(session))
         .catch(() => {

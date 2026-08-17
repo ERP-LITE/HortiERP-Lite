@@ -8,8 +8,6 @@ const envSchema = z
     DATABASE_URL: z.string().min(1, 'DATABASE_URL é obrigatório'),
     JWT_SECRET: z.string().min(1, 'JWT_SECRET é obrigatório'),
     JWT_EXPIRES_IN: z.string().default('8h'),
-    // Aceita uma ou várias origens separadas por vírgula. Útil no desenvolvimento para
-    // atender ao mesmo tempo o desktop (localhost) e o celular (IP da máquina na rede).
     CORS_ORIGIN: z
       .string()
       .default('http://localhost:5173')

@@ -6,7 +6,7 @@ import { companies, users } from './schema/index.js'
 const PLATFORM_COMPANY_NAME = 'Plataforma'
 
 async function run() {
-  const email = process.env.PLATFORM_ADMIN_EMAIL
+  const email = process.env.PLATFORM_ADMIN_EMAIL?.trim().toLowerCase()
   const password = process.env.PLATFORM_ADMIN_PASSWORD
   const name = process.env.PLATFORM_ADMIN_NAME || 'Super Admin'
 

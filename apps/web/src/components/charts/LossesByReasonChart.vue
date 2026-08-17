@@ -54,8 +54,6 @@ function showTooltip(event: MouseEvent | FocusEvent, item: (typeof sorted.value)
   }
 }
 
-// A API já corta a lista nos produtos de maior quantidade e informa quantos
-// sobraram, então aqui é só montar as linhas.
 function buildDetails(
   totals: DashboardQuantityByUnit[],
   products: DashboardProductQuantity[],

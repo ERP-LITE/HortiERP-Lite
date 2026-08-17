@@ -226,13 +226,11 @@ export type SystemLogMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
 export type ActivityAction = 'criou' | 'alterou' | 'excluiu' | 'importou' | 'ajustou' | 'cancelou'
 export type ActivityEntity = 'produto' | 'categoria' | 'unidade' | 'usuario' | 'entrada' | 'perda' | 'estoque'
 
-/** Histórico de negócio: diz QUAL registro foi mexido, diferente do log de requisições. */
 export interface ActivityLog {
   id: string
   action: ActivityAction
   entity: ActivityEntity
   entityId: string | null
-  /** Nome do registro no momento da ação — sobrevive à exclusão do registro. */
   entityLabel: string
   details: Record<string, unknown> | null
   createdAt: string
@@ -255,7 +253,6 @@ export interface SystemLog {
   statusCode: number
   level: SystemLogLevel
   createdAt: string
-  /** Presente apenas em `/logs/technical` (super_admin) */
   durationMs?: number
   errorCode?: string | null
   errorMessage?: string | null

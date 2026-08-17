@@ -73,9 +73,6 @@ function showTooltip(event: MouseEvent | FocusEvent, segment: (typeof segments.v
   }
 }
 
-// A API já devolve só os produtos de maior quantidade do grupo, junto com
-// quantos ficaram de fora — por isso a contagem de "outros" vem pronta em vez
-// de ser deduzida do tamanho da lista.
 function buildDetails(
   totals: DashboardQuantityByUnit[],
   products: DashboardProductQuantity[],

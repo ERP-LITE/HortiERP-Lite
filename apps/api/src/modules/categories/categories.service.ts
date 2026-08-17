@@ -1,11 +1,11 @@
-import { and, asc, count, eq, ilike, inArray, isNull, or } from 'drizzle-orm'
+import { and, asc, count, eq, ilike, isNull, or } from 'drizzle-orm'
 import { orderByColumn } from '../../shared/db/sorting.js'
 import { db } from '../../db/client.js'
 import { categories } from '../../db/schema/index.js'
 import { AppError } from '../../shared/errors/AppError.js'
 import { assertUniqueField } from '../../shared/db/assertUniqueField.js'
 import { buildPaginatedResult } from '../../shared/db/paginate.js'
-import { softDeleteById, softDeleteByIds } from '../../shared/db/softDelete.js'
+import { softDeleteById, softDeleteManyWithActivity } from '../../shared/db/softDelete.js'
 import { recordActivitySafe } from '../../shared/db/recordActivity.js'
 import type { CreateCategoryInput, ListCategoriesQuery, UpdateCategoryInput } from './categories.schema.js'
 
@@ -113,24 +113,5 @@ export async function deleteCategory(companyId: string, userId: string, id: stri
 }
 
 export async function deleteCategories(companyId: string, userId: string, ids: string[]) {
-  // Os nomes são lidos antes da exclusão: depois o histórico não saberia dizer o que saiu.
-  const removidos = await db
-    .select({ id: categories.id, label: categories.name })
-    .from(categories)
-    .where(and(eq(categories.companyId, companyId), inArray(categories.id, ids), isNull(categories.deletedAt)))
-
-  const result = await softDeleteByIds(categories, companyId, userId, ids)
-
-  for (const item of removidos) {
-    await recordActivitySafe({
-      companyId,
-      actorId: userId,
-      action: 'excluiu',
-      entity: 'categoria',
-      entityId: item.id,
-      entityLabel: item.label,
-    })
-  }
-
-  return result
+  return softDeleteManyWithActivity({ table: categories, companyId, userId, ids, entity: 'categoria' })
 }

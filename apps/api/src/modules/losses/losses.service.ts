@@ -14,9 +14,6 @@ export function buildLossesConditions(
   query: Pick<ListLossesQuery, 'search' | 'productId' | 'reason' | 'from' | 'to'> & { includeCancelled?: boolean },
 ) {
   const conditions = [eq(losses.companyId, companyId)]
-  // Perda cancelada foi estornada ao estoque, então não é mais desperdício: fica fora
-  // de qualquer contagem ou soma. Relatórios não passam `includeCancelled`, o que os
-  // mantém sempre limpos.
   if (!query.includeCancelled) conditions.push(isNull(losses.cancelledAt))
   if (query.search) {
     conditions.push(
@@ -139,22 +136,8 @@ export async function updateLoss(companyId: string, userId: string, id: string, 
   return getLoss(companyId, id)
 }
 
-/**
- * Cancela (estorna) uma perda lançada por engano.
- *
- * Nada é apagado: a perda ganha `cancelledAt` e sai dos relatórios, e a quantidade
- * volta ao estoque como movimento de `ajuste` — assim o histórico explica de onde
- * veio o saldo de volta. É o caminho para erro de produto ou de quantidade, que a
- * edição não cobre justamente porque mexeriam no estoque.
- *
- * Devolver estoque é sempre seguro (é incremento, nunca deixa saldo negativo), então
- * não existe o risco que impediria estornar uma entrada de mercadoria.
- */
 export async function cancelLoss(companyId: string, userId: string, id: string, data: CancelLossInput) {
   await db.transaction(async (tx) => {
-    // `for('update')` serializa cancelamentos concorrentes da mesma perda: sem o lock,
-    // dois cliques simultâneos passariam os dois pela checagem e devolveriam a
-    // quantidade ao estoque em dobro.
     const [loss] = await tx
       .select({
         id: losses.id,
@@ -190,14 +173,9 @@ export async function cancelLoss(companyId: string, userId: string, id: string, 
       referenceType: 'loss_cancellation',
       referenceId: loss.id,
       notes: `Estorno de perda cancelada: ${data.cancelReason}`,
-      // A perda pode ser de um produto excluído depois do lançamento. O estorno
-      // continua valendo: sem isso, o cancelamento respondia "Produto não
-      // encontrado" e o usuário ficava sem como tirar a perda dos relatórios.
       allowDeletedProduct: true,
     })
 
-    // Nome lido dentro da transação e gravado no histórico como texto: se o produto
-    // for excluído depois, a auditoria continua dizendo o que foi estornado.
     const [product] = await tx
       .select({ name: products.name })
       .from(products)

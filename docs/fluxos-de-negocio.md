@@ -10,7 +10,48 @@ As listagens de categorias, unidades, produtos e usuários permitem selecionar o
 
 Os campos opcionais do produto (SKU, código de barras, custo e preço de venda) podem ser **apagados** depois de preenchidos: a tela envia `null` e a API grava vazio. Omitir a chave no payload continua significando "não mexe neste campo", o que mantém atualizações parciais possíveis pela API. Campo em branco é normalizado para `null` em vez de `''` — dois produtos sem SKU guardando string vazia colidiriam no índice único parcial, que só ignora nulos, e a tela receberia um 409 dizendo que o SKU já existe.
 
+O e-mail do usuário é a identidade de login e não depende de maiúsculas: ele é gravado em minúsculas e quem entra pode digitar como quiser. Excluir um usuário **libera** o e-mail dele, então recontratar a mesma pessoa depois usa o mesmo endereço normalmente — o excluído continua sem conseguir entrar. Detalhes em [modelo de dados](./modelo-de-dados.md#users).
+
 Nenhum `admin` consegue rebaixar o próprio perfil de acesso nem desativar a própria conta (`409`); alterar **outros** usuários segue liberado. Sem essa trava a empresa podia ficar com zero admins ativos, e aí só um `super_admin` em impersonação conseguiria devolver o acesso à gestão de usuários. É a mesma proteção que já impedia excluir a própria conta.
+
+## Importação de produtos por planilha
+
+Tela `/produtos`. Rota `POST /products/import`, service `products.service.ts::importProducts`. Exige `admin` ou
+`gerente`, como os demais cadastros. O frontend lê o arquivo (`lib/productSpreadsheet.ts`) e envia as linhas já como
+JSON — a API nunca recebe o arquivo em si. Máximo de 2000 linhas por vez.
+
+**A operação é tudo-ou-nada.** Se qualquer linha estiver inválida, nada é gravado. Importar só as linhas boas
+obrigaria o usuário a corrigir o arquivo e reenviar, e aí as linhas já importadas voltariam como duplicadas; corrigir
+o arquivo inteiro de uma vez é o caminho mais previsível. Com `dryRun`, a mesma validação roda sem gravar nada — é o
+que a tela usa para mostrar a prévia antes de confirmar.
+
+Os erros voltam por número de linha, limitados a 200 por resposta; `omittedErrors` conta quantos ficaram de fora para
+a tela não fingir que a lista está completa.
+
+Como cada campo é interpretado:
+
+| Campo | Regra |
+|---|---|
+| `name` | obrigatório; recusado se repetir outro produto **do arquivo** ou já existente, ignorando maiúsculas |
+| `categoryName` | obrigatório; precisa existir, salvo com `createMissingRefs` |
+| `unitName` | obrigatório; aceita o **nome** ou a **abreviação** da unidade, porque quem preenche a planilha escreve "kg", não "Quilograma" |
+| `sku` | opcional; único quando informado, na mesma comparação sem maiúsculas |
+| `costPrice`, `salePrice`, `minStock`, `currentStock` | aceitam o formato brasileiro (`1.234,56`) e o americano (`1234.56`) — o separador decimal é o último que aparecer, e o outro é tratado como separador de milhar. Planilha exportada do Excel em português usa vírgula, mas quem digita à mão mistura os dois |
+| `active` | `sim`/`s`/`true`/`verdadeiro`/`1`/`ativo` e `nao`/`não`/`n`/`false`/`falso`/`0`/`inativo`; vazio vira ativo |
+
+Com `createMissingRefs`, as categorias e unidades que faltavam são criadas na mesma transação. A unidade nova precisa
+de uma abreviação única: ela é derivada do nome (10 primeiros caracteres) e desempatada com sufixo numérico quando já
+existe outra igual.
+
+**O estoque informado na planilha nasce junto com o produto e também vira uma movimentação de `ajuste`**
+(`referenceType: 'import'`), para que a primeira linha do histórico explique de onde veio o saldo e o gráfico de
+entradas × perdas do painel feche com o estoque atual. Como o produto está sendo criado naquela transação e ninguém
+mais o enxerga, o saldo é gravado direto na linha em vez de passar por `applyStockMovement` — somar a um saldo que é
+zero dá o mesmo resultado, sem duas consultas por produto (numa planilha cheia, eram milhares de idas ao banco).
+
+O resumo devolvido inclui `withInitialStock` e `initialStockWithoutCost`. O segundo é um aviso: quantidade sem custo
+entra no estoque valendo zero, e o painel mostraria a loja cheia com "valor em estoque: R$ 0,00". Não impede a
+importação, mas o usuário precisa ver isso antes de confirmar.
 
 ## Entrada de mercadoria
 
@@ -24,7 +65,7 @@ Uma entrada tem um cabeçalho (`stock_entries`: fornecedor em texto livre, data,
 Se qualquer produto do lote não existir, a transação inteira é revertida (nenhum item é gravado, nenhum estoque é alterado).
 O histórico e o relatório de entradas exibem o nome do usuário de `createdBy` como **Recebido por**, mantendo identificável quem recebeu a mercadoria.
 
-Depois de criar a entrada, a interface envia até 3 anexos pelos endpoints `/stock-entries/:id/attachments`. São aceitos XML, PDF, JPG, PNG e WEBP, com limite padrão de 10 MB por arquivo. Os arquivos não ficam em pasta pública: a API grava nomes aleatórios no volume privado configurado por `INVOICE_STORAGE_PATH`, enquanto `stock_entry_attachments` mantém nome original, MIME type, tamanho e autoria. Todo acesso valida o `companyId` da sessão; imagens e PDFs podem ser pré-visualizados, e XML é entregue somente como download. A assinatura do conteúdo é conferida para impedir que apenas a extensão/MIME seja falsificada. A listagem permite pesquisar também pelo número ou pela chave de acesso da nota. Administradores e gerentes podem excluir anexos definitivamente; operadores podem enviar, visualizar e baixar, mas não excluir. Uploads simultâneos da mesma entrada são serializados no banco para preservar o limite de 3 arquivos.
+Depois de criar a entrada, a interface envia até 3 anexos pelos endpoints `/stock-entries/:id/attachments`. São aceitos XML, PDF, JPG, PNG e WEBP, com limite padrão de 10 MB por arquivo. Os arquivos não ficam em pasta pública: a API grava nomes aleatórios no volume privado configurado por `INVOICE_STORAGE_PATH`, enquanto `stock_entry_attachments` mantém nome original, MIME type, tamanho e autoria. Todo acesso valida o `companyId` da sessão; imagens e PDFs podem ser pré-visualizados, e XML é entregue somente como download. A assinatura do conteúdo é conferida para impedir que apenas a extensão/MIME seja falsificada. A tabela de formatos aceitos é um `Map`, e não um objeto literal: o MIME type vem do cabeçalho enviado pelo cliente, e num objeto comum uma busca por chave herdada (`constructor`, `__proto__`) devolveria valor do prototype em vez de `undefined`, deixando passar um formato que não está na lista. A listagem permite pesquisar também pelo número ou pela chave de acesso da nota. Administradores e gerentes podem excluir anexos definitivamente; operadores podem enviar, visualizar e baixar, mas não excluir. Uploads simultâneos da mesma entrada são serializados no banco para preservar o limite de 3 arquivos.
 
 A ordem das etapas do upload é deliberada: a transferência e a validação do conteúdo acontecem **fora** de qualquer transação, e só depois abre-se uma transação curta com `pg_advisory_xact_lock` para reconferir a contagem e inserir o registro. Fazer a gravação dentro da transação faria um cliente lento segurar uma conexão do pool e o lock da entrada durante toda a transferência — poucos envios simultâneos de 10 MB bastariam para travar a API inteira. Antes de aceitar os bytes há ainda uma contagem sem lock, só para recusar cedo uma entrada que já está cheia; a contagem que vale é a de dentro da transação. Se qualquer etapa falhar, o arquivo já gravado é removido do disco.
 
@@ -72,7 +113,10 @@ correção não cobre. Exige um motivo do cancelamento e, numa única transaçã
 1. Marca `cancelledAt`, `cancelledBy` e `cancelReason` na perda. **Nada é apagado** — o registro continua consultável.
 2. Devolve a quantidade ao estoque como `stock_movements` de `type: 'ajuste'` e `referenceType: 'loss_cancellation'`,
    então o histórico explica de onde veio o saldo de volta. A perda original permanece no histórico: ficam as duas
-   linhas, e é isso que se quer auditar.
+   linhas, e é isso que se quer auditar. O estorno vale **mesmo que o produto tenha sido excluído** depois do
+   lançamento (`allowDeletedProduct` em `applyStockMovement`): a linha do produto continua existindo com seu saldo, e
+   recusar por causa da exclusão deixaria o usuário sem como tirar a perda dos relatórios. Registrar operação **nova**
+   em produto excluído continua bloqueado — a permissão existe só para estorno.
 3. Registra a ação `cancelou` na auditoria de negócio, com quem cancelou, o motivo e a quantidade estornada.
 
 Depois de cancelar, o lançamento correto é feito como uma perda nova. Devolver estoque é sempre seguro (é incremento,
@@ -120,7 +164,11 @@ O valor perdido usa `losses.unitCost`, o custo congelado no momento em que a per
 
 Cada agrupamento também traz um detalhamento por produto, limitado aos maiores em quantidade (`TOP_PRODUCTS_PER_GROUP`, hoje 5) mais um `otherProductsCount` com quantos ficaram de fora. O endpoint não é paginado e o tooltip só exibe alguns itens: sem esse corte, um período de 90 dias com centenas de produtos girando produzia dezenas de milhares de objetos num único JSON que a tela nunca chegava a mostrar.
 
+**O corte acontece no PostgreSQL, não em JavaScript.** Cada agrupamento sai de duas consultas: uma agregada, sem a dimensão de produto (limitada por dia × tipo × unidade, ou por motivo × unidade, ou por categoria × unidade), que produz as contagens e os `totalsByUnit`; e uma de detalhe que numera os produtos com `row_number()` por agrupamento e devolve só os cinco primeiros. A sobra vem de um `count(distinct)` na consulta agregada. Antes as duas coisas saíam de uma consulta só, agrupada por produto e sem limite: o corte reduzia a **resposta**, mas o banco continuava devolvendo uma linha por produto por dia — dezenas de milhares de linhas para exibir cinco. O `row_number()` usa o nome do produto como critério de desempate, para a ordem não variar entre execuções quando duas quantidades empatam.
+
 Contagens, somas e agrupamentos são calculados no PostgreSQL; produtos e perdas completos não são carregados em memória apenas para produzir os totais. Categorias excluídas logicamente não participam dos agrupamentos.
+
+Na distribuição por categoria, um produto **sem saldo** conta no `productCount` da categoria mas não entra nos `totalsByUnit` nem no detalhamento: ele é um produto cadastrado ali, mas não tem quantidade para exibir. Categoria em que nenhum produto tem saldo devolve `totalsByUnit` vazio, em vez de uma linha com zero — exibir "0 kg" sugeriria que existe algo em estoque naquela unidade.
 
 O período é resolvido em **datas civis de `America/Sao_Paulo`**, e o dia da timeline também: uma perda registrada às 22h conta no dia em que o usuário a lançou, não no dia seguinte. Sem período informado, o padrão são os últimos 30 dias; o teto é de 90 dias cheios, aplicado a partir do fim do intervalo. Ver [decisoes-arquiteturais.md](./decisoes-arquiteturais.md#filtro-de-período-nas-listagens).
 
@@ -156,7 +204,7 @@ Fluxo exclusivo do papel `super_admin` (dono da plataforma, não de nenhum clien
 
 1. Login do `super_admin` cai em `/selecionar-empresa`: lista todas as empresas-cliente (ativas clicáveis, suspensas desabilitadas) + um item pra "Configurações gerais do sistema" (`/empresas`).
 2. Em `/empresas`, cadastra uma nova empresa-cliente junto com o primeiro usuário admin dela numa única transação (`POST /companies`). Para manter o modal compacto, a criação é dividida em três abas: **Dados gerais** (identificação e contato), **Endereço** e **Administrador da empresa**; na edição aparecem somente as duas primeiras, pois usuários são gerenciados separadamente. Cada aba combina ícone e texto no desktop e mantém apenas o ícone no mobile, com rótulo acessível e tooltip. Ao completar oito dígitos no CEP, a interface tenta preencher o endereço por BrasilAPI, ViaCEP e OpenCEP, nessa ordem, com timeout individual e fallback automático; os campos permanecem editáveis e uma resposta atrasada de um CEP anterior é ignorada. O cadastro reúne nome fantasia, razão social, CNPJ, inscrição estadual opcional, responsável, e-mail, telefone e endereço completo. CNPJ, telefone e CEP são normalizados; o CNPJ passa pela validação dos dígitos verificadores e não pode se repetir entre empresas não excluídas. Na mesma tela o `super_admin` edita esses dados, ativa/suspende o acesso (`PATCH /companies/:id/active` — suspender bloqueia login de todos os usuários daquela empresa imediatamente) e gerencia os demais usuários `super_admin` da plataforma (`/platform-users`). A própria conta autenticada não pode ser excluída.
-3. Clicar numa empresa ativa em `/selecionar-empresa` "entra" nela (`POST /companies/:id/impersonate`): passa a ver e editar os dados daquela empresa com permissão de admin, mantendo seu próprio nome/e-mail de super_admin.
+3. Clicar numa empresa ativa em `/selecionar-empresa` "entra" nela (`POST /companies/:id/impersonate`): passa a ver e editar os dados daquela empresa com permissão de admin, mantendo seu próprio nome/e-mail de super_admin. A própria empresa "Plataforma" responde `403` nesse endpoint — ela nunca é uma empresa-cliente, e entrar nela exporia os `super_admin` na tela comum de usuários (ver [decisões arquiteturais](./decisoes-arquiteturais.md#empresa-da-plataforma-e-super_admin)).
 4. Uma faixa fixa no topo avisa que está em modo suporte, com botão pra voltar ao próprio perfil de super_admin sem logout (`POST /auth/exit-impersonation`).
 
 ## Controle manual de cobranças

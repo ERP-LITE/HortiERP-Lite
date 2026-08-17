@@ -61,8 +61,6 @@ const activeFilterCount = computed(
   () => Number(filters.value.status !== 'todos') + Number(filters.value.period.preset !== 'todos'),
 )
 
-// O BaseInput com `decimal-places` devolve string, então o formulário guarda tudo como
-// texto e converte só no envio — mesmo padrão das telas de perdas e entradas.
 interface BillingForm {
   companyId: string
   referenceMonth: string

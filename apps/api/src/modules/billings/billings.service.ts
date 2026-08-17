@@ -22,11 +22,6 @@ function normalizedValues(data: CreateBillingInput | UpdateBillingInput, actorId
   }
 }
 
-/**
- * Situação da cobrança derivada no banco, e não no navegador: a badge da tela
- * mostra exatamente o mesmo valor que o filtro `status` usa para montar o
- * `where`, sem chance das duas regras divergirem.
- */
 function statusExpression(today: string) {
   return sql<BillingStatus>`case
     when ${companyBillings.paidAt} is not null then 'paid'
@@ -82,12 +77,6 @@ export async function listBillings(query: ListBillingsQuery) {
   return buildPaginatedResult(data, total, query.page, query.pageSize)
 }
 
-/**
- * Só empresa-cliente viva recebe cobrança. A FK já garante que o id existe, mas não
- * impede faturar uma empresa excluída nem a própria empresa "Plataforma" — que
- * `listCompanies` esconde de toda tela, então a cobrança apareceria em `/cobrancas`
- * apontando para uma empresa que o super_admin não consegue abrir.
- */
 async function assertBillableCompany(companyId: string) {
   await getCompany(companyId)
 

@@ -17,11 +17,6 @@ export interface PaginationMeta {
   totalPages: number
 }
 
-/**
- * O pageSize é persistido no localStorage para funcionar como um único padrão
- * global compartilhado por todas as tabelas paginadas, enquanto cada tabela
- * mantém seu próprio estado de página e total de forma independente.
- */
 export function usePagination() {
   const page = ref(1)
   const pageSize = ref(getStoredPageSize())
@@ -38,10 +33,6 @@ export function usePagination() {
     totalPages.value = meta.totalPages
   }
 
-  /**
-   * Liga uma busca reativa à paginação: ao digitar, volta pra página 1 (ou
-   * recarrega direto se já estiver nela); ao trocar de página/tamanho, recarrega.
-   */
   function watchSearch(search: Ref<string>, load: () => void) {
     watch(search, () => {
       if (page.value !== 1) page.value = 1

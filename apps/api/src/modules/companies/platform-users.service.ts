@@ -70,7 +70,7 @@ export async function updatePlatformUser(
   data: UpdatePlatformUserInput,
 ) {
   await getPlatformUser(companyId, id)
-  if (data.email) await assertUniqueUserEmail(data.email, id)
+  if (data.email) await assertUniqueUserEmail(data.email, { excludeId: id })
   const passwordHash = data.password ? await bcrypt.hash(data.password, 10) : undefined
 
   const [user] = await db

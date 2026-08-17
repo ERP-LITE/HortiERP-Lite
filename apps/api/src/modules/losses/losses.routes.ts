@@ -21,8 +21,6 @@ export async function lossesRoutes(app: FastifyInstance) {
     return reply.status(201).send(loss)
   })
 
-  // Corrigir e cancelar exigem admin/gerente — mesmo contrato da correção de
-  // entradas. Registrar segue aberto a qualquer papel, inclusive operador.
   app.patch<{ Params: { id: string } }>(
     '/losses/:id',
     { preHandler: requireRole('admin', 'gerente') },
