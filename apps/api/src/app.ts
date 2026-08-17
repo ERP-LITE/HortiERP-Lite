@@ -11,6 +11,8 @@ import { env } from './shared/config/env.js'
 import { HEALTH_PATHS } from './shared/config/health.js'
 import { db } from './db/client.js'
 import { errorHandler } from './shared/middlewares/errorHandler.js'
+import { AppError } from './shared/errors/AppError.js'
+import { formatRetryDelay } from './shared/errors/frameworkMessages.js'
 import { authRoutes } from './modules/auth/auth.routes.js'
 import { companiesRoutes } from './modules/companies/companies.routes.js'
 import { categoriesRoutes } from './modules/categories/categories.routes.js'
@@ -49,6 +51,12 @@ export function buildApp(options: { systemLogs?: boolean } = {}) {
     timeWindow: '1 minute',
     allowList: (request) =>
       env.NODE_ENV !== 'production' && request.headers['user-agent'] === 'HortiERP-Load-Test/1.0',
+    errorResponseBuilder: (_request, context) =>
+      new AppError(
+        `Muitas tentativas em pouco tempo. Tente novamente em ${formatRetryDelay(context.ttl)}.`,
+        context.statusCode,
+        context.ban ? 'RATE_LIMIT_BANNED' : 'RATE_LIMITED',
+      ),
   })
 
   app.register(cookie)
@@ -69,6 +77,9 @@ export function buildApp(options: { systemLogs?: boolean } = {}) {
   })
 
   app.setErrorHandler(errorHandler)
+  app.setNotFoundHandler(async () => {
+    throw AppError.notFound('Endereço não encontrado')
+  })
   if (options.systemLogs !== false) registerSystemLogsHook(app)
 
   for (const healthPath of HEALTH_PATHS) {

@@ -9,6 +9,7 @@ import { stockEntryAttachments } from '../../db/schema/index.js'
 import { count, eq, sql } from 'drizzle-orm'
 import { env } from '../../shared/config/env.js'
 import { AppError } from '../../shared/errors/AppError.js'
+import { fileTooLargeMessage } from '../../shared/errors/frameworkMessages.js'
 
 const allowedFiles = new Map<string, { extension: string; previewable: boolean }>([
   ['application/pdf', { extension: '.pdf', previewable: true }],
@@ -105,12 +106,10 @@ export async function storeInvoiceAttachment(
 
   try {
     await pipeline(file.file, createWriteStream(path, { flags: 'wx', mode: 0o600 }))
+    // O `limit` do @fastify/multipart só marca `truncated`: quem consome o stream por conta
+    // própria (em vez de `toBuffer()`) recebe um stream que termina normalmente.
     if (file.file.truncated) {
-      throw new AppError(
-        `O arquivo excede o limite de ${Math.floor(env.INVOICE_MAX_FILE_SIZE / 1024 / 1024)} MB`,
-        413,
-        'FILE_TOO_LARGE',
-      )
+      throw new AppError(fileTooLargeMessage(), 413, 'FST_REQ_FILE_TOO_LARGE')
     }
     if (!(await hasValidSignature(path, inferredMimeType))) {
       throw new AppError('O conteúdo do arquivo não corresponde ao formato informado', 422, 'INVALID_FILE_CONTENT')

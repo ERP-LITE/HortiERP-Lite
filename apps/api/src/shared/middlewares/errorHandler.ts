@@ -1,6 +1,7 @@
 import type { FastifyError, FastifyReply, FastifyRequest } from 'fastify'
 import { ZodError } from 'zod'
 import { AppError } from '../errors/AppError.js'
+import { frameworkErrorMessage } from '../errors/frameworkMessages.js'
 import {
   UNIQUE_CONSTRAINTS,
   uniqueViolationConstraint,
@@ -45,11 +46,12 @@ export function errorHandler(error: FastifyError | Error, request: FastifyReques
   }
 
   if ('statusCode' in error && typeof error.statusCode === 'number' && error.statusCode < 500) {
-    request.technicalError = { code: error.code ?? 'ERROR', message: error.message }
+    const code = error.code ?? 'ERROR'
+    request.technicalError = { code, message: error.message }
     return reply.status(error.statusCode).send({
       error: {
-        code: error.code ?? 'ERROR',
-        message: error.message,
+        code,
+        message: frameworkErrorMessage(error.code, error.statusCode),
       },
     })
   }
