@@ -15,8 +15,6 @@ export const TEMPLATE_HEADERS = [
 
 type Field = keyof Omit<ImportProductRow, 'line'>
 
-/** A planilha do cliente raramente usa o cabeçalho exato do modelo, então cada campo
- *  aceita os nomes mais prováveis. A comparação ignora acento, caixa e pontuação. */
 const HEADER_ALIASES: Record<Field, string[]> = {
   name: ['nome', 'produto', 'descricao', 'nome do produto', 'item'],
   categoryName: ['categoria', 'grupo', 'setor', 'departamento'],
@@ -60,11 +58,6 @@ export interface SpreadsheetMapping {
   headerRow: string[]
 }
 
-/**
- * Converte a tabela lida do CSV nas linhas que a API espera. A numeração das linhas é
- * deslocada em 2 (cabeçalho + planilha começa no 1) para que o número mostrado no erro
- * seja o mesmo que o cliente enxerga aberto no Excel.
- */
 export function mapSpreadsheetToRows(table: string[][]): SpreadsheetMapping {
   const headerRow = table[0] ?? []
   const headers = headerRow.map(normalizeHeader)

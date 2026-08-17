@@ -35,10 +35,6 @@ const errorMessage = ref('')
 const search = ref('')
 const selectedLog = ref<SystemLog | null>(null)
 
-/**
- * No mobile a linha virou cartão de acordeão: o toque nela precisa abrir/fechar o cartão,
- * não o modal. Lá os detalhes saem pelo ícone do olho.
- */
 const isMobile = useIsMobile()
 
 function emptyFilters() {

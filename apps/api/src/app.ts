@@ -71,16 +71,10 @@ export function buildApp(options: { systemLogs?: boolean } = {}) {
   app.setErrorHandler(errorHandler)
   if (options.systemLogs !== false) registerSystemLogsHook(app)
 
-  // Os dois caminhos existem para que um monitor externo consiga verificar banco e
-  // disco, e não apenas se o site está servindo HTML — ver shared/config/health.ts.
   for (const healthPath of HEALTH_PATHS) {
     app.get(healthPath, async (_request, reply) => {
       try {
         await db.execute(sql`select 1`)
-        // Confere permissão de escrita sem criar arquivo: um marcador ficaria
-        // misturado aos anexos e entraria no backup junto com eles. Volume não
-        // montado falha no mkdir; sistema somente-leitura ou permissão errada
-        // falha no access.
         await mkdir(env.INVOICE_STORAGE_PATH, { recursive: true, mode: 0o700 })
         await access(env.INVOICE_STORAGE_PATH, fsConstants.W_OK)
         return { status: 'ok', checks: { database: 'ok', invoiceStorage: 'ok' } }

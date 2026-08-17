@@ -1,12 +1,11 @@
-import { and, asc, count, eq, ilike, inArray, isNull, or } from 'drizzle-orm'
+import { and, asc, count, eq, ilike, isNull, or } from 'drizzle-orm'
 import { orderByColumn } from '../../shared/db/sorting.js'
 import { db } from '../../db/client.js'
-import { categories, products, units } from '../../db/schema/index.js'
+import { categories, products, stockMovements, units } from '../../db/schema/index.js'
 import { AppError } from '../../shared/errors/AppError.js'
 import { assertUniqueField } from '../../shared/db/assertUniqueField.js'
 import { buildPaginatedResult } from '../../shared/db/paginate.js'
-import { softDeleteById, softDeleteByIds } from '../../shared/db/softDelete.js'
-import { applyStockMovement } from '../../shared/db/applyStockMovement.js'
+import { softDeleteById, softDeleteManyWithActivity } from '../../shared/db/softDelete.js'
 import { recordActivity, recordActivitySafe } from '../../shared/db/recordActivity.js'
 import type {
   CreateProductInput,
@@ -187,11 +186,6 @@ const MAX_REPORTED_ROWS = 200
 
 type ImportRowError = { line: number; name: string; errors: string[] }
 
-/**
- * Aceita tanto o formato brasileiro (1.234,56) quanto o americano (1234.56): o separador
- * decimal é o último que aparecer, e o outro é tratado como separador de milhar. Planilha
- * exportada do Excel em português usa vírgula, mas quem digita à mão costuma misturar.
- */
 function parseDecimal(raw: string | undefined) {
   const value = (raw ?? '').trim()
   if (!value) return { ok: true as const, value: undefined }
@@ -220,7 +214,6 @@ function parseActive(raw: string | undefined) {
   return { ok: false as const, value: true }
 }
 
-/** Unidade nova precisa de abreviação única; deriva do nome e desempata com sufixo. */
 function buildAbbreviation(name: string, taken: Set<string>) {
   const base = (name.slice(0, 10).trim() || 'un')
   let candidate = base
@@ -235,12 +228,6 @@ function buildAbbreviation(name: string, taken: Set<string>) {
 
 const lower = (value: string) => value.trim().toLocaleLowerCase('pt-BR')
 
-/**
- * Importa produtos em lote a partir de uma planilha. A operação é tudo-ou-nada: se
- * qualquer linha estiver inválida, nada é gravado. Importar só as linhas boas obrigaria o
- * usuário a reenviar o arquivo depois de corrigir, e aí as linhas já importadas voltariam
- * como duplicadas — corrigir o arquivo inteiro e reenviar é o caminho mais previsível.
- */
 export async function importProducts(companyId: string, userId: string, input: ImportProductsInput) {
   const [existingCategories, existingUnits, existingProducts] = await Promise.all([
     db
@@ -261,7 +248,6 @@ export async function importProducts(companyId: string, userId: string, input: I
   const unitByName = new Map<string, string>()
   for (const unit of existingUnits) {
     unitByName.set(lower(unit.name), unit.id)
-    // Quem preenche a planilha escreve "kg", não "Quilograma"
     if (!unitByName.has(lower(unit.abbreviation))) unitByName.set(lower(unit.abbreviation), unit.id)
   }
 
@@ -326,8 +312,6 @@ export async function importProducts(companyId: string, userId: string, input: I
       continue
     }
 
-    // Reserva nome e código já na validação para que duas linhas do mesmo arquivo
-    // pedindo o mesmo produto sejam apontadas como duplicadas.
     takenNames.add(lower(name))
     if (sku) takenSkus.add(lower(sku))
 
@@ -353,9 +337,6 @@ export async function importProducts(companyId: string, userId: string, input: I
     invalid: input.rows.length - accepted.length,
     imported: 0,
     withInitialStock: comEstoque.length,
-    // Quantidade sem custo entra no estoque valendo zero, e o painel mostraria a loja
-    // cheia com "valor em estoque: R$ 0,00". Não impede a importação, mas o usuário
-    // precisa ver isso antes de confirmar.
     initialStockWithoutCost: comEstoque.filter((item) => !item.costPrice).length,
     omittedErrors: Math.max(0, input.rows.length - accepted.length - errors.length),
     newCategories: [...newCategories.values()],
@@ -391,6 +372,7 @@ export async function importProducts(companyId: string, userId: string, input: I
       costPrice: item.costPrice?.toString(),
       salePrice: item.salePrice?.toString(),
       minStock: item.minStock.toString(),
+      currentStock: item.initialStock.toString(),
       active: item.active,
       createdBy: userId,
     }))
@@ -404,22 +386,26 @@ export async function importProducts(companyId: string, userId: string, input: I
       for (const item of inserted) createdIdByName.set(lower(item.name), item.id)
     }
 
-    // O estoque inicial entra como movimentação de ajuste, não como valor gravado direto
-    // no produto: assim a primeira linha do histórico explica de onde veio o saldo, e o
-    // gráfico de entradas x perdas do painel continua fechando com o estoque atual.
-    for (const item of comEstoque) {
+    const initialMovements = comEstoque.flatMap((item) => {
       const productId = createdIdByName.get(lower(item.name))
-      if (!productId) continue
-      await applyStockMovement(tx, {
-        companyId,
-        userId,
-        productId,
-        delta: item.initialStock,
-        type: 'ajuste',
-        referenceType: 'import',
-        referenceId: productId,
-        notes: 'Carga inicial de estoque por planilha',
-      })
+      if (!productId) return []
+      return [
+        {
+          companyId,
+          productId,
+          type: 'ajuste' as const,
+          quantity: item.initialStock.toString(),
+          balanceAfter: item.initialStock.toString(),
+          referenceType: 'import',
+          referenceId: productId,
+          notes: 'Carga inicial de estoque por planilha',
+          createdBy: userId,
+        },
+      ]
+    })
+
+    for (let index = 0; index < initialMovements.length; index += 500) {
+      await tx.insert(stockMovements).values(initialMovements.slice(index, index + 500))
     }
 
     await recordActivity(
@@ -458,25 +444,5 @@ export async function deleteProduct(companyId: string, userId: string, id: strin
 }
 
 export async function deleteProducts(companyId: string, userId: string, ids: string[]) {
-  // Os nomes precisam ser lidos antes: depois da exclusão o histórico não teria como
-  // dizer o que saiu, que é justamente o que se quer auditar.
-  const removed = await db
-    .select({ id: products.id, name: products.name })
-    .from(products)
-    .where(and(eq(products.companyId, companyId), inArray(products.id, ids), isNull(products.deletedAt)))
-
-  const result = await softDeleteByIds(products, companyId, userId, ids)
-
-  for (const item of removed) {
-    await recordActivitySafe({
-      companyId,
-      actorId: userId,
-      action: 'excluiu',
-      entity: 'produto',
-      entityId: item.id,
-      entityLabel: item.name,
-    })
-  }
-
-  return result
+  return softDeleteManyWithActivity({ table: products, companyId, userId, ids, entity: 'produto' })
 }

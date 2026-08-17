@@ -2,15 +2,6 @@ import { asc, desc, sql, type SQL, type SQLWrapper } from 'drizzle-orm'
 
 export type SortOrder = 'asc' | 'desc'
 
-/**
- * Monta a expressão de ordenação de uma listagem.
- *
- * Centraliza aqui duas decisões que antes ficavam repetidas (e divergentes)
- * em cada módulo: a direção assumida quando o cliente não manda `sortOrder`,
- * e o `nulls last`. No Postgres, `desc` traz os nulos primeiro por padrão —
- * sem isso, ordenar produtos por custo decrescente empurraria justamente os
- * produtos sem custo cadastrado para o topo da tela.
- */
 export function orderByColumn(
   column: SQLWrapper,
   sortOrder: SortOrder | undefined,
@@ -19,15 +10,6 @@ export function orderByColumn(
   return (sortOrder ?? defaultOrder) === 'asc' ? sql`${asc(column)} nulls last` : sql`${desc(column)} nulls last`
 }
 
-/**
- * Ordena uma coluna enum pela ordem alfabética dos rótulos exibidos na tela,
- * e não pela ordem em que os valores foram declarados no banco.
- *
- * Sem isso, ordenar Perdas por "Motivo" seguiria `vencido → avariado → ...`,
- * uma sequência que não corresponde a nada visível para quem usa o sistema.
- * A coluna é convertida para texto na comparação porque o driver envia os
- * valores como parâmetros sem tipo, o que o Postgres não casa direto com enum.
- */
 export function orderByLabeledEnum(
   column: SQLWrapper,
   labelOrder: readonly string[],

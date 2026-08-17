@@ -1,18 +1,6 @@
 import { index, jsonb, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core'
 import { companies } from './companies.js'
 
-/**
- * Auditoria de negócio: registra QUAL registro foi criado, alterado ou excluído.
- *
- * Complementa (não substitui) `system_logs`, que continua guardando a requisição HTTP crua
- * para diagnóstico técnico. A diferença prática é o que o administrador enxerga: aqui dá
- * para responder "quem excluiu o produto Tomate", coisa que o log de requisições não sabe,
- * porque só conhece o método e a rota.
- *
- * `entityLabel` guarda o nome do registro no momento da ação de propósito. Se o histórico
- * dependesse de join com a tabela de origem, excluir o produto apagaria a resposta junto —
- * justamente o caso que mais se quer auditar.
- */
 export const activityLogs = pgTable(
   'activity_logs',
   {

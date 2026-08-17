@@ -46,10 +46,6 @@ export async function stockEntriesRoutes(app: FastifyInstance) {
   app.post<{ Params: { id: string } }>(
     '/stock-entries/:id/attachments',
     {
-      // Limite próprio, bem abaixo do global de 300/min: cada requisição aqui
-      // pode gravar até INVOICE_MAX_FILE_SIZE em disco, então o teto global
-      // permitiria encher o volume em poucos minutos. Anexar nota é uma ação
-      // manual — 10 por minuto sobra para o uso real.
       config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
     },
     async (request, reply) => {

@@ -31,7 +31,6 @@ import type { Loss, LossReason, Product } from '@/types'
 
 const auth = useAuthStore()
 const canManage = computed(() => auth.user?.role === 'admin' || auth.user?.role === 'gerente')
-/** Perda cancelada é imutável: a API recusa a correção com 409. */
 const canCorrect = (loss: Loss) => canManage.value && !loss.cancelledAt
 
 const reasonOptions: { value: LossReason; label: string }[] = [
@@ -79,8 +78,6 @@ const activeFilterCount = computed(
 
 const modalOpen = ref(false)
 const saving = ref(false)
-// `editingId` nulo = modal registrando uma nova perda; preenchido = corrigindo uma
-// existente, e aí só motivo e observações ficam editáveis.
 const editingId = ref<string | null>(null)
 const editingLoss = ref<Loss | null>(null)
 const form = ref({ productId: '', quantity: '', reason: '' as LossReason | '', notes: '' })
@@ -154,7 +151,6 @@ function openEditModal(loss: Loss) {
 
 function validate(): boolean {
   fieldErrors.value = {}
-  // Na correção, produto e quantidade não são editáveis — nada a validar neles.
   if (!editingId.value) {
     if (!form.value.productId) fieldErrors.value.productId = 'Selecione o produto'
     if (!form.value.quantity || Number(form.value.quantity) <= 0) {
@@ -261,8 +257,6 @@ async function exportCsv() {
       reasonLabels[item.reason],
       csvNumber(item.quantity, 3),
       csvNumber(item.unitCost ?? item.product?.costPrice),
-      // Cancelada sai com valor em branco de propósito: somar a coluna na planilha
-      // não pode contar de novo um valor que foi estornado ao estoque.
       item.cancelledAt ? '' : csvNumber(Number(item.quantity) * Number(item.unitCost ?? item.product?.costPrice ?? 0)),
       item.cancelledAt ? `Cancelada: ${item.cancelReason ?? ''}`.trim() : 'Válida',
       item.createdByUser?.name ?? '',
@@ -320,10 +314,6 @@ onMounted(loadAll)
               Nenhuma perda registrada.
             </td>
           </tr>
-          <!--
-            Perda cancelada não abre no duplo clique: a API recusa corrigi-la com 409, e
-            abrir o modal para depois falhar seria pior que não abrir.
-          -->
           <tr
             v-for="loss in losses"
             v-else
@@ -399,10 +389,6 @@ onMounted(loadAll)
       @close="modalOpen = false"
     >
       <form class="space-y-4" @submit.prevent="handleSubmit">
-        <!--
-          Na correção, produto e quantidade aparecem como leitura: alterá-los mexeria no
-          estoque retroativamente. Para esses casos o caminho é cancelar e lançar de novo.
-        -->
         <div v-if="editingId" class="rounded-lg bg-gray-50 dark:bg-gray-900/40 p-3 space-y-1">
           <p class="text-sm text-gray-900 dark:text-gray-100 font-medium">
             {{ editingLoss?.product?.name }}

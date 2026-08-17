@@ -26,8 +26,6 @@ const logColumns = {
   createdAt: systemLogs.createdAt,
 }
 
-// `from`/`to` já chegam nas bordas do dia pelo fuso do negócio (period.schema.ts);
-// o ajuste de hora que existia aqui usava o relógio do container, que roda em UTC.
 function periodConditions(query: ListLogsQuery) {
   const conditions = []
   if (query.from) conditions.push(gte(systemLogs.createdAt, query.from))
@@ -61,8 +59,6 @@ async function queryLogs(conditions: ReturnType<typeof eq>[], query: ListLogsQue
     level: systemLogs.level,
     statusCode: systemLogs.statusCode,
   }
-  // `level` fica na ordem de declaração do enum de propósito: ali ela equivale
-  // à ordem de severidade, que é mais útil do que a ordem alfabética.
   const orderBy = orderByColumn(query.sortBy ? sortColumns[query.sortBy] : systemLogs.createdAt, query.sortOrder, 'desc')
 
   const baseQuery = db
@@ -99,11 +95,6 @@ export function listTechnicalLogs(query: ListLogsQuery) {
   return queryLogs(conditions, query, true)
 }
 
-/**
- * Histórico de negócio da empresa: quem criou, alterou ou excluiu qual registro. Lê a
- * tabela de auditoria, e não os logs de requisição — estes só sabem método e rota, então
- * respondiam "alterou Produtos" sem dizer qual produto.
- */
 export async function listCompanyActivityLogs(companyId: string, query: ListActivityQuery) {
   const conditions = [eq(activityLogs.companyId, companyId)]
   if (query.action) conditions.push(eq(activityLogs.action, query.action))

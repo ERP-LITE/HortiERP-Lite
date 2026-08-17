@@ -13,10 +13,6 @@ export function toISODate(date: Date) {
   return `${year}-${month}-${day}`
 }
 
-/**
- * Data de hoje pelo relógio do usuário. Usar `toISOString()` traria a data em
- * UTC, que a partir das 21h de Brasília já é o dia seguinte.
- */
 export function todayIso() {
   return toISODate(new Date())
 }

@@ -26,6 +26,7 @@ Não há tabela de junção usuário-empresa: um usuário pertence a exatamente 
 - Toda rota autenticada também confirma no banco que o usuário real, seu papel e a empresa da sessão continuam ativos. Em impersonação, tanto a empresa Plataforma do `super_admin` quanto a empresa acessada são verificadas. Assim, excluir/desativar usuário, mudar seu papel ou suspender uma empresa invalida imediatamente os JWTs já emitidos.
 - O frontend valida `/auth/me` a cada 45 segundos e quando a aba volta ao foco/visibilidade. Isso não substitui a proteção por requisição do backend: serve para retirar proativamente da interface quem ficou parado numa tela depois de a empresa ser suspensa, o usuário ser desativado ou o papel ser alterado. Um `401` redireciona ao login com mensagem genérica, sem revelar a causa administrativa.
 - O logout é idempotente e não exige que o JWT ainda seja válido: `POST /auth/logout` sempre tenta remover o cookie. O frontend também registra localmente a intenção de sair antes da chamada; se a API estiver indisponível, um F5 não restaura por engano o JWT que possa ter permanecido no navegador.
+- **Logout por inatividade** (`composables/useIdleLogout.ts`): 30 minutos sem interação encerram a sessão, com um aviso e contagem regressiva no último minuto. Mouse, teclado, roda e toque contam como presença (com limite de um reset por segundo, para `mousemove` não reagendar o cronômetro a cada pixel). **Depois que o aviso aparece, só o clique explícito em "continuar conectado" conta**: um movimento incidental do mouse não deve dispensar o aviso em silêncio, senão o usuário nunca fica sabendo que a sessão ia cair. É proteção de estação desacompanhada — o backend continua com sua própria expiração de 8h no JWT, independente disso.
 
 ## Papéis e permissões
 
@@ -63,6 +64,10 @@ A consulta de CEP é uma conveniência do frontend, não uma fonte autoritativa 
 
 Como a empresa "Plataforma" nunca deve ser suspensa nem aparecer misturada com empresas-cliente reais, `listCompanies` a exclui de toda listagem (via subquery que acha a `companyId` de qualquer usuário `super_admin`), e `setCompanyActive` rejeita explicitamente qualquer tentativa de suspendê-la (mesmo chamando o endpoint direto pelo id) — isso corrigiu um incidente real onde a Plataforma apareceu na tela de gestão de empresas e foi suspensa por engano, travando o próprio login do super_admin.
 
+São **quatro** as portas que precisam recusar a Plataforma, e vale enumerá-las porque a terceira ficou aberta por um tempo: `listCompanies` (esconde), `setCompanyActive` (não suspende), `assertBillableCompany` (não fatura) e `assertCompanyAccessible` (não acessa como suporte). Esta última é a de efeito mais grave: entrando na Plataforma como suporte, a sessão passa a valer como `admin` **dela**, e aí os próprios `super_admin` aparecem na tela comum de usuários — onde podem ser rebaixados para `operador` ou excluídos, exatamente o que `/platform-users` proíbe de propósito (ela só aceita nome, e-mail e senha). Rebaixando todos, ninguém mais acessa `/empresas` nem `/cobrancas`, e não existe tela para desfazer: só SQL.
+
+A recusa é repetida em dois níveis. `assertCompanyAccessible` barra na entrada, e `authenticate` barra a sessão já emitida comparando `realCompanyId` com `companyId`: numa impersonação legítima o super_admin entra em **outra** empresa, então os dois valores nunca coincidem. Essa segunda checagem existe porque o JWT vive 8h no cookie — sem ela, uma sessão aberta antes da correção continuaria valendo até expirar. Por ser só a forma do token, não custa consulta nenhuma.
+
 ## Impersonação ("acessar como suporte")
 
 O `super_admin` acessa os dados de uma empresa-cliente pra dar suporte sem precisar da senha de nenhum admin dela, e **sem virar** um usuário específico daquela empresa (evita a ambiguidade de "qual admin, se tiver vários" e mantém o rastro de auditoria apontando pra quem de fato agiu).
@@ -84,12 +89,28 @@ Endpoints envolvidos: `POST /companies/:id/impersonate` (super_admin only — en
 - **Exceção**: `company_billings` apaga a linha de verdade, pelos motivos descritos em [fluxos de negócio](./fluxos-de-negocio.md#controle-manual-de-cobranças). A coluna `deleted_at` continua existindo ali porque vem do helper `timestamps`, mas não é usada — o mesmo já acontece em `losses` e `stock_entries`, que não expõem exclusão nenhuma.
 - `createdBy`/`updatedBy`: `uuid` solto, sem `references()` — decisão deliberada (não só uma omissão) que permite a impersonação funcionar sem violar integridade referencial mesmo quando quem agiu não pertence à empresa do registro. `company_billings` é a única tabela que declara a FK para `users` (`on delete set null`): ela nunca é escrita durante impersonação, e por lidar com dinheiro compensa amarrar o responsável.
 - Categorias, unidades, produtos e usuários aceitam exclusão individual e em lote. A operação em lote recebe de 1 a 100 ids, aplica um único `UPDATE`, sempre combina os ids com o `companyId` da sessão e mantém as mesmas regras de papel da exclusão individual (`admin`/`gerente`; usuários somente `admin`).
+- **Falha de auditoria nunca derruba a operação do usuário.** `recordActivity` aceita um `executor` para participar da mesma transação da operação auditada — numa entrada de mercadoria que falha no meio, o histórico não pode ficar afirmando que a entrada foi criada. Fora de transação, as versões `recordActivitySafe`/`recordActivitiesSafe` engolem o erro: perder uma linha de histórico é ruim, impedir o lançamento de uma perda é pior.
+- Os quatro módulos compartilham `softDeleteManyWithActivity` (`shared/db/softDelete.ts`), que lê os rótulos, exclui e registra o histórico. Antes cada service repetia esse corpo quase idêntico, e o registro saía num laço de até 100 `insert` separados — hoje é um `insert` só, via `recordActivitiesSafe`. Os nomes continuam sendo lidos **antes** do `UPDATE`: depois da exclusão o histórico não teria como dizer o que saiu, que é justamente o que se quer auditar.
 
 ## Paginação
 
 Padrão único em todo módulo de listagem: `paginationQuerySchema` (Zod, `shared/schemas/pagination.schema.ts`) valida `page`/`pageSize` (máx. 100), e `buildPaginatedResult` (`shared/db/paginate.ts`) monta a resposta `{ data, page, pageSize, total, totalPages }`. Nenhum módulo reimplementa isso na mão.
 
 Os detalhamentos dos relatórios de perdas e entradas também seguem esse contrato. No frontend, listas usadas como opções de formulário percorrem todas as páginas por meio de `services/paginatedOptions.ts`; assim, o limite de 100 por requisição não oculta opções de empresas com cadastros maiores.
+
+O `pageSize` escolhido é guardado no `localStorage` e vale como **padrão único para todas as tabelas** (`composables/usePagination.ts`): quem prefere 50 linhas por página não precisa reajustar tela por tela. Já a página atual e o total continuam por tabela, cada uma com seu próprio estado.
+
+## Planilhas (importação e exportação CSV)
+
+Todo CSV do sistema é feito para o **Excel em português**, que é de onde as planilhas dos clientes vêm e para onde os relatórios voltam. Três decisões saem daí (`lib/csv.ts`):
+
+- **Separador `;`** — com `,` o Excel em português joga a linha inteira numa célula só.
+- **BOM (`U+FEFF`) no início do arquivo** — é o que faz o Excel reconhecer o arquivo como UTF-8; sem ele os acentos saem corrompidos.
+- **Vírgula decimal nos números** — sem isso o Excel trata `7.49` como texto (ou pior, como data) e a coluna exportada não soma. Como o separador de campo é `;`, a vírgula decimal não conflita com nada.
+
+Na leitura, o arquivo é decodificado como UTF-8 e, se aparecer o caractere de substituição (indicando bytes inválidos), a tentativa é repetida em Windows-1252 — que o Excel ainda usa ao salvar. O parser também trata aspas duplicadas dentro de campo entre aspas como uma aspa literal, `\r\n` como uma quebra só, e ignora a linha vazia final que o Excel costuma deixar.
+
+Na importação, `lib/productSpreadsheet.ts` aceita variações de cabeçalho (comparando sem acento, caixa e pontuação), porque a planilha do cliente raramente usa o cabeçalho exato do modelo. A numeração das linhas enviada à API é deslocada em 2 (cabeçalho + planilha começa em 1) para que **o número que aparece no erro seja o mesmo que o cliente vê aberto no Excel**.
 
 Campos textuais potencialmente extensos nas tabelas usam o componente compartilhado `ExpandableText`: a célula mantém largura limitada, exibe uma prévia e permite expandir pelo chevron sem provocar overflow horizontal. O componente força a quebra de sequências sem espaços e libera o conteúdo completo para impressão. Esse comportamento é independente do `v-mobile-accordion`, responsável por transformar linhas de tabela em cartões expansíveis em telas pequenas.
 
@@ -102,8 +123,15 @@ que a tela e o usuário passa a arrastar na horizontal para ler qualquer coisa. 
   esconde o `<thead>` e prefixa cada célula com o rótulo da coluna correspondente. A primeira célula com rótulo vira o
   resumo clicável; as demais aparecem ao expandir. A célula de ações só é reconhecida como tal se o `<th>`
   correspondente estiver **vazio** — daí a ausência de um cabeçalho "Ações" nas tabelas.
-- **Cartões próprios** (`StockView`, `StockMovementsView`): um bloco `sm:hidden` com `<article>` por registro e a
-  tabela marcada como `hidden sm:table`. Vale quando o cartão precisa de um arranjo diferente da ordem das colunas.
+- **Cartões próprios** (`StockView`, `StockMovementsView`, `StockEntryDetailsView`): um bloco `sm:hidden` com
+  `<article>` por registro e a tabela marcada como `hidden sm:table`. Vale quando o cartão precisa de um arranjo
+  diferente da ordem das colunas.
+
+Não existe um terceiro caminho. `StockEntryDetailsView` usou por um tempo apenas `overflow-x-auto` em volta da tabela
+de itens, e o resultado engana: a **página** não estoura (o `scrollWidth` continua igual ao viewport, porque o excesso
+rola dentro do cartão), mas a terceira coluna — justamente o custo unitário — fica fora da área visível, e o nome do
+produto quebra no meio da palavra por competir com as outras duas colunas em 320px. Conferir só overflow de página não
+detecta esse caso; é preciso olhar se cada valor está dentro do `innerWidth`.
 
 **Clique na linha não pode competir com o acordeão.** Onde a linha inteira abre um detalhe no desktop, o `@click` do
 `<tr>` tem que ser guardado por `useIsMobile()`. Sem isso o mesmo toque dispara os dois comportamentos — o modal abre e
@@ -165,7 +193,11 @@ Toda listagem aplica ainda um segundo critério estável (nome ou data) como des
 
 ## Integridade e índices
 
-Além das validações amigáveis dos services, nomes de categorias, unidades e produtos e abreviações/SKUs possuem índices únicos parciais e case-insensitive por empresa. Os índices consideram apenas registros com `deletedAt` nulo, preservando o comportamento de soft delete. Consultas operacionais frequentes também possuem índices compostos por empresa/data ou empresa/produto.
+Além das validações amigáveis dos services, nomes de categorias, unidades e produtos, abreviações/SKUs e o e-mail de usuário possuem índices únicos parciais que ignoram maiúsculas. Os índices consideram apenas registros com `deletedAt` nulo, preservando o comportamento de soft delete — o de usuário é global, os demais são por empresa (ver [modelo de dados](./modelo-de-dados.md#users)). Consultas operacionais frequentes também possuem índices compostos por empresa/data ou empresa/produto.
+
+A checagem existe **duas vezes de propósito**: o service confere antes do insert para devolver um erro amigável apontando o campo, e o índice segura o caso de duas requisições simultâneas passarem as duas pela checagem. O que não pode existir duas vezes é o **texto** da mensagem: campo e mensagem de cada índice moram só em `shared/db/uniqueConstraints.ts`, indexados pelo nome real do índice no PostgreSQL — que é o que o driver devolve no campo `constraint` do erro `23505`. Os dois caminhos (checagem amigável e tradução do erro no `errorHandler`) leem o mesmo mapa, porque levam à mesma tela e divergiam sem ninguém notar quando cada um guardava a própria cópia. `uniqueViolationConstraint`, no mesmo arquivo, é quem reconhece o `23505` — inclusive quando o Drizzle embrulha o erro do driver dentro de uma transação e o código sai do nível de cima.
+
+A única captura local de duplicidade que sobrou é a de `createCompanyWithAdmin`, e só para trocar o rótulo do campo: naquele formulário o campo se chama `adminEmail`, não `email`, e a mensagem precisa aparecer embaixo do campo que existe na tela.
 
 ## Logs técnicos e auditoria por empresa
 

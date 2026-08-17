@@ -1,22 +1,29 @@
 import bcrypt from 'bcryptjs'
-import { and, eq, isNull } from 'drizzle-orm'
+import { and, eq, isNull, type InferSelectModel } from 'drizzle-orm'
 import { db } from '../../db/client.js'
-import { users } from '../../db/schema/index.js'
+import { companies, users } from '../../db/schema/index.js'
 import { AppError } from '../../shared/errors/AppError.js'
 
+type Company = InferSelectModel<typeof companies>
+
+type UserWithCompany = InferSelectModel<typeof users> & { company: Company | null }
+
+type UsableUser = InferSelectModel<typeof users> & { company: Company }
+
+function assertAccountUsable(user: UserWithCompany | undefined, message: string): UsableUser {
+  if (!user || !user.active) throw AppError.unauthorized(message)
+  const { company } = user
+  if (!company || !company.active || company.deletedAt) throw AppError.unauthorized(message)
+  return { ...user, company }
+}
+
 export async function authenticateUser(email: string, password: string) {
-  const user = await db.query.users.findFirst({
+  const found = await db.query.users.findFirst({
     where: and(eq(users.email, email), isNull(users.deletedAt)),
     with: { company: true },
   })
 
-  if (!user || !user.active) {
-    throw AppError.unauthorized('E-mail ou senha incorretos')
-  }
-
-  if (!user.company || !user.company.active || user.company.deletedAt) {
-    throw AppError.unauthorized('E-mail ou senha incorretos')
-  }
+  const user = assertAccountUsable(found, 'E-mail ou senha incorretos')
 
   const passwordMatches = await bcrypt.compare(password, user.passwordHash)
 
@@ -28,20 +35,12 @@ export async function authenticateUser(email: string, password: string) {
 }
 
 export async function getUserProfile(companyId: string, userId: string) {
-  const user = await db.query.users.findFirst({
+  const found = await db.query.users.findFirst({
     where: and(eq(users.id, userId), eq(users.companyId, companyId), isNull(users.deletedAt)),
     with: { company: true },
   })
 
-  if (!user || !user.active) {
-    throw AppError.unauthorized('Usuário não encontrado')
-  }
-
-  if (!user.company || !user.company.active || user.company.deletedAt) {
-    throw AppError.unauthorized('Usuário não encontrado')
-  }
-
-  return user
+  return assertAccountUsable(found, 'Usuário não encontrado')
 }
 
 export async function changeOwnPassword(

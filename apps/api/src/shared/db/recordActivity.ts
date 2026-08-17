@@ -24,14 +24,6 @@ export interface ActivityInput {
 
 type Executor = Pick<typeof db, 'insert'>
 
-/**
- * Grava uma linha de auditoria. Recebe `executor` para poder participar da mesma transação
- * da operação auditada: numa entrada de mercadoria que falha no meio, o histórico não pode
- * ficar afirmando que a entrada foi criada.
- *
- * Falha de auditoria nunca derruba a operação do usuário quando roda fora de transação —
- * perder uma linha de histórico é ruim, impedir o lançamento de uma perda é pior.
- */
 export async function recordActivity(input: ActivityInput, executor: Executor = db) {
   await executor.insert(activityLogs).values({
     companyId: input.companyId,
@@ -44,11 +36,28 @@ export async function recordActivity(input: ActivityInput, executor: Executor = 
   })
 }
 
-/** Versão que engole o erro, para chamadas fora de transação. */
 export async function recordActivitySafe(input: ActivityInput) {
   try {
     await recordActivity(input)
   } catch {
-    // O histórico é secundário em relação à operação que o usuário pediu
+  }
+}
+
+export async function recordActivitiesSafe(inputs: ActivityInput[], executor: Executor = db) {
+  if (inputs.length === 0) return
+
+  try {
+    await executor.insert(activityLogs).values(
+      inputs.map((input) => ({
+        companyId: input.companyId,
+        actorId: input.actorId,
+        action: input.action,
+        entity: input.entity,
+        entityId: input.entityId ?? null,
+        entityLabel: input.entityLabel,
+        details: input.details,
+      })),
+    )
+  } catch {
   }
 }

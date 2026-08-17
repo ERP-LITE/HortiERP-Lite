@@ -78,7 +78,6 @@ const actionVariant: Record<ActivityAction, 'success' | 'warning' | 'danger' | '
   excluiu: 'danger',
   importou: 'success',
   ajustou: 'warning',
-  // Estorno mexeu no estoque: mais relevante que uma alteração comum, sem ser exclusão.
   cancelou: 'warning',
 }
 
@@ -98,10 +97,6 @@ const activeFilterCount = computed(
 
 const selectedLog = ref<ActivityLog | null>(null)
 
-/**
- * No mobile a linha virou cartão de acordeão: o toque nela precisa abrir/fechar o cartão,
- * não o modal. Lá os detalhes saem pelo ícone do olho.
- */
 const isMobile = useIsMobile()
 
 function queryParams() {
@@ -217,7 +212,6 @@ onMounted(loadLogs)
               <td class="px-4 py-3 text-sm font-medium text-gray-900 dark:text-gray-100">
                 <ExpandableText :text="log.entityLabel" />
               </td>
-              <!-- `.stop` para o clique do olho não borbulhar até o clique da linha. -->
               <td class="print:hidden whitespace-nowrap px-4 py-3 text-right" @click.stop>
                 <button
                   class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-primary-600 hover:bg-primary-50 dark:text-primary-400 dark:hover:bg-primary-900/30"

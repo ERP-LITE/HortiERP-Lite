@@ -4,18 +4,6 @@ import { db, pool } from '../db/client.js'
 import { stockEntryAttachments } from '../db/schema/index.js'
 import { env } from '../shared/config/env.js'
 
-/**
- * Remove do disco os anexos fiscais que não têm mais linha em
- * `stock_entry_attachments`.
- *
- * O upload grava o arquivo antes de inserir o registro, então uma queda da API
- * (ou do container) entre as duas etapas deixa um arquivo sem dono. Nada no
- * fluxo normal apaga esses restos: eles só crescem, ocupando o volume e
- * entrando nos backups criptografados junto com os anexos legítimos.
- *
- * A janela de carência existe porque um arquivo recém-gravado pode ser
- * justamente um upload em andamento, ainda sem o insert correspondente.
- */
 const GRACE_PERIOD_MS = 24 * 60 * 60 * 1000
 
 async function run() {

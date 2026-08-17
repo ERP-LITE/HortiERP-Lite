@@ -1,6 +1,7 @@
 import { and, eq, inArray, isNull } from 'drizzle-orm'
 import type { AnyPgColumn, PgTable } from 'drizzle-orm/pg-core'
 import { db } from '../../db/client.js'
+import { recordActivitiesSafe, type ActivityEntity } from './recordActivity.js'
 
 interface SoftDeletableColumns {
   id: AnyPgColumn
@@ -11,6 +12,8 @@ interface SoftDeletableColumns {
 }
 
 type SoftDeletableTable = PgTable & SoftDeletableColumns
+
+type NamedSoftDeletableTable = SoftDeletableTable & { name: AnyPgColumn }
 
 // o drizzle infere as chaves aceitas em .set() a partir do tipo concreto da tabela, algo que o TS
 // não consegue verificar de forma genérica contra a interface SoftDeletableTable acima — o `as any`
@@ -42,4 +45,35 @@ export async function softDeleteByIds<T extends SoftDeletableTable>(
     .returning({ id: table.id })
 
   return { deleted: deleted.length }
+}
+
+export async function softDeleteManyWithActivity(options: {
+  table: NamedSoftDeletableTable
+  companyId: string
+  userId: string
+  ids: string[]
+  entity: ActivityEntity
+  extraSet?: Record<string, unknown>
+}) {
+  const { table, companyId, userId, ids, entity, extraSet = {} } = options
+
+  const removidos = await db
+    .select({ id: table.id, label: table.name })
+    .from(table as PgTable)
+    .where(and(eq(table.companyId, companyId), inArray(table.id, ids), isNull(table.deletedAt)))
+
+  const result = await softDeleteByIds(table, companyId, userId, ids, extraSet)
+
+  await recordActivitiesSafe(
+    removidos.map((item) => ({
+      companyId,
+      actorId: userId,
+      action: 'excluiu' as const,
+      entity,
+      entityId: item.id as string,
+      entityLabel: item.label as string,
+    })),
+  )
+
+  return result
 }

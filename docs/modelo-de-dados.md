@@ -82,10 +82,17 @@ a badge da tela e o filtro por status nunca discordarem. Excluir uma cobrança a
 |---|---|---|
 | `id` | uuid | PK |
 | `companyId` | uuid | FK `companies.id`, obrigatório |
-| `name`, `email`, `passwordHash` | text | `email` é **único globalmente** (não escopado por empresa) |
+| `name`, `email`, `passwordHash` | text | `email` é **único globalmente** (não escopado por empresa), sempre gravado em minúsculas |
 | `role` | enum `user_role` | `admin` \| `gerente` \| `operador` \| `super_admin` |
 | `active` | boolean | default `true` — decisão individual do admin; **não** é sobrescrito por suspensão de empresa |
 | `createdAt`/`updatedAt`/`deletedAt`, `createdBy`/`updatedBy` | | |
+
+O e-mail é único **globalmente** porque o login recebe só e-mail e senha, sem escolher empresa: dois usuários com o mesmo e-mail em empresas diferentes deixariam a sessão ambígua.
+
+A unicidade vem do índice parcial `users_email_active_unique`, sobre `lower(email)` e restrito a `deleted_at is null`. As duas características resolvem problemas distintos:
+
+- **`lower(email)`** — a restrição anterior (`users_email_unique`, sensível à caixa) permitia `Maria@Loja.com` e `maria@loja.com` convivendo no banco, enquanto a checagem da aplicação já comparava em minúsculas; duas requisições simultâneas variando só a caixa passavam as duas. Pior: o login procura pelo e-mail exato, então quem fosse cadastrado com maiúscula não conseguia entrar digitando minúsculas — e o teclado do celular põe maiúscula na primeira letra sozinho. Hoje o `emailSchema` (`shared/schemas/email.schema.ts`) normaliza na borda de toda rota que aceita e-mail, e o `seedPlatform.ts` faz o mesmo por gravar direto no banco.
+- **`deleted_at is null`** — sem o filtro, o e-mail de um usuário excluído ficava reservado para sempre, e recontratar a mesma pessoa respondia "já existe um usuário com esse e-mail" apontando para alguém invisível em toda tela. É o mesmo padrão parcial que produtos, categorias e unidades já usavam; `assertUniqueUserEmail` aplica a mesma regra na checagem amigável.
 
 O bloqueio de uma empresa suspensa vem de `companies.active`, verificado no login e em toda requisição autenticada — `users.active` não espelha esse valor, para que reativar a empresa não devolva acesso a quem foi desativado à mão.
 

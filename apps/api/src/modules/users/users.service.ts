@@ -1,11 +1,11 @@
 import bcrypt from 'bcryptjs'
-import { and, asc, count, eq, ilike, inArray, isNull, or } from 'drizzle-orm'
+import { and, asc, count, eq, ilike, isNull, or } from 'drizzle-orm'
 import { orderByColumn } from '../../shared/db/sorting.js'
 import { db } from '../../db/client.js'
 import { users } from '../../db/schema/index.js'
 import { AppError } from '../../shared/errors/AppError.js'
 import { buildPaginatedResult } from '../../shared/db/paginate.js'
-import { softDeleteById, softDeleteByIds } from '../../shared/db/softDelete.js'
+import { softDeleteById, softDeleteManyWithActivity } from '../../shared/db/softDelete.js'
 import { recordActivitySafe } from '../../shared/db/recordActivity.js'
 import { assertUniqueUserEmail, userPublicColumns } from '../../shared/db/userPublicColumns.js'
 import type { CreateUserInput, ListUsersQuery, UpdateUserInput } from './users.schema.js'
@@ -16,9 +16,6 @@ export async function listUsers(companyId: string, query: ListUsersQuery) {
   if (query.role) conditions.push(eq(users.role, query.role))
   if (query.active !== undefined) conditions.push(eq(users.active, query.active))
   const where = and(...conditions)
-  // `role` não precisa de ordenação por rótulo: a ordem de declaração do enum
-  // (admin → gerente → operador → super_admin) já coincide com a ordem
-  // alfabética dos rótulos exibidos.
   const orderBy = orderByColumn(query.sortBy ? users[query.sortBy] : users.name, query.sortOrder)
 
   const [data, [{ total }]] = await Promise.all([
@@ -80,11 +77,6 @@ export async function createUser(companyId: string, requesterId: string, data: C
 export async function updateUser(companyId: string, requesterId: string, id: string, data: UpdateUserInput) {
   await getUser(companyId, id)
 
-  // A tela de usuários exige `admin`, então quem edita é sempre o admin da empresa.
-  // Deixar que ele se rebaixe ou se desative zerava os admins e trancava a empresa
-  // fora da própria gestão de usuários — só um super_admin em impersonação
-  // conseguiria reverter. Alterar OUTRO usuário nunca chega nesse estado, porque o
-  // próprio solicitante continua admin ativo.
   if (id === requesterId) {
     if (data.role && data.role !== 'admin') {
       throw AppError.conflict('Você não pode alterar o seu próprio perfil de acesso')
@@ -94,7 +86,7 @@ export async function updateUser(companyId: string, requesterId: string, id: str
     }
   }
 
-  if (data.email) await assertUniqueUserEmail(data.email, id)
+  if (data.email) await assertUniqueUserEmail(data.email, { excludeId: id })
 
   const passwordHash = data.password ? await bcrypt.hash(data.password, 10) : undefined
 
@@ -119,7 +111,6 @@ export async function updateUser(companyId: string, requesterId: string, id: str
     entity: 'usuario',
     entityId: user.id,
     entityLabel: user.name,
-    // Trocar a senha de outro usuário é a alteração mais sensível desta tela
     details: { senhaAlterada: Boolean(data.password) },
   })
 
@@ -142,24 +133,13 @@ export async function deleteUser(companyId: string, requesterId: string, id: str
 
 export async function deleteUsers(companyId: string, requesterId: string, ids: string[]) {
   const filteredIds = ids.filter((id) => id !== requesterId)
-  // Os nomes são lidos antes da exclusão: depois o histórico não saberia dizer quem saiu.
-  const removidos = await db
-    .select({ id: users.id, name: users.name })
-    .from(users)
-    .where(and(eq(users.companyId, companyId), inArray(users.id, filteredIds), isNull(users.deletedAt)))
 
-  const result = await softDeleteByIds(users, companyId, requesterId, filteredIds, { active: false })
-
-  for (const item of removidos) {
-    await recordActivitySafe({
-      companyId,
-      actorId: requesterId,
-      action: 'excluiu',
-      entity: 'usuario',
-      entityId: item.id,
-      entityLabel: item.name,
-    })
-  }
-
-  return result
+  return softDeleteManyWithActivity({
+    table: users,
+    companyId,
+    userId: requesterId,
+    ids: filteredIds,
+    entity: 'usuario',
+    extraSet: { active: false },
+  })
 }

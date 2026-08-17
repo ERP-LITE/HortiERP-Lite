@@ -114,8 +114,6 @@ function showTooltip(
   }
 }
 
-// A API já corta a lista nos produtos de maior quantidade e informa quantos
-// sobraram, então aqui é só montar as linhas.
 function buildDetails(
   quantities: DashboardQuantityByUnit[],
   products: DashboardProductQuantity[],

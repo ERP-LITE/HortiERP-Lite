@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { emailSchema } from '../../shared/schemas/email.schema.js'
 import { paginationQuerySchema } from '../../shared/schemas/pagination.schema.js'
 
 export const listPlatformUsersQuerySchema = paginationQuerySchema.extend({
@@ -8,13 +9,13 @@ export const listPlatformUsersQuerySchema = paginationQuerySchema.extend({
 
 export const createPlatformUserSchema = z.object({
   name: z.string().trim().min(1, 'Nome é obrigatório'),
-  email: z.string().trim().email('E-mail inválido'),
+  email: emailSchema,
   password: z.string().min(8, 'Senha deve ter ao menos 8 caracteres'),
 })
 
 export const updatePlatformUserSchema = z.object({
   name: z.string().trim().min(1, 'Nome é obrigatório').optional(),
-  email: z.string().trim().email('E-mail inválido').optional(),
+  email: emailSchema.optional(),
   password: z.string().min(8, 'Senha deve ter ao menos 8 caracteres').optional(),
 })
 

@@ -6,23 +6,17 @@ export function formatDateTime(value: string) {
   return new Date(value).toLocaleString('pt-BR')
 }
 
-// Recebe uma data "YYYY-MM-DD" (sem horário) e formata sem passar por `new Date()`,
-// evitando que o fuso do navegador desloque o dia exibido.
 export function formatDateOnly(value: string) {
   if (!value) return ''
   const [year, month, day] = value.split('-')
   return `${day}/${month}/${year}`
 }
 
-// Aceita tanto o número quanto a string `numeric` que vem do banco. `empty` cobre as telas
-// que preferem um traço a "R$ 0,00" quando o valor simplesmente não existe.
 export function formatCurrency(value: string | number | null | undefined, empty?: string) {
   if (empty !== undefined && (value === null || value === undefined || value === '')) return empty
   return Number(value ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 }
 
-// Aceita a competência como "AAAA-MM"/"AAAA-MM-DD" ou um Date já pronto. A data é remontada
-// pelas partes, no fuso local, para o mês exibido nunca escorregar por conversão de fuso.
 export function formatMonthYear(value: string | Date) {
   const date =
     typeof value === 'string'

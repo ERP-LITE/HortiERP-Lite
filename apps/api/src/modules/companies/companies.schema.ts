@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { emailSchema } from '../../shared/schemas/email.schema.js'
 import { paginationQuerySchema } from '../../shared/schemas/pagination.schema.js'
 
 export const listCompaniesQuerySchema = paginationQuerySchema.extend({
@@ -52,7 +53,7 @@ const companyFields = {
 export const createCompanySchema = z.object({
   ...companyFields,
   adminName: z.string().min(1, 'Nome do administrador é obrigatório'),
-  adminEmail: z.string().email('E-mail inválido'),
+  adminEmail: emailSchema,
   adminPassword: z.string().min(8, 'Senha deve ter ao menos 8 caracteres'),
 })
 

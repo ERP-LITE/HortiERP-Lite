@@ -5,19 +5,10 @@ import { db } from '../../db/client.js'
 import { companies, users } from '../../db/schema/index.js'
 import { AppError } from '../../shared/errors/AppError.js'
 import { assertUniqueField } from '../../shared/db/assertUniqueField.js'
+import { assertUniqueUserEmail } from '../../shared/db/userPublicColumns.js'
+import { UNIQUE_CONSTRAINTS, uniqueViolationConstraint } from '../../shared/db/uniqueConstraints.js'
 import { buildPaginatedResult } from '../../shared/db/paginate.js'
 import type { CreateCompanyInput, ListCompaniesQuery, UpdateCompanyInput } from './companies.schema.js'
-
-function assertUniqueAdminEmail(email: string) {
-  return assertUniqueField({
-    table: users,
-    idColumn: users.id,
-    valueColumn: users.email,
-    value: email,
-    field: 'adminEmail',
-    message: 'Já existe um usuário com esse e-mail',
-  })
-}
 
 function assertUniqueCompanyDocument(document: string, excludeId?: string) {
   return assertUniqueField({
@@ -30,16 +21,6 @@ function assertUniqueCompanyDocument(document: string, excludeId?: string) {
     deletedAtColumn: companies.deletedAt,
     excludeId,
   })
-}
-
-function isUniqueViolation(error: unknown): boolean {
-  return typeof error === 'object' && error !== null && 'code' in error && (error as { code: unknown }).code === '23505'
-}
-
-function uniqueConstraint(error: unknown): string | undefined {
-  return typeof error === 'object' && error !== null && 'constraint' in error && typeof error.constraint === 'string'
-    ? error.constraint
-    : undefined
 }
 
 function platformCompanyIdsSubquery() {
@@ -98,7 +79,10 @@ export async function getCompany(id: string) {
 }
 
 export async function createCompanyWithAdmin(data: CreateCompanyInput) {
-  await Promise.all([assertUniqueAdminEmail(data.adminEmail), assertUniqueCompanyDocument(data.document)])
+  await Promise.all([
+    assertUniqueUserEmail(data.adminEmail, { field: 'adminEmail' }),
+    assertUniqueCompanyDocument(data.document),
+  ])
 
   const passwordHash = await bcrypt.hash(data.adminPassword, 10)
 
@@ -141,11 +125,14 @@ export async function createCompanyWithAdmin(data: CreateCompanyInput) {
       }
     })
   } catch (error) {
-    if (isUniqueViolation(error)) {
-      if (uniqueConstraint(error) === 'companies_document_active_unique') {
-        throw AppError.duplicate('document', 'Já existe uma empresa com esse CNPJ')
-      }
-      throw AppError.duplicate('adminEmail', 'Já existe um usuário com esse e-mail')
+    const constraint = uniqueViolationConstraint(error)
+    if (constraint !== undefined) {
+      const duplicate =
+        constraint === 'companies_document_active_unique'
+          ? UNIQUE_CONSTRAINTS.companies_document_active_unique
+          : UNIQUE_CONSTRAINTS.users_email_active_unique
+      const field = constraint === 'companies_document_active_unique' ? 'document' : 'adminEmail'
+      throw AppError.duplicate(field, duplicate.message)
     }
     throw error
   }
@@ -156,6 +143,10 @@ export async function assertCompanyAccessible(companyId: string) {
 
   if (!company.active) {
     throw AppError.conflict('Empresa está suspensa. Reative antes de acessar.')
+  }
+
+  if (await isPlatformCompany(companyId)) {
+    throw AppError.forbidden('A empresa da plataforma não pode ser acessada como suporte')
   }
 
   return company
