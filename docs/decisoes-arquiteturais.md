@@ -199,6 +199,21 @@ A checagem existe **duas vezes de propósito**: o service confere antes do inser
 
 A única captura local de duplicidade que sobrou é a de `createCompanyWithAdmin`, e só para trocar o rótulo do campo: naquele formulário o campo se chama `adminEmail`, não `email`, e a mensagem precisa aparecer embaixo do campo que existe na tela.
 
+## Mensagens de erro sempre em português
+
+Toda mensagem que chega ao cliente é em português. Isso é fácil de garantir nos erros que o próprio sistema levanta (`AppError` e Zod), e é justamente onde a regra vazava: **erros do Fastify e dos seus plugins nascem em inglês**, e o `errorHandler` repassava `error.message` sem olhar em qualquer 4xx que não fosse `AppError`. Foi assim que `Rate limit exceeded, retry in 53 seconds` apareceu na tela do usuário.
+
+A tradução mora em `shared/errors/frameworkMessages.ts`, e `frameworkErrorMessage` resolve em duas camadas: primeiro pelo código do erro (`FST_REQ_FILE_TOO_LARGE`, `FST_ERR_CTP_INVALID_MEDIA_TYPE`, …), e, sem código conhecido, pela mensagem genérica do status HTTP. A função **nunca devolve `undefined`** — é o que garante que um plugin novo, com códigos que ninguém mapeou, degrade para um texto genérico em português em vez de voltar a vazar inglês.
+
+O texto original em inglês não é jogado fora: o `errorHandler` mantém a mensagem crua em `request.technicalError`, que é o que vai para `system_logs`. O usuário lê português, o operador continua com o texto do framework para depurar.
+
+Dois erros precisaram de tratamento na origem, e não no `errorHandler`:
+
+- **Excesso de requisições:** o `errorResponseBuilder` do `@fastify/rate-limit` levanta um `AppError`, para a resposta sair no mesmo envelope de todo o resto. O tempo de espera é calculado a partir de `context.ttl` (milissegundos), **não** do campo `context.after` do plugin — que já vem formatado em inglês (`"53 seconds"`) e daria uma tradução por interpretação de texto.
+- **Endereço inexistente:** o 404 padrão do Fastify não passa pelo `errorHandler` e usa outro formato de corpo (`{ message, error, statusCode }`), então o frontend nem achava a mensagem e caía no texto genérico. Um `setNotFoundHandler` levanta `AppError.notFound`, unificando idioma e envelope.
+
+O anexo grande demais é um caso à parte e vale registrar, porque a documentação do `@fastify/multipart` engana: com `throwFileSizeLimit` ligado (o padrão), o erro `FST_REQ_FILE_TOO_LARGE` só é levantado por `toBuffer()` ou pelo iterador de partes. Quem consome `file.file` por conta própria — é o que `invoice-storage.ts` faz, gravando direto em disco com `pipeline` para não carregar 10 MB na memória — recebe um stream que **termina normalmente**, apenas com `truncated` marcado. Sem a checagem explícita de `file.file.truncated`, o upload responderia `201` com o arquivo cortado. A frase com o limite em MB mora em `fileTooLargeMessage`, junto do mapa de traduções, e é usada tanto por essa checagem quanto pelo código do framework — para os dois caminhos nunca divergirem.
+
 ## Logs técnicos e auditoria por empresa
 
 Um hook global `onResponse` registra em `system_logs` as requisições da API, sem persistir corpo, senha, cookie ou token. Respostas 2xx/3xx são `info`, 4xx são `warning` e 5xx são `error`; o tratamento centralizado de erros anexa código e mensagem ao contexto antes da persistência.
