@@ -148,7 +148,19 @@ Histórico append-only de toda variação de estoque — nunca é editado ou apa
 | `balanceAfter` | numeric(12,3) | saldo do produto após o movimento (snapshot, não recalculado) |
 | `referenceType`, `referenceId` | text/uuid | em `entrada`/`perda`, aponta pra `stock_entry`/`loss` que originou o movimento; em `ajuste`, depende da origem: `'adjustment'` (ajuste manual) e `'import'` (carga inicial por planilha) usam o próprio `productId` como referência, porque não existe entidade própria; `'loss_cancellation'` (estorno de perda cancelada) aponta pra `loss` estornada, de modo que a perda e o estorno ficam localizáveis pelo mesmo `referenceId` |
 | `notes` | text | nulável; só preenchido em `ajuste`, com o motivo digitado pelo usuário (ver [fluxo de ajuste manual](./fluxos-de-negocio.md#ajuste-manual-de-estoque)) |
-| `createdAt`, `createdBy` | timestamp/uuid | sem `updatedBy`/`deletedAt` — registro imutável; `createdBy` identifica o usuário responsável quando informado |
+| `movementDate` | timestamp | **quando o fato aconteceu** — copiada da `entryDate` da entrada ou da `lossDate` da perda que originou o movimento. É a coluna que os filtros de período, o histórico e o dashboard usam |
+| `createdAt`, `createdBy` | timestamp/uuid | sem `updatedBy`/`deletedAt` — registro imutável; `createdAt` é **quando foi digitado**, e nas duas datas está a diferença entre o fato e o lançamento; `createdBy` identifica o usuário responsável quando informado |
+
+**Por que duas datas.** `stock_entries` e `losses` sempre tiveram a data do fato (`entryDate`/`lossDate`), mas
+`stock_movements` só tinha `createdAt`. Enquanto ninguém podia informar a data, as duas coincidiam e ninguém notava.
+Quando as telas passaram a aceitar data retroativa, a divergência ficaria permanente: a entrada de ontem apareceria
+como ontem na tela de Entradas e como hoje no histórico de movimentações e no gráfico do painel. `movementDate` existe
+para as duas telas contarem a mesma história, e `createdAt` continua sendo a trilha de auditoria de quando a linha
+nasceu. A migration `0005` preencheu as linhas antigas com `created_at`, que era a única data que existia.
+
+O índice `stock_movements_company_movement_date_idx` acompanha essa mudança: é por `movementDate` que as consultas de
+período filtram. O índice antigo por `createdAt` continua, porque `createdAt` ainda é o critério de desempate na
+ordenação.
 
 A relação Drizzle `createdByUser` resolve somente as colunas públicas `id` e `name` para o histórico e o resumo do dashboard. Como os campos de auditoria não possuem FK, a relação pode ser nula em registros antigos; a interface apresenta nesses casos “Usuário não identificado”.
 

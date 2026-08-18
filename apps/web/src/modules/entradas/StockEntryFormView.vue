@@ -7,6 +7,7 @@ import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
 import BaseSelect from '@/components/ui/BaseSelect.vue'
 import DateInput from '@/components/ui/DateInput.vue'
+import { oldestEventDateIso, todayIso } from '@/lib/period'
 import { getApiErrorMessage } from '@/services/api'
 import { toastError, toastSuccess } from '@/lib/alerts'
 import { listAllProducts } from '@/services/productsService'
@@ -26,6 +27,8 @@ const saving = ref(false)
 const errorMessage = ref('')
 
 const supplierName = ref('')
+const entryDate = ref(todayIso())
+const entryDateError = ref('')
 const notes = ref('')
 const invoiceNumber = ref('')
 const invoiceSeries = ref('')
@@ -62,6 +65,11 @@ async function loadProducts() {
 
 function validate(): boolean {
   invoiceErrors.value = {}
+  entryDateError.value = ''
+  if (!entryDate.value) entryDateError.value = 'Informe a data da entrada'
+  else if (entryDate.value > todayIso()) entryDateError.value = 'A data não pode ser futura'
+  else if (entryDate.value < oldestEventDateIso()) entryDateError.value = 'A data é antiga demais'
+
   if (invoiceAccessKey.value && !/^\d{44}$/.test(invoiceAccessKey.value)) {
     invoiceErrors.value.invoiceAccessKey = 'A chave da NF-e deve ter 44 dígitos'
   }
@@ -73,7 +81,8 @@ function validate(): boolean {
   })
 
   return itemErrors.value.every((rowErrors) => Object.keys(rowErrors).length === 0) &&
-    Object.keys(invoiceErrors.value).length === 0
+    Object.keys(invoiceErrors.value).length === 0 &&
+    !entryDateError.value
 }
 
 function handleFiles(event: Event) {
@@ -95,6 +104,7 @@ async function handleSubmit() {
   try {
     const entry = await createStockEntry({
       supplierName: supplierName.value || undefined,
+      entryDate: entryDate.value || undefined,
       notes: notes.value || undefined,
       invoiceNumber: invoiceNumber.value || undefined,
       invoiceSeries: invoiceSeries.value || undefined,
@@ -136,7 +146,14 @@ onMounted(loadProducts)
       class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6 space-y-6"
       @submit.prevent="handleSubmit"
     >
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <DateInput
+          v-model="entryDate"
+          label="Data da entrada"
+          :min="oldestEventDateIso()"
+          :max="todayIso()"
+          :error="entryDateError"
+        />
         <BaseInput v-model="supplierName" label="Fornecedor (opcional)" />
         <BaseInput v-model="notes" label="Observações (opcional)" />
       </div>

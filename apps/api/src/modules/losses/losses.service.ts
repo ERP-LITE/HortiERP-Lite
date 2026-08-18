@@ -67,6 +67,7 @@ export async function getLoss(companyId: string, id: string) {
 
 export async function createLoss(companyId: string, userId: string, data: CreateLossInput) {
   return db.transaction(async (tx) => {
+    const lossDate = data.lossDate ?? new Date()
     const [product] = await tx
       .select({ costPrice: products.costPrice })
       .from(products)
@@ -83,7 +84,7 @@ export async function createLoss(companyId: string, userId: string, data: Create
         unitCost: product.costPrice,
         reason: data.reason,
         notes: data.notes,
-        lossDate: data.lossDate ?? new Date(),
+        lossDate,
         createdBy: userId,
       })
       .returning()
@@ -96,6 +97,7 @@ export async function createLoss(companyId: string, userId: string, data: Create
       type: 'perda',
       referenceType: 'loss',
       referenceId: loss.id,
+      movementDate: lossDate,
       requireSufficientStock: true,
     })
 

@@ -57,7 +57,7 @@ importação, mas o usuário precisa ver isso antes de confirmar.
 
 Tela `/entradas` → `/entradas/nova`. Rota `POST /stock-entries`, service `stock-entries.service.ts::createStockEntry`. Qualquer usuário autenticado pode registrar (sem restrição de papel — ver decisões arquiteturais).
 
-Uma entrada tem um cabeçalho (`stock_entries`: fornecedor em texto livre, data, observações), dados opcionais de nota fiscal (número, série, chave de acesso, emissão e valor total), anexos privados e uma lista de itens (`stock_entry_items`: produto + quantidade + custo unitário opcional). O registro da entrada e a atualização do estoque rodam numa única transação:
+Uma entrada tem um cabeçalho (`stock_entries`: fornecedor em texto livre, data da entrada, observações), dados opcionais de nota fiscal (número, série, chave de acesso, emissão e valor total), anexos privados e uma lista de itens (`stock_entry_items`: produto + quantidade + custo unitário opcional). O registro da entrada e a atualização do estoque rodam numa única transação:
 
 1. Cria a linha em `stock_entries`.
 2. Para cada item: chama o helper compartilhado `applyStockMovement`, que soma a quantidade ao `currentStock` com um `UPDATE` atômico escopado por empresa, valida pelo retorno que o produto existe e grava um `stock_movements` com `type: 'entrada'`, quantidade positiva e `balanceAfter` = novo saldo retornado pelo banco; em seguida insere a linha em `stock_entry_items`.
@@ -81,9 +81,43 @@ Se um upload falhar depois do registro da entrada, o lançamento de estoque perm
 
 Administradores e gerentes podem corrigir posteriormente fornecedor, observações e os dados fiscais da entrada. Produtos, quantidades e custos permanecem imutáveis nesse fluxo para não alterar retroativamente o estoque; uma correção de quantidades deve ser feita pelo fluxo auditável de ajuste de estoque.
 
+### Data do lançamento
+
+A tela traz **a data de hoje preenchida** e o usuário pode trocá-la antes de salvar. Existe para o caso comum de a
+mercadoria ter chegado ontem e o lançamento só sair no dia seguinte — sem isso, o registro nasceria com a data errada e
+a única correção possível seria o ajuste manual de estoque.
+
+Os limites, iguais em entrada e perda (`shared/schemas/eventDate.schema.ts`):
+
+- **Data futura é recusada.** Não se recebe mercadoria que ainda não chegou, nem se perde o que ainda não existe.
+- **Retroatividade vai até `MAX_BACKDATE_DAYS` (hoje 365 dias).** O teto não protege contra fraude — quem pode lançar
+  pode escolher qualquer dia dentro da janela; ele protege contra o erro de digitação de ano, que jogaria o lançamento
+  para um período que ninguém mais audita.
+- **Data impossível é recusada** em vez de virar outro dia. `2026-02-31` não é normalizada para março.
+- O calendário da tela desabilita os dias fora da faixa (`min`/`max` do `DateInput`), então o caminho normal nem chega
+  a mandar data inválida. A validação da API continua valendo por si.
+
+**Qual instante é gravado.** A tela manda apenas a data civil. Quando é hoje, guarda-se o instante real do lançamento,
+para o histórico de movimentações manter a hora; quando é retroativa, guarda-se o início daquele dia no fuso do
+negócio, porque a hora verdadeira do fato é desconhecida e inventá-la seria pior.
+
+**A data escolhida também vale para a movimentação de estoque** (`movementDate`), e é isso que mantém a tela de
+Entradas, o histórico de movimentações e o gráfico do painel contando a mesma coisa. Ver
+[modelo de dados](./modelo-de-dados.md#stock_movements). No histórico, uma movimentação cuja data do fato cai em dia
+diferente do lançamento aparece com **"Lançado em …"** — sem essa marca não haveria como distinguir o que aconteceu do
+que foi digitado depois.
+
+O que **não** tem data informada: o ajuste manual de estoque (é uma correção de contagem, feita no dia em que se
+conta), o estorno de perda cancelada (o estorno acontece hoje, mesmo que a perda seja antiga) e a carga inicial por
+planilha. Nesses casos a data da movimentação é o próprio instante do lançamento.
+
 ## Registro de perda
 
 Tela `/perdas`. Rota `POST /losses`, service `losses.service.ts::createLoss`. Mesma liberação de papel que entradas.
+
+A data segue exatamente a mesma regra da entrada (ver [Data do lançamento](#data-do-lançamento)): vem preenchida com
+hoje, aceita retroatividade dentro da janela e recusa futuro. O que a perda **não** aceita é mudar a data depois de
+registrada — corrigir só alcança motivo e observações.
 
 1. Pelo helper compartilhado `applyStockMovement`, **subtrai e valida o saldo numa única atualização atômica** (`currentStock >= quantidade`). A condição é reavaliada pelo PostgreSQL mesmo quando existem perdas simultâneas.
 2. Se o produto não existir, rejeita com `404`; se existir mas não houver saldo suficiente, rejeita com `422 INSUFFICIENT_STOCK`.

@@ -147,6 +147,35 @@ seguir, ajuste o e-mail da outra e rode a atualização novamente.
 apenas passa a recusar duplicatas que diferem só pela caixa — que a versão antiga também já recusava na aplicação. Os
 e-mails regravados em minúsculas permanecem assim, e é justamente com eles que os usuários passam a entrar.
 
+### `0005_eager_sphinx.sql` — data do fato nas movimentações de estoque
+
+Acrescenta `stock_movements.movement_date` (a data em que a entrada ou a perda **aconteceu**, que passa a ser a coluna
+usada pelos filtros de período, pelo histórico e pelo painel), preenche as linhas existentes com `created_at` e cria o
+índice `stock_movements_company_movement_date_idx`. Ver [modelo de dados](./modelo-de-dados.md#stock_movements).
+
+**Não exige nenhuma intervenção** e não pode falhar por causa dos dados: a coluna nasce com `default now()`, o
+preenchimento é uma cópia direta de `created_at` e o índice não impõe unicidade. As movimentações antigas ficam com a
+data que sempre tiveram — a do lançamento, que era a única existente antes desta versão.
+
+O que vale saber é o **custo**, porque `stock_movements` é a tabela que mais cresce numa instalação antiga: a migration
+reescreve todas as linhas (o `UPDATE`) e depois constrói o índice, as duas coisas numa transação só. Enquanto isso roda,
+gravações em `stock_movements` **esperam** — e a API da versão anterior continua no ar durante a migration, porque o
+Compose só troca o container da API depois que o `migrate` termina. Em outras palavras: durante alguns instantes, quem
+estiver lançando entrada ou perda vai ver a operação demorar. No volume típico de uma frutaria isso é imperceptível; se
+a tabela já tiver muitos milhões de linhas, prefira aplicar em horário de baixo movimento. Para dimensionar antes:
+
+```bash
+docker compose --env-file .env.production -f docker-compose.production.yml exec postgres \
+  psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c \
+  "select count(*) as movimentacoes, pg_size_pretty(pg_total_relation_size('stock_movements')) as tamanho from stock_movements;"
+```
+
+**No rollback**, a versão anterior roda sem tocar no banco: ela não conhece a coluna, não a inclui no `insert`, e o
+`default now()` reproduz exatamente o comportamento antigo (data do movimento = instante do lançamento). As datas
+retroativas já gravadas continuam lá, e voltam a valer quando a versão atual retornar — mas, enquanto a versão anterior
+estiver no ar, o histórico e o painel voltam a filtrar por `created_at`, então uma movimentação retroativa aparece no dia
+em que foi digitada.
+
 ## Deploy automático pelo GitHub Actions
 
 O workflow `.github/workflows/ci.yml` publica automaticamente na Oracle Cloud depois que os builds, as migrations
@@ -256,6 +285,7 @@ rollback exige restauração coordenada do backup e não apenas a troca da image
 | Migration | Versão anterior roda no schema novo? | Observação |
 |---|---|---|
 | `0003` — `losses.cancelled_at`, `cancelled_by`, `cancel_reason` | **Sim** | Três colunas nuláveis. O Drizzle lista as colunas explicitamente no `select`, então a versão anterior simplesmente não as enxerga, e o `insert` antigo as deixa nulas. Rollback por troca de imagem é seguro, sem tocar no banco. |
+| `0005` — `stock_movements.movement_date` | **Sim** | Coluna `not null`, mas com `default now()`: o `insert` da versão anterior a omite e o banco preenche com o instante do lançamento, que é o comportamento dela. Rollback por troca de imagem é seguro. A ressalva é de leitura, não de escrita — a versão anterior filtra período por `created_at`, então movimentações lançadas com data retroativa aparecem no dia em que foram digitadas enquanto ela estiver no ar. |
 
 O sentido inverso **não** é compatível e vale para qualquer migration: restaurar um dump anterior à migration e apontar
 o código **atual** para ele quebra toda consulta que use as colunas novas. Depois de restaurar um backup antigo, rode as

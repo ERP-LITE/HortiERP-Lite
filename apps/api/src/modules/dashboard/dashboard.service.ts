@@ -77,11 +77,11 @@ export async function getDashboardSummary(companyId: string, range: { from?: Dat
   )
   const movementPeriodConditions = and(
     eq(stockMovements.companyId, companyId),
-    gte(stockMovements.createdAt, periodStart),
-    lte(stockMovements.createdAt, periodEnd),
+    gte(stockMovements.movementDate, periodStart),
+    lte(stockMovements.movementDate, periodEnd),
   )
 
-  const movementDay = sql`date_trunc('day', ${stockMovements.createdAt} at time zone ${BUSINESS_TIME_ZONE_SQL})`
+  const movementDay = sql`date_trunc('day', ${stockMovements.movementDate} at time zone ${BUSINESS_TIME_ZONE_SQL})`
   const movementDayText = sql<string>`to_char(${movementDay}, 'YYYY-MM-DD')`
   const movementQuantity = sql`coalesce(sum(abs(${stockMovements.quantity})), 0)`
   const lossQuantity = sql`coalesce(sum(${losses.quantity}), 0)`
@@ -246,7 +246,7 @@ export async function getDashboardSummary(companyId: string, range: { from?: Dat
         product: true,
         createdByUser: { columns: { id: true, name: true } },
       },
-      orderBy: desc(stockMovements.createdAt),
+      orderBy: [desc(stockMovements.movementDate), desc(stockMovements.createdAt)],
       limit: 10,
     }),
   ])

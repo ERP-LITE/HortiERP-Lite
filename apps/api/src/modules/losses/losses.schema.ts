@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { eventDateSchema } from '../../shared/schemas/eventDate.schema.js'
 import { periodQueryFields } from '../../shared/schemas/period.schema.js'
 import { booleanQueryParam, paginationQuerySchema } from '../../shared/schemas/pagination.schema.js'
 
@@ -20,7 +21,7 @@ export const createLossSchema = z.object({
   quantity: z.coerce.number().positive('Quantidade deve ser maior que zero'),
   reason: z.enum(lossReasons),
   notes: z.string().optional(),
-  lossDate: z.coerce.date().optional(),
+  lossDate: eventDateSchema.optional(),
 })
 
 export type CreateLossInput = z.infer<typeof createLossSchema>

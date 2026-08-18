@@ -36,6 +36,13 @@
       "when": 1786971414006,
       "tag": "0004_lethal_demogoblin",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1787059031267,
+      "tag": "0005_eager_sphinx",
+      "breakpoints": true
     }
   ]
 }

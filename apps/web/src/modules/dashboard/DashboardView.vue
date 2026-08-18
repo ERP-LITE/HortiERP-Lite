@@ -200,11 +200,11 @@ onMounted(loadSummary)
                 </BaseBadge>
               </div>
               <time
-                :datetime="movement.createdAt"
+                :datetime="movement.movementDate"
                 class="shrink-0 text-right text-xs leading-5 text-gray-500 dark:text-gray-400"
               >
-                <span class="block">{{ formatDate(movement.createdAt) }}</span>
-                <span class="block">{{ formatMovementTime(movement.createdAt) }}</span>
+                <span class="block">{{ formatDate(movement.movementDate) }}</span>
+                <span class="block">{{ formatMovementTime(movement.movementDate) }}</span>
               </time>
             </li>
           </ul>
