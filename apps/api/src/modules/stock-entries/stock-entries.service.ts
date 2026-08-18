@@ -96,12 +96,13 @@ export async function getStockEntry(companyId: string, id: string) {
 
 export async function createStockEntry(companyId: string, userId: string, data: CreateStockEntryInput) {
   return db.transaction(async (tx) => {
+    const entryDate = data.entryDate ?? new Date()
     const [entry] = await tx
       .insert(stockEntries)
       .values({
         companyId,
         supplierName: data.supplierName,
-        entryDate: data.entryDate ?? new Date(),
+        entryDate,
         notes: data.notes,
         invoiceNumber: data.invoiceNumber,
         invoiceSeries: data.invoiceSeries,
@@ -121,6 +122,7 @@ export async function createStockEntry(companyId: string, userId: string, data: 
         type: 'entrada',
         referenceType: 'stock_entry',
         referenceId: entry.id,
+        movementDate: entryDate,
       })
     }
 

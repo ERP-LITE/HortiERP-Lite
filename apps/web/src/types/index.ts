@@ -156,6 +156,7 @@ export interface StockMovement {
   referenceType: string
   referenceId: string
   notes: string | null
+  movementDate: string
   createdAt: string
   createdByUser: { id: string; name: string } | null
   product: Product

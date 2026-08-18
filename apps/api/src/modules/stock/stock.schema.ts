@@ -16,7 +16,7 @@ export const listStockMovementsQuerySchema = paginationQuerySchema.extend({
   productId: z.string().uuid().optional(),
   type: z.enum(['entrada', 'perda', 'ajuste']).optional(),
   ...periodQueryFields,
-  sortBy: z.enum(['createdAt', 'type', 'quantity', 'balanceAfter']).optional(),
+  sortBy: z.enum(['movementDate', 'type', 'quantity', 'balanceAfter']).optional(),
 })
 
 export type ListStockMovementsQuery = z.infer<typeof listStockMovementsQuerySchema>

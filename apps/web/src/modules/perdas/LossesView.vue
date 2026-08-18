@@ -5,6 +5,7 @@ import PageHeader from '@/components/ui/PageHeader.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
 import BaseSelect from '@/components/ui/BaseSelect.vue'
+import DateInput from '@/components/ui/DateInput.vue'
 import BaseModal from '@/components/ui/BaseModal.vue'
 import BaseBadge from '@/components/ui/BaseBadge.vue'
 import BaseToggle from '@/components/ui/BaseToggle.vue'
@@ -16,7 +17,7 @@ import SearchInput from '@/components/ui/SearchInput.vue'
 import PeriodPicker from '@/components/ui/PeriodPicker.vue'
 import ExpandableText from '@/components/ui/ExpandableText.vue'
 import SortableTableHeader from '@/components/ui/SortableTableHeader.vue'
-import type { PeriodValue } from '@/lib/period'
+import { oldestEventDateIso, todayIso, type PeriodValue } from '@/lib/period'
 import { formatDate } from '@/lib/format'
 import { getApiErrorMessage, resolveFormError } from '@/services/api'
 import { toastSuccess } from '@/lib/alerts'
@@ -80,7 +81,7 @@ const modalOpen = ref(false)
 const saving = ref(false)
 const editingId = ref<string | null>(null)
 const editingLoss = ref<Loss | null>(null)
-const form = ref({ productId: '', quantity: '', reason: '' as LossReason | '', notes: '' })
+const form = ref({ productId: '', quantity: '', lossDate: todayIso(), reason: '' as LossReason | '', notes: '' })
 const fieldErrors = ref<Record<string, string>>({})
 
 const cancelModalOpen = ref(false)
@@ -131,7 +132,7 @@ async function loadAll() {
 function openCreateModal() {
   editingId.value = null
   editingLoss.value = null
-  form.value = { productId: '', quantity: '', reason: '', notes: '' }
+  form.value = { productId: '', quantity: '', lossDate: todayIso(), reason: '', notes: '' }
   fieldErrors.value = {}
   modalOpen.value = true
 }
@@ -142,6 +143,7 @@ function openEditModal(loss: Loss) {
   form.value = {
     productId: loss.productId,
     quantity: String(Number(loss.quantity)),
+    lossDate: loss.lossDate.slice(0, 10),
     reason: loss.reason,
     notes: loss.notes ?? '',
   }
@@ -156,6 +158,9 @@ function validate(): boolean {
     if (!form.value.quantity || Number(form.value.quantity) <= 0) {
       fieldErrors.value.quantity = 'Informe uma quantidade maior que zero'
     }
+    if (!form.value.lossDate) fieldErrors.value.lossDate = 'Informe a data da perda'
+    else if (form.value.lossDate > todayIso()) fieldErrors.value.lossDate = 'A data não pode ser futura'
+    else if (form.value.lossDate < oldestEventDateIso()) fieldErrors.value.lossDate = 'A data é antiga demais'
   }
   if (!form.value.reason) fieldErrors.value.reason = 'Selecione o motivo'
   return Object.keys(fieldErrors.value).length === 0
@@ -179,6 +184,7 @@ async function handleSubmit() {
       await createLoss({
         productId: form.value.productId,
         quantity: Number(form.value.quantity),
+        lossDate: form.value.lossDate || undefined,
         reason: form.value.reason,
         notes: form.value.notes || undefined,
       })
@@ -414,6 +420,13 @@ onMounted(loadAll)
             :decimal-places="3"
             label="Quantidade"
             :error="fieldErrors.quantity"
+          />
+          <DateInput
+            v-model="form.lossDate"
+            label="Data da perda"
+            :min="oldestEventDateIso()"
+            :max="todayIso()"
+            :error="fieldErrors.lossDate"
           />
         </template>
         <BaseSelect v-model="form.reason" label="Motivo" :options="reasonOptions" :error="fieldErrors.reason" />

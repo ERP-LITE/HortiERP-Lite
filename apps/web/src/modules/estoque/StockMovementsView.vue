@@ -14,7 +14,7 @@ import PeriodPicker from '@/components/ui/PeriodPicker.vue'
 import ExpandableText from '@/components/ui/ExpandableText.vue'
 import SortableTableHeader from '@/components/ui/SortableTableHeader.vue'
 import type { PeriodValue } from '@/lib/period'
-import { formatDateTime } from '@/lib/format'
+import { formatDate, formatDateTime } from '@/lib/format'
 import { getApiErrorMessage } from '@/services/api'
 import { listAllStockMovements, listStockMovements } from '@/services/stockService'
 import { csvNumber } from '@/lib/csv'
@@ -25,7 +25,17 @@ import { useTableSort } from '@/composables/useTableSort'
 import type { MovementType, Product, StockMovement } from '@/types'
 
 const { page, pageSize, total, totalPages, applyMeta, watchSearch } = usePagination()
-const { sortBy, sortOrder, toggleSort } = useTableSort(() => { page.value = 1; return loadMovements() }, 'createdAt', 'desc')
+
+function isBackdated(movement: StockMovement) {
+  return formatDate(movement.movementDate) !== formatDate(movement.createdAt)
+}
+
+/** Data retroativa não tem hora conhecida: exibir 00:00 fingiria uma precisão que não existe. */
+function movementDateLabel(movement: StockMovement) {
+  return isBackdated(movement) ? formatDate(movement.movementDate) : formatDateTime(movement.movementDate)
+}
+
+const { sortBy, sortOrder, toggleSort } = useTableSort(() => { page.value = 1; return loadMovements() }, 'movementDate', 'desc')
 
 const movements = ref<StockMovement[]>([])
 const products = ref<Product[]>([])
@@ -119,7 +129,7 @@ async function exportCsv() {
   return {
     headers: ['Data', 'Produto', 'Tipo', 'Quantidade', 'Saldo apos', 'Usuario', 'Observacao'],
     rows: all.map((item) => [
-      formatDateTime(item.createdAt),
+      movementDateLabel(item),
       item.product?.name ?? '',
       typeLabels[item.type],
       csvNumber(item.quantity, 3),
@@ -164,7 +174,10 @@ onMounted(() => {
                 class="text-sm font-semibold text-gray-900 dark:text-gray-100"
               />
               <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
-                {{ formatDateTime(movement.createdAt) }}
+                {{ movementDateLabel(movement) }}
+              </p>
+              <p v-if="isBackdated(movement)" class="mt-0.5 text-xs text-amber-600 dark:text-amber-500">
+                Lançado em {{ formatDateTime(movement.createdAt) }}
               </p>
               <div class="mt-0.5 flex min-w-0 items-start gap-1 text-xs text-gray-500 dark:text-gray-400">
                 <span class="shrink-0">Por</span>
@@ -200,7 +213,7 @@ onMounted(() => {
       <table class="hidden min-w-full divide-y divide-gray-200 dark:divide-gray-700 sm:table">
         <thead class="bg-gray-50 dark:bg-gray-900/60">
           <tr>
-            <SortableTableHeader field="createdAt" :active-field="sortBy" :order="sortOrder" @sort="toggleSort">Data</SortableTableHeader>
+            <SortableTableHeader field="movementDate" :active-field="sortBy" :order="sortOrder" @sort="toggleSort">Data</SortableTableHeader>
             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
               Produto
             </th>
@@ -226,7 +239,14 @@ onMounted(() => {
           </tr>
           <tr v-for="movement in movements" v-else :key="movement.id">
             <td class="px-4 py-3 text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">
-              {{ formatDateTime(movement.createdAt) }}
+              {{ movementDateLabel(movement) }}
+              <span
+                v-if="isBackdated(movement)"
+                class="block text-xs text-amber-600 dark:text-amber-500"
+                :title="`Data informada pelo usuário; o lançamento foi feito em ${formatDateTime(movement.createdAt)}`"
+              >
+                Lançado em {{ formatDateTime(movement.createdAt) }}
+              </span>
             </td>
             <td class="max-w-72 px-4 py-3 text-sm font-medium text-gray-900 dark:text-gray-100">
               <ExpandableText :text="movement.product?.name" :max-length="45" />

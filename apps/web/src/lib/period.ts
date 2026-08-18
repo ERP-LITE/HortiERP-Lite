@@ -47,3 +47,9 @@ export function rangeForPreset(preset: PeriodPreset): { from: string; to: string
       return { from: '', to: '' }
   }
 }
+
+export const MAX_BACKDATE_DAYS = 365
+
+export function oldestEventDateIso() {
+  return toISODate(addDays(new Date(), -MAX_BACKDATE_DAYS))
+}

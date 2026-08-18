@@ -14,6 +14,7 @@ interface ApplyStockMovementInput {
   referenceType: string
   referenceId: string
   notes?: string
+  movementDate?: Date
   requireSufficientStock?: boolean
   allowDeletedProduct?: boolean
 }
@@ -28,6 +29,7 @@ export async function applyStockMovement(tx: Transaction, input: ApplyStockMovem
     referenceType,
     referenceId,
     notes,
+    movementDate,
     requireSufficientStock,
     allowDeletedProduct,
   } = input
@@ -79,6 +81,7 @@ export async function applyStockMovement(tx: Transaction, input: ApplyStockMovem
       referenceType,
       referenceId,
       notes,
+      movementDate,
       createdBy: userId,
     })
     .returning()

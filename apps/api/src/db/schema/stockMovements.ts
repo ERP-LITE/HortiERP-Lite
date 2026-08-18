@@ -17,9 +17,11 @@ export const stockMovements = pgTable('stock_movements', {
   referenceType: text('reference_type').notNull(),
   referenceId: uuid('reference_id').notNull(),
   notes: text('notes'),
+  movementDate: timestamp('movement_date', { withTimezone: true }).notNull().defaultNow(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   createdBy: uuid('created_by'),
 }, (table) => ({
   companyCreatedAtIdx: index('stock_movements_company_created_at_idx').on(table.companyId, table.createdAt),
+  companyMovementDateIdx: index('stock_movements_company_movement_date_idx').on(table.companyId, table.movementDate),
   companyProductIdx: index('stock_movements_company_product_idx').on(table.companyId, table.productId),
 }))

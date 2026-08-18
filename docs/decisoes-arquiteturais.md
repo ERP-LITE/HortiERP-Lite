@@ -146,6 +146,13 @@ Datas escolhidas na interface usam o `DateInput` compartilhado, com calendário 
 tema claro/escuro e renderizado acima de modais. Isso evita diferenças de idioma e aparência dos seletores nativos
 de cada navegador, mantendo o valor técnico enviado à API no formato ISO `AAAA-MM-DD`.
 
+O calendário é `position: fixed` fora do fluxo (para escapar do `overflow` de modais e tabelas), então a posição é
+calculada em JavaScript — e ela usa a **altura medida** do calendário já renderizado, não uma estimativa. A estimativa
+anterior era menor que ele, e existia uma faixa de alturas de tela em que sobrava espaço suficiente pela conta mas não
+de verdade: abria para baixo e cortava o rodapé com "Limpar"/"Hoje", sem possibilidade de rolar até ele. A posição
+final é limitada à janela nas duas pontas, então não cabendo nem acima nem abaixo o calendário encosta na borda em vez
+de sair da tela. Como a altura depende da largura aplicada, a medição acontece em duas passadas de `nextTick`.
+
 "Hoje" nunca sai de `new Date().toISOString()`: isso devolve a data em UTC, que a partir das 21h de Brasília já é o
 dia seguinte — uma cobrança venceria hoje e apareceria como atrasada no fim da tarde. O front usa `todayIso()`
 (`lib/period.ts`), com o relógio local do usuário, e a API usa `todayIsoDate()` (`shared/utils/date.ts`), fixado em
@@ -165,8 +172,9 @@ As bordas saem de `startOfBusinessDay`/`endOfBusinessDay` (`shared/utils/date.ts
 fuso via `Intl` em duas passadas em vez de assumir -03:00 fixo — o Brasil já teve horário de verão e pode ter de novo.
 Nenhum service ajusta hora na mão: fazer isso com `setHours` usa o relógio do container (UTC) e reintroduz o bug.
 
-A timeline diária do dashboard agrupa por `date_trunc('day', created_at at time zone 'America/Sao_Paulo')`, e não pelo
-`created_at` cru: sem a conversão, uma perda registrada às 22h aparecia no gráfico no dia seguinte. O fuso entra na
+A timeline diária do dashboard agrupa por `date_trunc('day', movement_date at time zone 'America/Sao_Paulo')`, e não
+pela coluna crua: sem a conversão, uma perda registrada às 22h aparecia no gráfico no dia seguinte. A coluna é
+`movement_date` (a data do fato) e não `created_at` — ver [Data do fato e data do lançamento](#data-do-fato-e-data-do-lançamento). O fuso entra na
 consulta como literal (`sql.raw`) e não como parâmetro, porque a mesma expressão precisa sair idêntica no `select` e no
 `group by` — dois placeholders distintos fariam o Postgres tratá-los como expressões diferentes. Os limites do período
 também são resolvidos em datas civis (`resolvePeriod`), o que de passagem fez o teto de 90 dias render 90 dias, e não 91.
@@ -198,6 +206,29 @@ Além das validações amigáveis dos services, nomes de categorias, unidades e 
 A checagem existe **duas vezes de propósito**: o service confere antes do insert para devolver um erro amigável apontando o campo, e o índice segura o caso de duas requisições simultâneas passarem as duas pela checagem. O que não pode existir duas vezes é o **texto** da mensagem: campo e mensagem de cada índice moram só em `shared/db/uniqueConstraints.ts`, indexados pelo nome real do índice no PostgreSQL — que é o que o driver devolve no campo `constraint` do erro `23505`. Os dois caminhos (checagem amigável e tradução do erro no `errorHandler`) leem o mesmo mapa, porque levam à mesma tela e divergiam sem ninguém notar quando cada um guardava a própria cópia. `uniqueViolationConstraint`, no mesmo arquivo, é quem reconhece o `23505` — inclusive quando o Drizzle embrulha o erro do driver dentro de uma transação e o código sai do nível de cima.
 
 A única captura local de duplicidade que sobrou é a de `createCompanyWithAdmin`, e só para trocar o rótulo do campo: naquele formulário o campo se chama `adminEmail`, não `email`, e a mensagem precisa aparecer embaixo do campo que existe na tela.
+
+## Data do fato e data do lançamento
+
+Entrada de mercadoria e perda aceitam **data retroativa**, informada pelo usuário e preenchida com hoje por padrão. A
+decisão que essa funcionalidade forçou não foi o campo na tela: foi separar **quando o fato aconteceu** de **quando
+alguém digitou**.
+
+`stock_entries.entryDate` e `losses.lossDate` sempre existiram, mas `stock_movements` só tinha `createdAt`, e era por
+`createdAt` que o histórico de movimentações e o dashboard filtravam o período. Enquanto ninguém podia informar data, as
+duas coincidiam sempre e ninguém percebia que eram conceitos diferentes. Bastava permitir a data retroativa para as
+telas divergirem em silêncio: a mesma entrada apareceria em dois dias distintos dependendo de qual tela se olhasse. Por
+isso a migration `0005` acrescentou `stock_movements.movement_date`, e todas as consultas de período passaram a usá-la —
+`createdAt` sobrou como trilha de auditoria e critério de desempate na ordenação.
+
+A validação vive num só lugar (`shared/schemas/eventDate.schema.ts`) e é compartilhada pelos dois módulos, porque a
+regra é a mesma e duplicá-la em dois schemas Zod seria repetir a política de datas do sistema em dois arquivos. Ela
+recusa data futura, recusa data impossível em vez de normalizá-la e limita a retroatividade a `MAX_BACKDATE_DAYS`. O
+`DateInput` ganhou `min`/`max` opcionais para o calendário nem oferecer os dias fora da faixa — mas a checagem da API é
+que vale, a da tela só evita a ida ao servidor.
+
+Só entrada e perda têm data informada. Ajuste de estoque, estorno de perda e carga por planilha não têm, e o motivo é o
+mesmo nos três: o fato **é** o lançamento. Ajustar estoque é o resultado de uma contagem feita agora; estornar uma perda
+antiga é uma decisão de hoje, não um evento do passado.
 
 ## Mensagens de erro sempre em português
 

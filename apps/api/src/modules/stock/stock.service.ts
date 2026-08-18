@@ -37,13 +37,13 @@ export async function listStockMovements(companyId: string, query: ListStockMove
   }
   if (query.productId) conditions.push(eq(stockMovements.productId, query.productId))
   if (query.type) conditions.push(eq(stockMovements.type, query.type))
-  if (query.from) conditions.push(gte(stockMovements.createdAt, query.from))
-  if (query.to) conditions.push(lte(stockMovements.createdAt, query.to))
+  if (query.from) conditions.push(gte(stockMovements.movementDate, query.from))
+  if (query.to) conditions.push(lte(stockMovements.movementDate, query.to))
   const where = and(...conditions)
   const movementOrderBy =
     query.sortBy === 'type'
       ? orderByLabeledEnum(stockMovements.type, MOVEMENT_TYPE_LABEL_ORDER, query.sortOrder)
-      : orderByColumn(query.sortBy ? stockMovements[query.sortBy] : stockMovements.createdAt, query.sortOrder, 'desc')
+      : orderByColumn(query.sortBy ? stockMovements[query.sortBy] : stockMovements.movementDate, query.sortOrder, 'desc')
 
   const [data, [{ total }]] = await Promise.all([
     db.query.stockMovements.findMany({
@@ -52,7 +52,7 @@ export async function listStockMovements(companyId: string, query: ListStockMove
         product: true,
         createdByUser: { columns: { id: true, name: true } },
       },
-      orderBy: [movementOrderBy, desc(stockMovements.createdAt)],
+      orderBy: [movementOrderBy, desc(stockMovements.movementDate), desc(stockMovements.createdAt)],
       limit: query.pageSize,
       offset: (query.page - 1) * query.pageSize,
     }),

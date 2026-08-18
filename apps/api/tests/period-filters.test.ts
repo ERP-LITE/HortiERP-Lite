@@ -76,7 +76,7 @@ describe('filtro de período pelo fuso do negócio', () => {
     const tenant = await createTenant('mov-periodo', '1000')
     const cookie = authCookie(ctx.app, tenant.admin)
 
-    for (const createdAt of [DEZ_DA_MANHA, ULTIMA_MEIA_HORA, JA_NO_DIA_SEGUINTE]) {
+    for (const instant of [DEZ_DA_MANHA, ULTIMA_MEIA_HORA, JA_NO_DIA_SEGUINTE]) {
       await db.insert(stockMovements).values({
         companyId: tenant.companyId,
         productId: tenant.productId,
@@ -85,7 +85,8 @@ describe('filtro de período pelo fuso do negócio', () => {
         balanceAfter: '999',
         referenceType: 'loss',
         referenceId: tenant.productId,
-        createdAt,
+        movementDate: instant,
+        createdAt: instant,
         createdBy: tenant.admin.id,
       })
     }
@@ -139,7 +140,8 @@ describe('filtro de período pelo fuso do negócio', () => {
       balanceAfter: '995',
       referenceType: 'loss',
       referenceId: tenant.productId,
-      createdAt: new Date('2026-08-15T01:00:00.000Z'), // 14/08 22:00 em Brasília
+      movementDate: new Date('2026-08-15T01:00:00.000Z'), // 14/08 22:00 em Brasília
+      createdAt: new Date('2026-08-15T01:00:00.000Z'),
       createdBy: tenant.admin.id,
     })
 

@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { eventDateSchema } from '../../shared/schemas/eventDate.schema.js'
 import { periodQueryFields } from '../../shared/schemas/period.schema.js'
 import { paginationQuerySchema } from '../../shared/schemas/pagination.schema.js'
 
@@ -18,7 +19,7 @@ export const stockEntryItemSchema = z.object({
 
 export const createStockEntrySchema = z.object({
   supplierName: z.string().trim().max(200).optional(),
-  entryDate: z.coerce.date().optional(),
+  entryDate: eventDateSchema.optional(),
   notes: z.string().trim().max(2000).optional(),
   invoiceNumber: z.string().trim().max(60).optional(),
   invoiceSeries: z.string().trim().max(20).optional(),

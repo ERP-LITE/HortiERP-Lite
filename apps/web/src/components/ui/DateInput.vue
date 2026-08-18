@@ -4,7 +4,7 @@ import { Calendar, ChevronLeft, ChevronRight } from '@lucide/vue'
 import { formatDateOnly, formatMonthYear } from '@/lib/format'
 import { toISODate, todayIso } from '@/lib/period'
 
-const props = defineProps<{ modelValue: string; label?: string; error?: string }>()
+const props = defineProps<{ modelValue: string; label?: string; error?: string; min?: string; max?: string }>()
 const emit = defineEmits<{ 'update:modelValue': [value: string] }>()
 
 const container = ref<HTMLElement | null>(null)
@@ -42,20 +42,35 @@ const calendarDays = computed(() => {
       date,
       iso: toISODate(date),
       currentMonth: date.getMonth() === visibleMonth.value.getMonth(),
+      disabled: outOfRange(toISODate(date)),
     }
   })
 })
 
+const MARGIN = 8
+const GAP = 6
+/** Altura usada só na primeira medição, antes de o calendário existir no DOM. */
+const ESTIMATED_HEIGHT = 400
+
 function updatePosition() {
   if (!trigger.value) return
   const rect = trigger.value.getBoundingClientRect()
-  const width = Math.min(320, window.innerWidth - 16)
-  const left = Math.max(8, Math.min(rect.left, window.innerWidth - width - 8))
-  const openAbove = window.innerHeight - rect.bottom < 370 && rect.top > window.innerHeight - rect.bottom
+  const width = Math.min(320, window.innerWidth - 2 * MARGIN)
+  const left = Math.max(MARGIN, Math.min(rect.left, window.innerWidth - width - MARGIN))
+
+  // Altura real quando o calendário já está renderizado: a estimativa antiga era menor que ele,
+  // e numa faixa de alturas de tela abria para baixo cortando o rodapé.
+  const height = calendar.value?.offsetHeight || ESTIMATED_HEIGHT
+  const spaceBelow = window.innerHeight - rect.bottom - GAP
+  const spaceAbove = rect.top - GAP
+  const openAbove = spaceBelow < height && spaceAbove > spaceBelow
+  const preferredTop = openAbove ? rect.top - GAP - height : rect.bottom + GAP
+
   calendarStyle.value = {
     left: `${left}px`,
     width: `${width}px`,
-    ...(openAbove ? { bottom: `${window.innerHeight - rect.top + 6}px` } : { top: `${rect.bottom + 6}px` }),
+    // Não cabendo nem acima nem abaixo, encosta na borda em vez de sair da tela.
+    top: `${Math.max(MARGIN, Math.min(preferredTop, window.innerHeight - height - MARGIN))}px`,
   }
 }
 
@@ -66,13 +81,22 @@ async function toggle() {
   visibleMonth.value = startOfMonth(props.modelValue)
   await nextTick()
   updatePosition()
+  // Segunda passada: a altura do calendário depende da largura, que só existe depois da primeira.
+  await nextTick()
+  updatePosition()
 }
 
 function moveMonth(amount: number) {
   visibleMonth.value = new Date(visibleMonth.value.getFullYear(), visibleMonth.value.getMonth() + amount, 1)
 }
 
+function outOfRange(iso: string) {
+  if (!iso) return false
+  return (!!props.min && iso < props.min) || (!!props.max && iso > props.max)
+}
+
 function selectDate(value: string) {
+  if (outOfRange(value)) return
   emit('update:modelValue', value)
   open.value = false
 }
@@ -156,7 +180,8 @@ onBeforeUnmount(() => {
           v-for="day in calendarDays"
           :key="day.iso"
           type="button"
-          class="aspect-square rounded-lg text-sm transition-colors"
+          class="aspect-square rounded-lg text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent"
+          :disabled="day.disabled"
           :class="[
             day.iso === modelValue
               ? 'bg-primary-600 font-semibold text-white shadow-sm hover:bg-primary-700'
@@ -173,7 +198,7 @@ onBeforeUnmount(() => {
 
       <div class="mt-3 flex items-center justify-between border-t border-gray-100 pt-3 dark:border-gray-700">
         <button type="button" class="text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200" @click="selectDate('')">Limpar</button>
-        <button type="button" class="text-sm font-medium text-primary-600 hover:text-primary-700 dark:text-primary-400" @click="selectDate(today)">Hoje</button>
+        <button type="button" class="text-sm font-medium text-primary-600 hover:text-primary-700 dark:text-primary-400" :disabled="outOfRange(today)" @click="selectDate(today)">Hoje</button>
       </div>
     </div>
   </Teleport>
