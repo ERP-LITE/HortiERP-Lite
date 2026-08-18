@@ -56,6 +56,15 @@ jobs:
       - name: Run integration tests
         run: npm run test:run --workspace=apps/api
 
+      - name: Run web unit tests
+        run: npm test --workspace=apps/web
+
+      - name: Check CSP script hash
+        run: npm run csp:hash
+
+      - name: Check tenant scope on database queries
+        run: npm run check:tenant-scope
+
   deploy-production:
     name: Deploy to Oracle Cloud
     needs: build-and-test

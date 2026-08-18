@@ -6,10 +6,12 @@ dist/
 build/
 
 # Env files
+# `.env` sozinho não cobre variantes: `.env.production` guarda JWT_SECRET, senha do Postgres,
+# senha do backup e as chaves do bucket, e o guia de deploy manda criá-lo na raiz do repositório.
 .env
-.env.local
-.env.*.local
+.env.*
 !.env.example
+!.env.*.example
 
 # Logs
 *.log

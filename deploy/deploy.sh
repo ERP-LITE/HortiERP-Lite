@@ -50,6 +50,19 @@ if [ "$migrate_exit_code" != '0' ]; then
   exit 1
 fi
 
+# O Caddyfile é montado do repositório, não copiado para dentro de uma imagem. Como o `up -d` acima
+# só recria container cujo serviço mudou (imagem ou configuração do Compose), uma alteração no
+# arquivo montado passaria batida e o gateway seguiria com a configuração antiga em memória — foi
+# assim que a CSP nova quase não chegou a produção. `caddy reload` aplica sem derrubar conexão.
+echo "Recarregando configuração do gateway..."
+if ! IMAGE_TAG="$image_tag" docker compose --env-file "$env_file" -f "$compose_file" exec -T gateway \
+  caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile; then
+  echo "Deploy falhou: o Caddyfile novo foi recusado pelo gateway." >&2
+  echo "O gateway segue no ar com a configuração anterior. Verifique a sintaxe de deploy/Caddyfile." >&2
+  IMAGE_TAG="$image_tag" docker compose --env-file "$env_file" -f "$compose_file" logs --tail=50 gateway >&2 || true
+  exit 1
+fi
+
 echo "Validando estado dos containers..."
 IMAGE_TAG="$image_tag" docker compose --env-file "$env_file" -f "$compose_file" ps
 

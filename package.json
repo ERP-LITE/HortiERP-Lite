@@ -12,16 +12,19 @@
     "dev:web": "npm run dev --workspace=apps/web",
     "build:api": "npm run build --workspace=apps/api",
     "build:web": "npm run build --workspace=apps/web",
-    "test": "npm test --workspace=apps/api",
+    "test": "npm test --workspace=apps/api && npm test --workspace=apps/web && npm run csp:hash && npm run check:tenant-scope",
     "test:load": "sh scripts/run-load-test.sh",
     "db:generate": "npm run db:generate --workspace=apps/api",
     "db:migrate": "npm run db:migrate --workspace=apps/api",
     "db:seed": "npm run db:seed --workspace=apps/api",
     "db:seed:platform": "npm run db:seed:platform --workspace=apps/api",
-    "invoices:cleanup": "npm run invoices:cleanup --workspace=apps/api --"
+    "invoices:cleanup": "npm run invoices:cleanup --workspace=apps/api --",
+    "csp:hash": "node scripts/csp-hash.mjs",
+    "check:tenant-scope": "node scripts/check-tenant-scope.mjs"
   },
   "devDependencies": {
     "esbuild": "^0.28.1",
+    "typescript": "^5.5.4",
     "vite": "^8.2.1"
   },
   "engines": {

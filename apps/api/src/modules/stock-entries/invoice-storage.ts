@@ -6,7 +6,7 @@ import { pipeline } from 'node:stream/promises'
 import type { MultipartFile } from '@fastify/multipart'
 import { db } from '../../db/client.js'
 import { stockEntryAttachments } from '../../db/schema/index.js'
-import { count, eq, sql } from 'drizzle-orm'
+import { and, count, eq, sql } from 'drizzle-orm'
 import { env } from '../../shared/config/env.js'
 import { AppError } from '../../shared/errors/AppError.js'
 import { fileTooLargeMessage } from '../../shared/errors/frameworkMessages.js'
@@ -59,11 +59,21 @@ export async function deleteInvoiceFile(storedName: string) {
 
 type DbExecutor = typeof db | Parameters<Parameters<typeof db.transaction>[0]>[0]
 
-async function countAttachments(executor: DbExecutor, stockEntryId: string) {
+/**
+ * O `companyId` no filtro é redundante hoje — a rota já validou a entrada com `getStockEntry` antes
+ * de chegar aqui. Ele existe para a contagem não depender de o chamador ter feito essa checagem:
+ * `stock_entry_attachments` guarda `companyId` justamente para não precisar confiar na rota pai.
+ */
+async function countAttachments(executor: DbExecutor, companyId: string, stockEntryId: string) {
   const [{ total }] = await executor
     .select({ total: count() })
     .from(stockEntryAttachments)
-    .where(eq(stockEntryAttachments.stockEntryId, stockEntryId))
+    .where(
+      and(
+        eq(stockEntryAttachments.companyId, companyId),
+        eq(stockEntryAttachments.stockEntryId, stockEntryId),
+      ),
+    )
   return total
 }
 
@@ -95,7 +105,7 @@ export async function storeInvoiceAttachment(
     throw new AppError('A extensão do arquivo não corresponde ao formato enviado', 422, 'INVALID_FILE_TYPE')
   }
 
-  if ((await countAttachments(db, stockEntryId)) >= MAX_ATTACHMENTS_PER_ENTRY) {
+  if ((await countAttachments(db, companyId, stockEntryId)) >= MAX_ATTACHMENTS_PER_ENTRY) {
     file.file.resume()
     throw attachmentLimitError()
   }
@@ -118,7 +128,7 @@ export async function storeInvoiceAttachment(
 
     return await db.transaction(async (tx) => {
       await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${stockEntryId}, 0))`)
-      if ((await countAttachments(tx, stockEntryId)) >= MAX_ATTACHMENTS_PER_ENTRY) {
+      if ((await countAttachments(tx, companyId, stockEntryId)) >= MAX_ATTACHMENTS_PER_ENTRY) {
         throw attachmentLimitError()
       }
 
