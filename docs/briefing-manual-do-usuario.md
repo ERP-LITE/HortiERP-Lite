@@ -4,6 +4,12 @@
 > pedido curto tipo *"gere o manual descrito neste briefing"*. Tudo que o Claude precisa saber sobre
 > o sistema está aqui — ele não tem acesso ao código nem ao sistema rodando, então **não deve
 > inventar nada que não esteja neste documento**.
+>
+> **Revisão de 18/08/2026:** os fatos deste briefing foram conferidos contra o código-fonte, arquivo
+> por arquivo, e os pontos duvidosos foram testados no sistema rodando. Duas afirmações da versão
+> anterior estavam **erradas** e foram corrigidas: o alerta de estoque baixo (seção 7.3) e a geração
+> do PDF (seção 7.11). Se o comportamento do sistema mudar, corrija aqui também — é este arquivo que
+> gera o manual.
 
 ---
 
@@ -15,6 +21,17 @@ hortifrúti. O manual será entregue ao primeiro cliente junto com o acesso ao s
 O objetivo é bem concreto: **o cliente deve conseguir usar o sistema sem ligar perguntando cada
 passo.** Todo trecho do manual deve ser julgado por isso. Se um parágrafo não responde a uma
 pergunta que alguém faria de verdade, ele não deveria estar lá.
+
+**Dados que o manual precisa citar textualmente:**
+
+- **Endereço de acesso ao sistema:** `https://erp-163-176-246-92.nip.io`
+- **Contato do suporte:** WhatsApp **(47) 99154-0607**
+
+O endereço entra no capítulo do primeiro acesso, com a sugestão de salvar como favorito no navegador
+do computador e na tela inicial do celular — é um endereço comprido e fácil de digitar errado. O
+contato do suporte entra em **três pontos**: primeiro acesso, senha do administrador esquecida e
+Perguntas Frequentes. São os momentos em que a pessoa está travada e não deveria ter que procurar o
+número. Não crie uma seção só para o contato: ele deve estar onde o problema aparece.
 
 ## 2. Quem vai ler
 
@@ -40,7 +57,7 @@ A equipe do cliente — dono/gerente da loja e os funcionários que mexem no est
 - Blocos de destaque curtos onde couber: **Atenção** (o que dá problema), **Dica** (atalho que
   economiza tempo).
 - Onde uma imagem ajudaria muito, deixe um marcador para eu colar a captura depois, no formato:
-  `[CAPTURA: tela de Estoque com o filtro "só estoque baixo" ligado]`
+  `[CAPTURA: tela de Estoque com o filtro "Somente estoque baixo" ligado]`
 - Não prometa nada que não esteja neste briefing. Se algo parecer faltar, escreva
   `[CONFIRMAR: ...]` em vez de supor.
 
@@ -49,8 +66,9 @@ A equipe do cliente — dono/gerente da loja e os funcionários que mexem no est
 1. **Primeiros 30 minutos** — uma página só, o caminho mínimo para o sistema começar a servir:
    entrar, cadastrar categorias e unidades, cadastrar (ou importar) os produtos, lançar o estoque
    inicial, lançar a primeira entrada. É a página mais importante do manual.
-2. **Entrando no sistema** — login, esqueci a senha (falar com o administrador da empresa),
-   trocar a própria senha, sair, e o encerramento automático por inatividade.
+2. **Entrando no sistema** — login, esqueci a senha (falar com o administrador da empresa), **o que
+   fazer quando é o próprio administrador que esqueceu**, trocar a própria senha, sair, e o
+   encerramento automático por inatividade.
 3. **Conhecendo a tela** — menu lateral, o que cada item faz, como funciona no celular.
 4. **Cadastros que vêm antes de tudo** — categorias, unidades de medida, produtos.
 5. **Importar produtos por planilha** — capítulo próprio, é onde mais erram.
@@ -115,7 +133,36 @@ sendo um cartão que abre e fecha ao ser tocado, mostrando os campos daquele reg
 (observações, nomes compridos) aparecem cortados com uma setinha para expandir.
 
 Em quase todas as listas, **dois cliques em cima da linha abrem a edição** — vale mencionar como
-dica, é o atalho que mais economiza tempo.
+dica, é o atalho que mais economiza tempo. **No celular não existe duplo clique:** lá a pessoa toca
+no cartão para expandi-lo, e o **lápis aparece dentro do cartão aberto**. Diga isso de forma direta,
+senão quem usa no depósito fica sem saber como editar.
+
+**Perfil e Sair** ficam no menu que abre ao clicar no **círculo com as iniciais do usuário, no canto
+superior direito da tela**. No celular aparece só o círculo, sem o nome ao lado.
+
+Ao lado desse círculo existe um botão que **alterna entre modo claro e modo escuro** (a dica do botão
+diz "Ativar modo escuro" / "Ativar modo claro"). Vale duas linhas no manual: quem clicar sem querer e
+vir a tela ficar preta precisa saber que não quebrou nada e como voltar.
+
+### 6.1 Nomes exatos dos botões
+
+Use estes nomes, em negrito, exatamente como estão. Não invente variação nem sinônimo:
+
+| Onde | Nome do botão |
+|---|---|
+| Criar categoria | **Nova categoria** |
+| Criar unidade | **Nova unidade** |
+| Criar produto | **Novo produto** |
+| Abrir a importação de planilha | **Importar planilha** |
+| Baixar o modelo da planilha | **Baixar planilha modelo** |
+| Lançar entrada | **Nova entrada** |
+| Registrar perda | **Registrar perda** (não "Nova perda") |
+| Cancelar uma perda | **Cancelar perda** |
+| Conferência de estoque em lote | **Ajuste em lote** |
+| Criar usuário | **Novo usuário** |
+| Filtro de estoque baixo | **Somente estoque baixo** |
+| Filtro de perdas canceladas | **Mostrar perdas canceladas** |
+| Gerar o PDF do relatório | **Gerar PDF** |
 
 ---
 
@@ -128,9 +175,19 @@ cliente**, não copie.
 
 - O login é por **e-mail e senha**. O e-mail não diferencia maiúsculas de minúsculas: pode digitar
   como quiser.
-- Não existe "esqueci minha senha" por e-mail. Quem redefine é o administrador da empresa, pela tela
-  de Usuários. Isso precisa estar claro no manual.
-- Cada um troca a própria senha em **Perfil**, informando a senha atual, a nova e a confirmação.
+- **O sistema não envia e-mail nenhum** — nem de boas-vindas, nem de recuperação de senha. Isso muda
+  a expectativa de quem está acostumado com o "esqueci minha senha" de outros sites, e precisa estar
+  explícito no manual.
+- Quem redefine a senha de um funcionário é o **administrador da empresa**, pela tela de Usuários.
+- **E se quem esqueceu for o próprio administrador?** Se a empresa tem mais de um administrador, o
+  outro redefine normalmente pela tela de Usuários. Se houver só um e for ele quem esqueceu, ninguém
+  dentro da empresa consegue resolver: é preciso falar com o suporte, pelo WhatsApp
+  **(47) 99154-0607**. Acrescente uma **Dica** recomendando cadastrar um segundo administrador de
+  confiança desde o começo — é a diferença entre um problema de dois minutos e uma manhã parada.
+- Cada um troca a própria senha em **Perfil**, informando a senha atual, a nova e a confirmação. O
+  acesso a **Perfil** e a **Sair** está no menu do círculo com as iniciais, no canto superior direito.
+- A conta da empresa e o **primeiro administrador** (nome, e-mail e senha) são criados por mim, o
+  fornecedor, que entrega as credenciais direto ao cliente. Não existe autocadastro.
 - **Encerramento automático:** 30 minutos sem usar e a sessão cai. No último minuto aparece um aviso
   com contagem regressiva. Para continuar conectado é preciso **clicar no botão do aviso** — só mexer
   o mouse não resolve, e isso é de propósito: assim ninguém deixa o sistema aberto e destravado num
@@ -155,17 +212,30 @@ cliente**, não copie.
 - **O estoque do produto não é digitado na tela do produto.** Um produto novo nasce com estoque zero,
   e o saldo só muda por entrada, perda ou ajuste. Isso confunde muita gente e merece um **Atenção**.
 - **Estoque mínimo** é o que liga o alerta de "estoque baixo": o sistema avisa quando o saldo fica
-  igual ou menor que esse número. Produto com estoque mínimo zero nunca aparece no alerta.
+  **igual ou menor** que esse número.
+- **Atenção, isto foi testado e costuma surpreender:** como zero é igual a zero, produto **sem**
+  estoque mínimo definido *também* aparece no alerta enquanto o saldo dele estiver zerado. Na prática,
+  quem segue o capítulo 1 e cadastra os produtos antes de lançar o estoque vai ver **o catálogo
+  inteiro** acusado como estoque baixo. Isso é normal e se resolve no passo do estoque inicial. O
+  manual precisa avisar antes, senão o cliente liga achando que o sistema está errado.
 - **Custo** é o que alimenta o "valor em estoque" do painel e o valor das perdas. Produto sem custo
   entra nas contas valendo zero — outro **Atenção** importante.
 
 ### 7.4 Importar produtos por planilha
 
-Fica na tela de **Produtos**. É o caminho para o primeiro carregamento do cadastro. Limite de **2000
-linhas** por vez.
+Fica na tela de **Produtos**, no botão **Importar planilha**. É o caminho para o primeiro
+carregamento do cadastro. Limite de **2000 linhas** por vez.
 
-- Colunas: nome, categoria, unidade, SKU, custo, preço de venda, estoque mínimo e estoque atual, e
-  se o produto está ativo.
+- **Existe um botão "Baixar planilha modelo"** dentro da tela de importação. Ele baixa uma planilha
+  com os cabeçalhos certos e duas linhas de exemplo já preenchidas. **Coloque esse download como
+  primeiro passo do capítulo** — é o que mais evita erro de importação.
+- São **dez** colunas, e estes são os cabeçalhos do modelo, nesta ordem: `nome`, `categoria`,
+  `unidade`, `codigo`, `codigo de barras`, `custo`, `preco de venda`, `estoque minimo`,
+  `estoque atual`, `ativo`. Só **nome, categoria e unidade** são obrigatórias; as outras podem ficar
+  em branco.
+- Um cuidado de vocabulário: a coluna `codigo` é o mesmo campo que o cadastro do produto chama de
+  **SKU** (código interno). No modelo a palavra "SKU" não aparece, então explique a equivalência em
+  vez de trocar o nome da coluna.
 - Na coluna de unidade pode escrever **o nome ou a abreviação** ("Quilograma" ou "kg"). Foi feito
   assim porque na planilha ninguém escreve o nome completo.
 - Números aceitam **os dois formatos**: `1.234,56` (brasileiro) e `1234.56` (americano).
@@ -195,7 +265,8 @@ Uma entrada tem:
   ser alterada depois de salvar**, então vale conferir antes.
 - **Nota fiscal (opcional):** número, série, chave de acesso, data de emissão e valor total. A data
   de emissão da nota é independente da data da entrada: a nota pode ter sido emitida num dia e a
-  mercadoria ter chegado noutro.
+  mercadoria ter chegado noutro. A **chave de acesso** tem de ter **exatamente 44 dígitos** — chave
+  incompleta é recusada, e vale dizer isso para o cliente não achar que é defeito.
 - **Itens:** produto, quantidade e, se quiser, o custo unitário daquele recebimento.
 - **Anexos:** até **3 arquivos** por entrada, em XML, PDF, JPG, PNG ou WEBP, até 10 MB cada.
 
@@ -242,7 +313,14 @@ observações são editáveis.
 motivo e devolve a quantidade ao estoque. A perda cancelada:
 
 - continua no histórico, com a marca **Cancelada** e a quantidade riscada;
-- **sai** dos relatórios e de todos os números do painel;
+- **sai** dos relatórios e dos valores de perda do painel;
+- **gera um ajuste automático no histórico de movimentações**, devolvendo a quantidade ao estoque,
+  com a observação "Estorno de perda cancelada" seguida do motivo digitado. Isso foi testado: depois
+  de cancelar uma perda de 10 unidades ficam **dois** movimentos no histórico — a perda de −10 e um
+  ajuste de +10. Esse ajuste **não foi lançado por ninguém à mão**, é o próprio sistema registrando a
+  devolução para o histórico não ter buraco sem explicação. Sem essa frase no manual, o cliente liga
+  perguntando que ajuste é aquele. Note também que, por ser um ajuste, ele continua aparecendo no
+  gráfico de movimentações do painel — só os *valores de perda* é que saem;
 - sai da lista de perdas, e volta a aparecer se ligar o filtro **Mostrar perdas canceladas**;
 - na planilha exportada, aparece na coluna de situação, e o valor perdido sai em branco para não ser
   somado por engano.
@@ -257,10 +335,13 @@ Uma perda já cancelada não aceita mais correção, e a linha dela nem abre no 
 
 ### 7.8 Consulta de estoque e movimentações
 
-- **Estoque** lista os produtos com o saldo atual e tem o filtro **só estoque baixo**.
+- **Estoque** lista os produtos com o saldo atual e tem o filtro **Somente estoque baixo**.
 - **Movimentações** é o histórico completo e imutável de tudo que mexeu no estoque, com três tipos:
   **entrada**, **perda** e **ajuste**. Filtra por produto, tipo e período, e mostra o usuário
   responsável por cada movimento.
+- Sobre os **ajustes**: parte deles é lançada à mão na conferência de estoque, mas parte é
+  **automática** — criada pelo sistema quando uma perda é cancelada ou quando entra o estoque inicial
+  de uma importação. Diga isso, senão o ajuste que aparece sozinho parece erro.
 - Cada movimento guarda o **saldo que ficou depois dele**, o que permite reconstruir a história do
   produto.
 
@@ -308,23 +389,50 @@ Duas coisas que geram dúvida e precisam de explicação:
 - Produto sem saldo **conta** na quantidade de produtos da categoria, mas não aparece nas quantidades.
 - Produtos inativos não entram em nenhum número do painel.
 
-**Período:** o padrão são os últimos 30 dias e o máximo é **90 dias** por consulta. O dia é sempre o
-dia inteiro no horário de Brasília — escolher "hoje" traz o que foi lançado às 8h e o que foi lançado
-às 23h30.
+- A **contagem** de produtos com estoque baixo é completa, mas a **lista** que aparece embaixo mostra
+  no máximo **10 produtos**. Vale uma frase, no mesmo espírito da observação sobre os "5 maiores".
+
+**Período:** o padrão são os últimos 30 dias e o máximo é **90 dias** por consulta. Um detalhe que
+precisa estar no manual: o painel **corta em silêncio** — pedir seis meses devolve os últimos 90 dias
+sem nenhum aviso na tela. O dia é sempre o dia inteiro no horário de Brasília — escolher "hoje" traz
+o que foi lançado às 8h e o que foi lançado às 23h30.
 
 ### 7.11 Relatórios
 
-- Indicadores no topo, detalhamento de perdas e entradas embaixo, com pesquisa e filtro de período.
-- **PDF:** gerado pelo diálogo de impressão do navegador. O documento sai com título, período, data de
-  emissão e o nome de quem emitiu. Vale um passo a passo curto de como salvar como PDF em vez de
-  imprimir, porque é exatamente o tipo de coisa que gera ligação.
-- **Planilha:** as telas de Produtos, Estoque, Movimentações, Entradas e Perdas exportam a lista para
-  planilha, já no formato que o **Excel em português** abre certo, com os números na vírgula. Diga que
-  o arquivo abre direto no Excel — sem falar em CSV, ponto e vírgula ou codificação.
+A tela tem **três abas**, e o cliente escolhe uma antes de tudo:
+
+| Aba | O que traz |
+|---|---|
+| **Estoque por categoria** | situação atual do estoque; **esta aba não tem filtro de período** |
+| **Perdas por período** | indicadores e detalhamento das perdas |
+| **Entradas por período** | indicadores e detalhamento das entradas |
+
+Cada aba mostra indicadores no topo e o detalhamento embaixo, com pesquisa e filtro de período.
+
+**PDF — este ponto errou na versão anterior do manual e precisa sair certo.** Existe um botão
+**Gerar PDF** na própria tela de Relatórios, e ele **não** é um atalho para o Ctrl+P: o botão primeiro
+reúne **todas as páginas** do relatório e estampa a data de emissão, e só depois abre a impressão do
+navegador. Quem aperta Ctrl+P direto imprime **apenas as linhas que estão na tela naquele momento** —
+se o mês tem 300 perdas e a tela mostra 15, o PDF sai com 15 linhas parecendo completo, e é esse
+arquivo que vai para o contador.
+
+O passo a passo do manual, portanto, é: escolher a aba e o período → clicar em **Gerar PDF** (esperar
+um instante, ele carrega o relatório inteiro) → no diálogo de impressão que abre, escolher **Salvar
+como PDF** em vez de uma impressora → salvar. Ponha um **Atenção** dizendo para não usar o Ctrl+P
+direto, e por quê. O documento sai com título, período, data de emissão e o nome de quem emitiu.
+
+**Planilha:** o botão de exportar **não tem texto — é um ícone de seta para baixo** na barra de cima
+da tela. Diga isso, ou o cliente procura um botão escrito "Exportar" e não acha. Duas informações que
+valem: ele exporta **tudo que os filtros estão mostrando, não só a página que está na tela**; e as
+telas que têm esse botão são **Produtos, Estoque, Movimentações, Entradas, Perdas e Logs de
+atividades**. O arquivo sai no formato que o **Excel em português** abre certo, com os números na
+vírgula — diga que abre direto no Excel, sem falar em CSV, ponto e vírgula ou codificação.
 
 ### 7.12 Usuários
 
-Só o administrador. Cadastra nome, e-mail, perfil e senha, e pode desativar quem saiu da empresa.
+Só o administrador. Cadastra nome, e-mail, perfil e senha, e pode desativar quem saiu da empresa. A
+senha precisa ter **no mínimo 8 caracteres** — informe isso, senão o administrador topa com o aviso
+sem entender.
 
 Duas travas que parecem defeito e não são, e por isso entram no manual:
 
@@ -346,23 +454,26 @@ Transforme cada uma numa entrada da seção de Perguntas Frequentes, com respost
 o capítulo correspondente:
 
 1. Cadastrei o produto e o estoque ficou zero. Por quê?
-2. Como coloco o estoque que já tenho hoje na loja?
-3. Esqueci de lançar a entrada de ontem. Posso lançar com a data de ontem?
-4. Lancei a entrada com a quantidade errada. Como conserto?
-5. Lancei com a data errada. Como conserto?
-6. Lancei uma perda que não existiu. Como apago?
-7. Sumiu uma perda da lista. Para onde foi?
-8. Por que o sistema não deixa eu registrar essa perda?
-9. Por que o valor em estoque está R$ 0,00 se tem mercadoria?
-10. Por que o gráfico de categoria mostra "8" e não os quilos?
-11. Esqueci minha senha.
-12. O sistema me desconectou sozinho.
-13. O PDF da nota não abre no meu celular.
-14. Minha importação de planilha não passou e não entrou nada.
-15. Qual a diferença entre lançar uma perda e ajustar o estoque?
-16. Como mando o relatório do mês para o contador?
-17. O funcionário saiu. O que faço com o acesso dele?
-18. Quero ver quem alterou aquele produto.
+2. Cadastrei tudo e o painel diz que **todos** os produtos estão com estoque baixo. Está errado?
+3. Como coloco o estoque que já tenho hoje na loja?
+4. Esqueci de lançar a entrada de ontem. Posso lançar com a data de ontem?
+5. Lancei a entrada com a quantidade errada. Como conserto?
+6. Lancei com a data errada. Como conserto?
+7. Lancei uma perda que não existiu. Como apago?
+8. Sumiu uma perda da lista. Para onde foi?
+9. Cancelei uma perda e apareceu um **ajuste** que eu não lancei. Que ajuste é esse?
+10. Por que o sistema não deixa eu registrar essa perda?
+11. Por que o valor em estoque está R$ 0,00 se tem mercadoria?
+12. Por que o gráfico de categoria mostra "8" e não os quilos?
+13. Esqueci minha senha.
+14. O administrador esqueceu a senha dele. E agora?
+15. O sistema me desconectou sozinho.
+16. O PDF da nota não abre no meu celular.
+17. Minha importação de planilha não passou e não entrou nada.
+18. Qual a diferença entre lançar uma perda e ajustar o estoque?
+19. Como mando o relatório do mês para o contador?
+20. O funcionário saiu. O que faço com o acesso dele?
+21. Quero ver quem alterou aquele produto.
 
 ## 9. O que NÃO entra no manual
 
@@ -381,6 +492,10 @@ Importante, para não vazar coisa que não é do cliente:
 
 Um único arquivo Markdown, pronto para eu revisar e virar PDF. Sumário com links internos, títulos
 numerados, tabelas onde couber, e os marcadores `[CAPTURA: ...]` nos pontos onde a imagem ajuda.
+
+**Não deve sobrar nenhum `[CONFIRMAR]` no manual final.** O endereço de acesso, o contato do suporte e
+os nomes de todos os botões estão neste briefing (seções 1 e 6.1). Se ainda assim faltar algum dado,
+use `[CONFIRMAR: ...]` em vez de supor — mas confira antes se a resposta não está aqui.
 
 Comece o documento com uma abertura de dois parágrafos explicando, em linguagem de dono de loja, o
 que o sistema resolve: saber o que tem em estoque, o que entrou, o que se perdeu e quanto isso custou
