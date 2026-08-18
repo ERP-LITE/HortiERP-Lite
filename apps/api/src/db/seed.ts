@@ -40,7 +40,23 @@ function dateDaysAgo(days: number) {
   return date
 }
 
+/**
+ * O seed cria contas de demonstração com senha conhecida (`admin123` e companhia). Rodá-lo contra
+ * produção entrega um administrador completo de uma empresa-cliente a quem souber o padrão — e o
+ * comando é vizinho do `db:migrate` no roteiro de deploy, então o erro é fácil de cometer.
+ * Mesma postura de `env.ts` com o JWT_SECRET e de `assertTestDatabase` nos testes: recusar, não avisar.
+ */
+function assertNotProduction() {
+  if (process.env.NODE_ENV !== 'production') return
+
+  console.error('Seed recusado: NODE_ENV=production.')
+  console.error('Este comando cria usuários de demonstração com senha conhecida e nunca deve rodar em produção.')
+  console.error('Para criar o primeiro acesso de uma instalação real, use: npm run db:seed:platform')
+  process.exit(1)
+}
+
 async function run() {
+  assertNotProduction()
   console.log('Iniciando seed...')
 
   await db.transaction(async (tx) => {

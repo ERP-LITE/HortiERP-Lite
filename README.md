@@ -107,6 +107,16 @@ npm test
 O comando cria o container `hortierp-tests-postgres-test-1`, aplica as migrations, executa os testes e remove o
 container ao terminar. A suíte recusa executar se o nome do banco em `DATABASE_URL` não contiver `test`.
 
+Em seguida rodam os testes unitários do frontend (`apps/web/tests`, sem banco nem navegador — hoje cobrem a proteção
+contra fórmula nas planilhas exportadas) e duas verificações estáticas:
+
+- `npm run csp:hash` — confere se o hash de `script-src` na CSP ainda corresponde ao script inline de
+  `apps/web/index.html`.
+- `npm run check:tenant-scope` — lê o código da API com o AST do TypeScript e acusa consulta a tabela multiempresa numa
+  função que não menciona `companyId`. Como o banco não tem RLS, o isolamento entre empresas depende desse filtro estar
+  escrito em toda consulta; a verificação existe para o esquecimento aparecer no CI e não em produção. Ver
+  [decisões arquiteturais](./docs/decisoes-arquiteturais.md#o-verificador-que-substitui-a-rede-de-proteção-por-enquanto).
+
 O workflow em `.github/workflows/ci.yml` também executa os builds da API e do frontend, aplica as migrations em um
 banco descartável e roda a suíte a cada push e pull request.
 

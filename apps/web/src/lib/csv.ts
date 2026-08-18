@@ -1,6 +1,32 @@
 
 const BOM = '\uFEFF'
 
+/**
+ * Excel e LibreOffice avaliam como **fórmula** toda célula que comece com `=`, `+`, `-`, `@`,
+ * tabulação ou retorno de carro. Como as planilhas exportadas levam texto digitado pelo usuário
+ * (nome de produto, observação, motivo), um valor como `=HYPERLINK("http://…"&A1;"clique")` viraria
+ * fórmula viva na máquina de quem abre o arquivo — quem exporta é normalmente o administrador, e
+ * quem digitou pode ser um operador. O apóstrofo à frente faz a planilha tratar a célula como texto
+ * e não é exibido.
+ */
+const FORMULA_TRIGGER = /^[=+\-@\t\r]/
+
+/**
+ * Número no formato brasileiro, inclusive negativo. Ele dispara o `-` do teste acima sem ser
+ * ameaça, e prefixá-lo transformaria quantidade em texto — a planilha pararia de somar a coluna.
+ */
+const NUMERIC_CELL = /^-?(?:\d+|\d{1,3}(?:\.\d{3})+)(?:,\d+)?$/
+
+function protectFromFormula(text: string) {
+  if (!FORMULA_TRIGGER.test(text) || NUMERIC_CELL.test(text)) return text
+  return `'${text}`
+}
+
+/** Inverso de `protectFromFormula`, para o arquivo exportado voltar pela importação sem o apóstrofo. */
+function unprotectFromFormula(text: string) {
+  return text.startsWith("'") && FORMULA_TRIGGER.test(text.slice(1)) ? text.slice(1) : text
+}
+
 function detectDelimiter(firstLine: string) {
   const candidates = [';', ',', '\t']
   let best = ';'
@@ -81,11 +107,13 @@ export function parseCsv(input: string): string[][] {
     rows.push(row)
   }
 
-  return rows.filter((item) => item.some((cell) => cell.trim() !== ''))
+  return rows
+    .filter((item) => item.some((cell) => cell.trim() !== ''))
+    .map((item) => item.map(unprotectFromFormula))
 }
 
 function escapeCell(value: unknown) {
-  const text = value === null || value === undefined ? '' : String(value)
+  const text = protectFromFormula(value === null || value === undefined ? '' : String(value))
   return /[";,\n\r]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text
 }
 

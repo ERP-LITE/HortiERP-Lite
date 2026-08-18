@@ -105,6 +105,13 @@ O deploy reconstrói API, frontend e backup. O serviço `migrate` aplica a migra
 dados existentes permanecem no volume `postgres_production_data`. Não execute `docker compose down -v`, pois `-v`
 remove os volumes persistentes do banco, dos anexos e dos backups.
 
+**Configuração do gateway é caso à parte.** O `deploy/Caddyfile` é *montado* do repositório, não copiado para dentro de
+uma imagem, e o `docker compose up -d` só recria container cujo serviço mudou — imagem ou configuração do Compose.
+Alteração no arquivo montado é invisível para o Compose, então o gateway seguiria servindo com a configuração antiga em
+memória. Por isso `deploy.sh` termina com um `caddy reload`: aplica sem derrubar conexão e, se o arquivo estiver
+inválido, **recusa e mantém a configuração anterior no ar** — o deploy falha em vez de derrubar o site. O
+`deploy/nginx.conf` não precisa disso: ele entra na imagem do frontend (`COPY`) e chega pelo rebuild.
+
 Confirme a migration, os serviços e o novo volume:
 
 ```bash
@@ -175,6 +182,46 @@ docker compose --env-file .env.production -f docker-compose.production.yml exec 
 retroativas já gravadas continuam lá, e voltam a valer quando a versão atual retornar — mas, enquanto a versão anterior
 estiver no ar, o histórico e o painel voltam a filtrar por `created_at`, então uma movimentação retroativa aparece no dia
 em que foi digitada.
+
+## Dois cuidados que o deploy não perdoa
+
+### `npm run db:seed` nunca em produção
+
+`db:seed` cria a empresa Demo e três contas com senha conhecida (`admin123` e companhia). O comando é
+vizinho de `db:migrate` no roteiro, e o erro de rodar os dois juntos numa instalação real entregaria um
+**administrador completo de uma empresa-cliente** a quem souber o padrão.
+
+Hoje o próprio script recusa: `assertNotProduction` aborta com código 1 quando `NODE_ENV=production`,
+sem tocar no banco. Para criar o primeiro acesso de uma instalação real o comando é
+`npm run db:seed:platform`, que exige `PLATFORM_ADMIN_EMAIL` e `PLATFORM_ADMIN_PASSWORD` e não tem
+senha embutida.
+
+### O `.env.production` fica fora do Git
+
+O arquivo guarda `POSTGRES_PASSWORD`, `JWT_SECRET`, `BACKUP_ENCRYPTION_PASSWORD` e as chaves de acesso
+do bucket de backup. O `.gitignore` cobre `.env.*` justamente por isso — antes cobria só `.env`, e
+`.env.production` ficava rastreável no diretório onde este guia manda criá-lo.
+
+Se em algum momento ele **foi** comitado, remover do histórico não basta: trate as quatro chaves como
+queimadas e troque todas. `JWT_SECRET` vazado permite forjar sessão de qualquer usuário de qualquer
+empresa, e a chave do bucket dá acesso aos backups.
+
+Confira antes de um `git add` no servidor:
+
+```bash
+git check-ignore -v .env.production   # deve responder com a regra que o ignora
+git status --short | grep -i env      # não deve listar nada além dos .example
+```
+
+### Ao mexer no `index.html`, recalcule o hash da CSP
+
+A CSP autoriza o único script inline do `index.html` por `sha256-…`, em vez de liberar
+`'unsafe-inline'` (ver [decisões arquiteturais](./decisoes-arquiteturais.md#csp-sem-unsafe-inline-o-hash-do-script-do-tema)).
+O hash aparece em `deploy/Caddyfile` e duas vezes em `deploy/nginx.conf`.
+
+A falha é silenciosa: hash divergente bloqueia o script e o tema escuro volta a piscar branco no
+carregamento — nada quebra, e ninguém percebe até o cliente reclamar. O CI roda `npm run csp:hash` e
+falha o build; localmente, `npm run csp:hash -- --write` atualiza os três lugares.
 
 ## Deploy automático pelo GitHub Actions
 

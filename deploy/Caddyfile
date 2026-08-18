@@ -1,13 +1,18 @@
 {$APP_DOMAIN} {
 	encode zstd gzip
 
+	# ATENÇÃO: o hash em script-src é do único <script> inline de apps/web/index.html — o que aplica
+	# o tema antes da primeira pintura. Ele é inline de propósito: num arquivo externo chegaria depois
+	# do primeiro quadro e o modo escuro piscaria branco. Mudar aquele script exige recalcular o hash:
+	#   npm run csp:hash
+	# Se divergir, o script é bloqueado e o tema só é aplicado depois que o Vue monta (volta o piscado).
 	header {
 		Strict-Transport-Security "max-age=31536000; includeSubDomains"
 		X-Content-Type-Options "nosniff"
 		X-Frame-Options "DENY"
 		Referrer-Policy "strict-origin-when-cross-origin"
 		Permissions-Policy "camera=(), microphone=(), geolocation=()"
-		Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; frame-src blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+		Content-Security-Policy "default-src 'self'; script-src 'self' 'sha256-oE4Kg4n7TtACoc6A3k0Po1UGbOzPabV/EugI3MC3myU='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; frame-src blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
 		-Server
 	}
 
