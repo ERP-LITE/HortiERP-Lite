@@ -23,3 +23,8 @@ export async function exitImpersonation() {
 export async function changePassword(currentPassword: string, newPassword: string) {
   await api.patch('/auth/password', { currentPassword, newPassword })
 }
+
+export async function fetchOwnPersonalData() {
+  const { data } = await api.get<Record<string, unknown>>('/auth/me/personal-data')
+  return data
+}

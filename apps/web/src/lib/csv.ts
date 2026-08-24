@@ -1,3 +1,4 @@
+import { downloadBlob } from './download'
 
 const BOM = '\uFEFF'
 
@@ -132,14 +133,7 @@ export function csvNumber(value: string | number | null | undefined, decimals = 
 
 export function downloadCsv(fileName: string, content: string) {
   const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' })
-  const url = URL.createObjectURL(blob)
-  const link = document.createElement('a')
-  link.href = url
-  link.download = fileName.endsWith('.csv') ? fileName : `${fileName}.csv`
-  document.body.appendChild(link)
-  link.click()
-  document.body.removeChild(link)
-  URL.revokeObjectURL(url)
+  downloadBlob(fileName.endsWith('.csv') ? fileName : `${fileName}.csv`, blob)
 }
 
 export async function readSpreadsheetFile(file: File) {

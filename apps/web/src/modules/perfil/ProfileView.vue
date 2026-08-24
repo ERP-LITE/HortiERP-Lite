@@ -4,9 +4,11 @@ import PageHeader from '@/components/ui/PageHeader.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import { useAuthStore } from '@/stores/auth'
-import { changePassword } from '@/services/authService'
+import { changePassword, fetchOwnPersonalData } from '@/services/authService'
 import { getApiErrorMessage } from '@/services/api'
-import { toastSuccess } from '@/lib/alerts'
+import { toastError, toastSuccess } from '@/lib/alerts'
+import { Download } from '@lucide/vue'
+import { downloadBlob } from '@/lib/download'
 import type { UserRole } from '@/types'
 
 const auth = useAuthStore()
@@ -45,6 +47,24 @@ async function handleSubmit() {
     saving.value = false
   }
 }
+
+const downloading = ref(false)
+
+async function handleDownloadPersonalData() {
+  if (downloading.value) return
+
+  downloading.value = true
+  try {
+    const data = await fetchOwnPersonalData()
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+    downloadBlob(`meus-dados-${new Date().toISOString().slice(0, 10)}.json`, blob)
+    toastSuccess('Download dos seus dados iniciado')
+  } catch (error) {
+    toastError(getApiErrorMessage(error, 'Não foi possível baixar seus dados'))
+  } finally {
+    downloading.value = false
+  }
+}
 </script>
 
 <template>
@@ -70,6 +90,24 @@ async function handleSubmit() {
             </dd>
           </div>
         </dl>
+
+        <div class="mt-6 border-t border-gray-100 dark:border-gray-700 pt-4">
+          <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300">Meus dados pessoais</h3>
+          <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+            Baixe tudo o que o sistema guarda sobre você: seu cadastro e o histórico das ações que você
+            registrou. O arquivo é seu e pode ser aberto em qualquer computador.
+          </p>
+          <BaseButton
+            type="button"
+            variant="secondary"
+            class="mt-3"
+            :disabled="downloading"
+            @click="handleDownloadPersonalData"
+          >
+            <Download :size="16" />
+            {{ downloading ? 'Preparando...' : 'Baixar meus dados' }}
+          </BaseButton>
+        </div>
       </div>
 
       <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">

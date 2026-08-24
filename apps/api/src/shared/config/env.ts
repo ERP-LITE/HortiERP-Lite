@@ -28,6 +28,12 @@ const envSchema = z
       .transform((value) => value === 'true'),
     INVOICE_STORAGE_PATH: z.string().min(1).default('./storage/invoices'),
     INVOICE_MAX_FILE_SIZE: z.coerce.number().int().positive().default(10 * 1024 * 1024),
+    TECHNICAL_LOG_RETENTION_DAYS: z.coerce
+      .number()
+      .int()
+      .min(180, 'TECHNICAL_LOG_RETENTION_DAYS não pode ser menor que 180 dias (Marco Civil, art. 15)')
+      .default(180),
+    AUDIT_RETENTION_DAYS: z.coerce.number().int().min(1).default(5 * 365),
   })
   .superRefine((value, context) => {
     if (value.NODE_ENV !== 'production') return

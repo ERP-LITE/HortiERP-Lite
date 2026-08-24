@@ -54,6 +54,21 @@ const TRAVESSIAS_LEGITIMAS = [
     tabela: 'stockEntryAttachments',
     motivo: 'manutenção operacional: varre o disco de todas as empresas comparando com o banco, por definição transversal',
   },
+  {
+    arquivo: 'modules/retention/retention.service.ts',
+    tabela: 'systemLogs',
+    motivo: 'retenção de dados: o corte é por data, não por empresa — filtrar por empresa deixaria log vencido de outra para trás',
+  },
+  {
+    arquivo: 'modules/retention/retention.service.ts',
+    tabela: 'activityLogs',
+    motivo: 'retenção de dados: o corte é por data, não por empresa — filtrar por empresa deixaria log vencido de outra para trás',
+  },
+  {
+    arquivo: 'modules/retention/retention.service.ts',
+    tabela: 'users',
+    motivo: 'anonimização por prazo de exclusão, transversal por definição: roda sem sessão e precisa alcançar todas as empresas',
+  },
 ]
 
 const IGNORAR_PASTAS = new Set(['migrations', 'schema'])

@@ -95,8 +95,10 @@ A suíte de integração usa um PostgreSQL temporário e isolado na porta `5434`
 permissões, invalidação de sessão, concorrência de estoque, busca/paginação, integridade de dados (índices únicos),
 identidade de e-mail sem depender de maiúsculas, identificação do usuário responsável pelas operações, impersonação
 (incluindo a recusa da empresa Plataforma), agregações do painel, controle manual de cobranças, data retroativa de
-entradas e perdas (limites e coerência entre listagem, histórico e painel) e a garantia de que nenhuma mensagem de erro
-chega ao cliente em inglês.
+entradas e perdas (limites e coerência entre listagem, histórico e painel), a garantia de que nenhuma mensagem de erro
+chega ao cliente em inglês e o tratamento de dados pessoais: expurgo dos logs por prazo, anonimização de usuário
+excluído (inclusive do nome que fica no histórico de atividades), exportação dos dados do próprio titular sem vazar
+atividade de colega, e a exclusão definitiva de uma empresa sem encostar na empresa vizinha.
 
 Com Docker disponível, execute na raiz:
 
@@ -114,8 +116,18 @@ contra fórmula nas planilhas exportadas) e duas verificações estáticas:
   `apps/web/index.html`.
 - `npm run check:tenant-scope` — lê o código da API com o AST do TypeScript e acusa consulta a tabela multiempresa numa
   função que não menciona `companyId`. Como o banco não tem RLS, o isolamento entre empresas depende desse filtro estar
-  escrito em toda consulta; a verificação existe para o esquecimento aparecer no CI e não em produção. Ver
+  escrito em toda consulta; a verificação existe para o esquecimento aparecer no CI e não em produção. As poucas
+  consultas transversais de propósito — login por e-mail, manutenção operacional e retenção de dados por data — estão
+  declaradas com justificativa no próprio verificador. Ver
   [decisões arquiteturais](./docs/decisoes-arquiteturais.md#o-verificador-que-substitui-a-rede-de-proteção-por-enquanto).
+
+Manutenção de dados pessoais (rodada por linha de comando, não pela interface):
+
+- `npm run data:retention` — apaga log técnico e trilha de auditoria vencidos e anonimiza usuário excluído há mais que o
+  prazo. Aceita `--dry-run`. Deve ser agendado por cron em produção; ver
+  [deploy em produção](./docs/deploy-producao.md).
+- `npm run data:erase-company` — apaga em definitivo todos os dados de uma empresa e os arquivos de nota fiscal dela.
+  Irreversível: exige `--id` e `--confirm` com o nome exato, e não tem equivalente na interface de propósito.
 
 O workflow em `.github/workflows/ci.yml` também executa os builds da API e do frontend, aplica as migrations em um
 banco descartável e roda a suíte a cada push e pull request.

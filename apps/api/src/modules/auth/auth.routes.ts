@@ -5,6 +5,7 @@ import { AppError } from '../../shared/errors/AppError.js'
 import { getCompany } from '../companies/companies.service.js'
 import { changePasswordSchema, loginSchema } from './auth.schema.js'
 import { authenticateUser, changeOwnPassword, getUserProfile } from './auth.service.js'
+import { exportOwnPersonalData } from './personal-data.service.js'
 
 export async function authRoutes(app: FastifyInstance) {
   app.post(
@@ -75,6 +76,26 @@ export async function authRoutes(app: FastifyInstance) {
       companyName: user.company.name,
     }
   })
+
+  /**
+   * Direito de acesso e portabilidade do titular (LGPD, art. 18, II e V): a pessoa baixa os
+   * próprios dados sem depender de pedido ao administrador. Limitado porque é uma consulta pesada
+   * e ninguém precisa exportar os próprios dados mais de uma vez por minuto.
+   */
+  app.get(
+    '/auth/me/personal-data',
+    { preHandler: [authenticate], config: { rateLimit: { max: 5, timeWindow: '1 minute' } } },
+    async (request, reply) => {
+      const data = await exportOwnPersonalData(
+        request.user.realCompanyId ?? request.user.companyId,
+        request.user.sub,
+      )
+
+      const date = new Date().toISOString().slice(0, 10)
+      reply.header('content-disposition', `attachment; filename="meus-dados-${date}.json"`)
+      return data
+    },
+  )
 
   app.patch(
     '/auth/password',
