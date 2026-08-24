@@ -300,7 +300,7 @@ exporta é normalmente o administrador**, então o efeito acontece na máquina d
 
 ## CSP sem `unsafe-inline`: o hash do script do tema
 
-A CSP de produção (`deploy/Caddyfile`, repetida em `deploy/nginx.conf`) autoriza scripts por **hash**,
+A CSP de produção (`deploy/caddy/Caddyfile`, repetida em `deploy/nginx.conf`) autoriza scripts por **hash**,
 não por `'unsafe-inline'`. A diferença importa porque `'unsafe-inline'` anula a CSP como rede de
 proteção: com ela, qualquer script injetado executaria.
 
@@ -438,3 +438,32 @@ Três decisões de escopo, todas cobertas por teste:
   Civil (art. 10) exige, mediante pedido.
 - **Teto de 5.000 atividades** por exportação, com indicação de truncamento — para a resposta não
   virar um download de dezenas de megabytes numa conta antiga.
+
+## Montagem de arquivo único quebra em silêncio
+
+A configuração do gateway era montada como **arquivo único** (`./deploy/Caddyfile:/etc/caddy/Caddyfile`).
+Isso funcionou até o deploy passar a atualizar o arquivo, e então produziu a pior categoria de falha:
+a que reporta sucesso.
+
+A cadeia era esta. O Docker, ao montar um arquivo único, amarra o **inode** — a identidade do
+arquivo no disco — e não o caminho. O `rsync` do deploy não edita no lugar: escreve um temporário e
+renomeia por cima, o que **cria um inode novo**. O arquivo no servidor ficava atualizado, e o
+container seguia lendo o inode antigo. O `caddy reload` então recarregava a configuração **velha**,
+com êxito, e devolvia código de saída 0. Job verde, CSP antiga no ar, nada nos logs.
+
+Medido lado a lado, com o mesmo `rsync` do deploy:
+
+| Montagem | Host depois do rsync | Container depois do rsync |
+|---|---|---|
+| arquivo único | conteúdo novo | **conteúdo antigo** |
+| diretório | conteúdo novo | conteúdo novo |
+
+Daí duas mudanças. A montagem passou a ser de **diretório** (`./deploy/caddy:/etc/caddy`), porque
+diretório resolve o nome a cada abertura e vê o arquivo trocado. E o `deploy.sh` ganhou uma
+conferência que compara o resumo do arquivo no repositório com o que o container está lendo, e
+**falha o deploy** se divergirem.
+
+A segunda mudança é a que importa mais no longo prazo. A primeira corrige esta causa; a segunda
+garante que qualquer outra causa futura apareça como deploy vermelho em vez de silêncio. A lição não
+é sobre inode: é que passo de deploy sem verificação de efeito pode estar mentindo desde o primeiro
+dia sem ninguém notar.

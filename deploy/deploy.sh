@@ -50,15 +50,35 @@ if [ "$migrate_exit_code" != '0' ]; then
   exit 1
 fi
 
-# O Caddyfile é montado do repositório, não copiado para dentro de uma imagem. Como o `up -d` acima
-# só recria container cujo serviço mudou (imagem ou configuração do Compose), uma alteração no
-# arquivo montado passaria batida e o gateway seguiria com a configuração antiga em memória — foi
-# assim que a CSP nova quase não chegou a produção. `caddy reload` aplica sem derrubar conexão.
+# A configuração do gateway é montada do repositório, não copiada para dentro de uma imagem. Como o
+# `up -d` acima só recria container cujo serviço mudou (imagem ou configuração do Compose), uma
+# alteração no arquivo montado passa batida e o gateway segue com a configuração antiga em memória.
+# `caddy reload` aplica sem derrubar conexão.
+#
+# Mas recarregar não basta, e esta verificação existe porque o pior caso já aconteceu de verdade: o
+# `rsync` do deploy substitui o arquivo por renomeação, o que cria um inode novo. Enquanto o
+# Caddyfile era montado como arquivo único, o container seguia amarrado ao inode antigo — o
+# `caddy reload` recarregava a configuração velha e retornava **sucesso**. Job verde, CSP antiga no
+# ar, ninguém percebia. A montagem passou a ser de diretório para resolver a causa; esta conferência
+# garante que, se a montagem quebrar de novo por outro motivo, o deploy falha em vez de mentir.
+echo "Conferindo se o gateway vê a configuração atual..."
+caddyfile_host=$(md5sum < "$repository_dir/deploy/caddy/Caddyfile" | cut -d' ' -f1)
+caddyfile_container=$(IMAGE_TAG="$image_tag" docker compose --env-file "$env_file" -f "$compose_file" \
+  exec -T gateway md5sum /etc/caddy/Caddyfile | cut -d' ' -f1)
+if [ "$caddyfile_host" != "$caddyfile_container" ]; then
+  echo "Deploy falhou: o gateway está lendo um Caddyfile diferente do que há no repositório." >&2
+  echo "  repositório: $caddyfile_host" >&2
+  echo "  container:   $caddyfile_container" >&2
+  echo "Recrie o gateway para refazer a montagem e rode o deploy de novo:" >&2
+  echo "  docker compose --env-file $env_file -f $compose_file up -d --force-recreate gateway" >&2
+  exit 1
+fi
+
 echo "Recarregando configuração do gateway..."
 if ! IMAGE_TAG="$image_tag" docker compose --env-file "$env_file" -f "$compose_file" exec -T gateway \
   caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile; then
   echo "Deploy falhou: o Caddyfile novo foi recusado pelo gateway." >&2
-  echo "O gateway segue no ar com a configuração anterior. Verifique a sintaxe de deploy/Caddyfile." >&2
+  echo "O gateway segue no ar com a configuração anterior. Verifique a sintaxe de deploy/caddy/Caddyfile." >&2
   IMAGE_TAG="$image_tag" docker compose --env-file "$env_file" -f "$compose_file" logs --tail=50 gateway >&2 || true
   exit 1
 fi

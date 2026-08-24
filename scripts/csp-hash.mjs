@@ -14,7 +14,7 @@ const raiz = join(dirname(fileURLToPath(import.meta.url)), '..')
 const htmlPath = join(raiz, 'apps/web/index.html')
 // A CSP vive em dois lugares de propósito: o Caddy protege o tráfego público e o nginx protege quem
 // alcançar a porta 8080 direto. Duplicação divergiria em silêncio, então as duas são conferidas aqui.
-const alvos = [join(raiz, 'deploy/Caddyfile'), join(raiz, 'deploy/nginx.conf')]
+const alvos = [join(raiz, 'deploy/caddy/Caddyfile'), join(raiz, 'deploy/nginx.conf')]
 
 const html = await readFile(htmlPath, 'utf8')
 const inline = [...html.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/g)].map((m) => m[1])
