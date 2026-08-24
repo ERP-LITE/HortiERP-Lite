@@ -12,6 +12,8 @@
     "db:seed": "tsx src/db/seed.ts",
     "db:seed:platform": "tsx src/db/seedPlatform.ts",
     "invoices:cleanup": "tsx src/scripts/cleanupInvoiceOrphans.ts",
+    "data:retention": "tsx src/scripts/retentionPurge.ts",
+    "data:erase-company": "tsx src/scripts/eraseCompany.ts",
     "test": "sh scripts/test-integration.sh",
     "test:run": "tsx --test --test-concurrency=1 tests/**/*.test.ts"
   },

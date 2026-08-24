@@ -362,3 +362,79 @@ A diferença entre os dois fluxos está no que se faz quando é justamente a qua
 - **Entrada** não tem: estornar uma entrada é decremento e poderia deixar o saldo negativo se a mercadoria já saiu. Ali a correção continua sendo o ajuste manual de estoque.
 
 O cancelamento de perda existe porque o ajuste manual, embora conserte o **saldo**, deixa o registro da perda intacto — e portanto o "valor perdido no período" do painel e o relatório de perdas seguiriam inflados. Num sistema cujo propósito é medir desperdício, esse número errado é o dano principal, não o saldo.
+
+## Retenção de dados pessoais: dois prazos, duas leis
+
+O sistema guarda dado pessoal em dois lugares que crescem sem parar: `system_logs` (endereço IP e
+navegador, uma linha por requisição) e `activity_logs` (nome de quem fez o quê). Até a implementação
+da retenção, nenhum dos dois tinha expurgo — cresciam para sempre.
+
+O instinto de quem lê "LGPD" é apagar o quanto antes. Está errado, e o motivo importa:
+
+- O **Marco Civil da Internet** (art. 15) obriga provedor de aplicação com fins econômicos a
+  **guardar** data, hora e IP por 6 meses. É piso legal.
+- A **LGPD** (arts. 15 e 16) manda **não guardar** além do necessário. É teto.
+
+Os dois prazos se encontram exatamente em 180 dias, que é o padrão de `TECHNICAL_LOG_RETENTION_DAYS`.
+O `env.ts` **recusa subir a API** com valor menor: encurtar esse prazo não é economia de espaço, é
+descumprir a lei, e um erro assim não deve depender de alguém revisar um arquivo de configuração.
+
+Para `activity_logs` o prazo é 5 anos (`AUDIT_RETENTION_DAYS`), acompanhando a fiscalização
+tributária. A justificativa é a finalidade: a trilha só serve enquanto responde "quem lançou a
+movimentação deste período" — e o período deixa de ser questionável depois disso.
+
+### Por que exclusão de usuário não apaga o nome na hora
+
+`softDelete` marca `deletedAt` e mantém nome e e-mail. Isso parece contradizer a LGPD, e é a decisão
+certa: o histórico de atividades referencia o `id` do usuário, e apagar a linha inteira transformaria
+a trilha de auditoria em uma lista de identificadores sem significado, justamente no período em que
+ela pode ser exigida.
+
+A resposta é retenção com prazo, não exclusão imediata. Passados os 5 anos, `anonymizeDeletedUsers`
+corta o vínculo com a pessoa: nome vira `Usuário removido`, o e-mail passa para o domínio
+`anonimizado.invalid` (reservado pela RFC 2606, nunca registrável por ninguém) e o hash da senha é
+substituído por um valor sem formato bcrypt — segunda tranca para o caso de alguém reativar a conta
+direto no banco sem saber que ela foi anonimizada.
+
+Um detalhe que quase passou: o nome também mora em `activity_logs.entityLabel`. Anonimizar só a linha
+de `users` deixaria o nome legível na tela de histórico, e a anonimização não teria servido para nada.
+A transação limpa os dois.
+
+### Exclusão definitiva é script, não rota
+
+`eraseCompany` apaga todas as linhas de uma empresa e os arquivos de nota fiscal — o que a LGPD exige
+no fim do contrato. Deliberadamente **não existe tela nem rota HTTP**: uma rota seria um botão a um
+clique de apagar o cliente errado, sem volta. Exigir acesso ao servidor e repetir o nome exato da
+empresa faz o acidente ser improvável, e é operação feita uma vez por contrato, não função do dia a
+dia.
+
+Duas ordens importam ali e estão cobertas por teste:
+
+- As chaves estrangeiras não têm `ON DELETE CASCADE`, então cada tabela filha sai antes da que ela
+  referencia. `stock_entry_items` não tem `companyId` e é alcançada pela entrada a que pertence — se a
+  ordem estivesse errada, sobrariam itens órfãos apontando para entradas inexistentes.
+- Os arquivos do disco só são apagados **depois** do commit. Se a transação abortasse com os arquivos
+  já removidos, a nota fiscal estaria perdida com o registro dela intacto. Arquivo sobrando é
+  recuperável pelo `cleanupInvoiceOrphans`; arquivo apagado por engano, não.
+
+### O verificador de escopo e as travessias de propósito
+
+As consultas de retenção cortam por **data, não por empresa** — filtrar por `companyId` deixaria log
+vencido de outra empresa para trás. Isso viola a regra do `check-tenant-scope`, e por isso as três
+entram em `TRAVESSIAS_LEGITIMAS` com o motivo escrito. A regra continua valendo para todo o resto: é
+mais seguro justificar cada exceção do que afrouxar a verificação.
+
+## Direito de acesso do titular
+
+`GET /auth/me/personal-data` devolve ao usuário o que o sistema guarda sobre ele — cadastro e as
+atividades que ele mesmo registrou — atendendo aos incisos II e V do art. 18 da LGPD sem depender de
+pedido ao administrador. A tela de Perfil tem o botão que baixa o arquivo.
+
+Três decisões de escopo, todas cobertas por teste:
+
+- **Só o próprio titular.** As atividades filtram por `actorId`; atividade de colega não entra.
+- **O histórico técnico entra como resumo** (quantidade e período), não como lista de IPs. O titular
+  tem direito de saber que o registro existe; o detalhamento é fornecido sob o sigilo que o Marco
+  Civil (art. 10) exige, mediante pedido.
+- **Teto de 5.000 atividades** por exportação, com indicação de truncamento — para a resposta não
+  virar um download de dezenas de megabytes numa conta antiga.

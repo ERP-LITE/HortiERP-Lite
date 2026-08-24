@@ -11,6 +11,7 @@ import ExpandableText from '@/components/ui/ExpandableText.vue'
 import SortableTableHeader from '@/components/ui/SortableTableHeader.vue'
 import { formatCurrency, formatDate, formatDateTime } from '@/lib/format'
 import { confirmDelete, toastError, toastSuccess } from '@/lib/alerts'
+import { downloadBlob } from '@/lib/download'
 import { getApiErrorMessage } from '@/services/api'
 import {
   getStockEntry,
@@ -148,16 +149,7 @@ function openPreviewInNewTab() {
 async function downloadAttachment(attachment: StockEntryAttachment) {
   try {
     const blob = await getStockEntryAttachmentBlob(entryId.value, attachment.id)
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = attachment.originalName
-    // O elemento precisa estar no documento para o clique valer: fora do DOM, Firefox e
-    // Safari do iOS ignoram o `click()` e o download simplesmente não acontecia.
-    document.body.appendChild(link)
-    link.click()
-    link.remove()
-    setTimeout(() => URL.revokeObjectURL(url), 1000)
+    downloadBlob(attachment.originalName, blob)
   } catch (error) {
     errorMessage.value = getApiErrorMessage(error, 'Não foi possível baixar o anexo')
   }

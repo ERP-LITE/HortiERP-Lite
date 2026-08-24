@@ -389,22 +389,61 @@ do container entre as duas etapas deixa um arquivo sem dono, e nenhum fluxo da a
 ocupar o volume `invoice_files` e a entrar em todos os backups criptografados junto com os anexos legítimos.
 
 ```bash
-docker compose --env-file .env.production -f docker-compose.production.yml exec api npm run invoices:cleanup -- --dry-run
-docker compose --env-file .env.production -f docker-compose.production.yml exec api npm run invoices:cleanup
+docker compose --env-file .env.production -f docker-compose.production.yml exec api \
+  node dist/scripts/cleanupInvoiceOrphans.js --dry-run
+docker compose --env-file .env.production -f docker-compose.production.yml exec api \
+  node dist/scripts/cleanupInvoiceOrphans.js
 ```
+
+**Use `node dist/...`, não `npm run`.** Os atalhos do `package.json` chamam `tsx src/...`, e a imagem
+de produção não tem nenhum dos dois: o `Dockerfile` roda `npm prune --omit=dev` (que remove o `tsx`) e
+copia apenas `dist`, sem o `src`. O `npm run` funciona no ambiente de desenvolvimento; em produção o
+caminho é sempre o arquivo compilado.
 
 O script só apaga arquivos que não têm registro correspondente **e** foram modificados há mais de 24 horas; a
 carência evita remover um upload em andamento. Comece sempre pelo `--dry-run`, que lista os candidatos sem tocar em
 nada. Agende mensalmente — a frequência não precisa ser alta, já que só quedas no meio de um upload geram órfãos.
 
-## Crescimento dos logs
+## Retenção de dados pessoais
 
-`system_logs` (uma linha por requisição da API) e `activity_logs` (auditoria de negócio) **não têm expurgo
-automático**. Requisições de healthcheck e as próprias telas de consulta de log já são ignoradas pelo hook, então o
-crescimento acompanha o uso real do sistema — mas numa instalação de longa duração essas são as tabelas que mais
-pesam no dump.
+`system_logs` (uma linha por requisição, com endereço IP e navegador) e `activity_logs` (auditoria de
+negócio, com o nome de quem fez) guardam dado pessoal. A LGPD manda eliminá-lo quando a finalidade
+termina, e o script `retentionPurge` é quem faz isso.
 
-Para dimensionar antes de decidir qualquer limpeza:
+Os prazos não são preferência, são consequência de duas leis que empurram em sentidos opostos:
+
+| Dado | Prazo | Por quê |
+|---|---|---|
+| `system_logs` | **180 dias** | Piso do Marco Civil da Internet (art. 15): provedor de aplicação com fins econômicos guarda data, hora e IP por 6 meses. A LGPD manda não guardar além do necessário, então o padrão é exatamente o piso. A API **recusa subir** com `TECHNICAL_LOG_RETENTION_DAYS` menor que 180. |
+| `activity_logs` | **5 anos** | Acompanha o prazo de fiscalização tributária. A trilha só tem valor enquanto responde "quem lançou a movimentação deste período". |
+| Usuário excluído | **5 anos** | Depois disso o nome e o e-mail são substituídos e o vínculo com a pessoa é cortado. O `id` continua, para o histórico não virar um buraco, mas deixa de levar a alguém. |
+
+```bash
+# Sempre comece pelo dry-run: ele conta sem apagar nada.
+docker compose --env-file .env.production -f docker-compose.production.yml exec api \
+  node dist/scripts/retentionPurge.js --dry-run
+
+docker compose --env-file .env.production -f docker-compose.production.yml exec api \
+  node dist/scripts/retentionPurge.js
+```
+
+**Não precisa agendar nada na VM.** O serviço `retention` do `docker-compose.production.yml` roda o
+script em laço, uma vez por semana, e sobe junto com o deploy. Os comandos acima servem para rodar
+fora de hora — conferir volumes antes de mexer num prazo, por exemplo.
+
+A escolha de container em vez de cron é deliberada: cron mora fora do repositório e fora do deploy,
+então precisaria ser criado à mão em cada máquina — e seria esquecido numa troca de servidor, com a
+retenção deixando de existir sem ninguém notar. É o mesmo motivo pelo qual o backup também roda em
+laço num container, e não por cron.
+
+O intervalo é ajustável por `RETENTION_INTERVAL_SECONDS` no `.env.production` (padrão: 604800, uma
+semana). Para acompanhar:
+
+```bash
+docker compose --env-file .env.production -f docker-compose.production.yml logs --tail=20 retention
+```
+
+Para dimensionar as tabelas antes de mexer em qualquer prazo:
 
 ```bash
 docker compose --env-file .env.production -f docker-compose.production.yml exec postgres \
@@ -412,9 +451,30 @@ docker compose --env-file .env.production -f docker-compose.production.yml exec 
   "select relname, pg_size_pretty(pg_total_relation_size(relid)) from pg_catalog.pg_statio_user_tables order by pg_total_relation_size(relid) desc limit 10;"
 ```
 
-A retenção é uma decisão do operador, não do sistema: `activity_logs` é o histórico que responde "quem excluiu o
-produto Tomate" e costuma valer a pena guardar por muito mais tempo que o log técnico. Se optar por apagar, comece
-pelo `system_logs` antigo e faça o backup antes.
+## Apagar em definitivo os dados de uma empresa
+
+No encerramento de um contrato, a LGPD (arts. 15 e 16) exige eliminar os dados quando a finalidade
+acaba. O `eraseCompany` faz isso: apaga as linhas de todas as tabelas daquela empresa e os arquivos de
+nota fiscal do disco. **É irreversível e não existe tela para isso de propósito** — uma rota HTTP
+seria um botão a um clique de apagar o cliente errado.
+
+```bash
+# 1. Descubra o id e confira os volumes. Nada é apagado aqui.
+docker compose --env-file .env.production -f docker-compose.production.yml exec api \
+  node dist/scripts/eraseCompany.js --id=<uuid> --dry-run
+
+# 2. Apague, repetindo o nome exato que o dry-run mostrou.
+docker compose --env-file .env.production -f docker-compose.production.yml exec api \
+  node dist/scripts/eraseCompany.js --id=<uuid> --confirm="Nome Exato da Empresa"
+```
+
+O script recusa rodar se o `--confirm` não corresponder ao nome, e recusa apagar a empresa da
+plataforma — que destruiria o próprio acesso de super admin.
+
+**Faça um backup antes, e saiba o que ele significa.** Os backups já enviados continuam contendo os
+dados apagados até expirarem pela regra de ciclo de vida do bucket (30 dias). Se o contrato exigir
+eliminação imediata inclusive dos backups, isso é operação manual no painel do provedor — o script
+não alcança lá, e prometer o contrário no contrato seria falso.
 
 ## Teste de restauração
 

@@ -5,7 +5,7 @@
 > o sistema está aqui — ele não tem acesso ao código nem ao sistema rodando, então **não deve
 > inventar nada que não esteja neste documento**.
 >
-> **Revisão de 18/08/2026:** os fatos deste briefing foram conferidos contra o código-fonte, arquivo
+> **Revisão de 24/08/2026:** os fatos deste briefing foram conferidos contra o código-fonte, arquivo
 > por arquivo, e os pontos duvidosos foram testados no sistema rodando. Duas afirmações da versão
 > anterior estavam **erradas** e foram corrigidas: o alerta de estoque baixo (seção 7.3) e a geração
 > do PDF (seção 7.11). Se o comportamento do sistema mudar, corrija aqui também — é este arquivo que
@@ -67,8 +67,8 @@ A equipe do cliente — dono/gerente da loja e os funcionários que mexem no est
    entrar, cadastrar categorias e unidades, cadastrar (ou importar) os produtos, lançar o estoque
    inicial, lançar a primeira entrada. É a página mais importante do manual.
 2. **Entrando no sistema** — login, esqueci a senha (falar com o administrador da empresa), **o que
-   fazer quando é o próprio administrador que esqueceu**, trocar a própria senha, sair, e o
-   encerramento automático por inatividade.
+   fazer quando é o próprio administrador que esqueceu**, trocar a própria senha, **baixar os próprios
+   dados**, sair, e o encerramento automático por inatividade.
 3. **Conhecendo a tela** — menu lateral, o que cada item faz, como funciona no celular.
 4. **Cadastros que vêm antes de tudo** — categorias, unidades de medida, produtos.
 5. **Importar produtos por planilha** — capítulo próprio, é onde mais erram.
@@ -163,6 +163,7 @@ Use estes nomes, em negrito, exatamente como estão. Não invente variação nem
 | Filtro de estoque baixo | **Somente estoque baixo** |
 | Filtro de perdas canceladas | **Mostrar perdas canceladas** |
 | Gerar o PDF do relatório | **Gerar PDF** |
+| Baixar os próprios dados pessoais (em Perfil) | **Baixar meus dados** |
 
 ---
 
@@ -186,6 +187,11 @@ cliente**, não copie.
   confiança desde o começo — é a diferença entre um problema de dois minutos e uma manhã parada.
 - Cada um troca a própria senha em **Perfil**, informando a senha atual, a nova e a confirmação. O
   acesso a **Perfil** e a **Sair** está no menu do círculo com as iniciais, no canto superior direito.
+- Ainda em **Perfil**, existe o botão **Baixar meus dados**. Ele baixa um arquivo com o que o sistema
+  guarda sobre aquela pessoa: o cadastro dela e o histórico das ações que ela registrou. É um direito
+  de quem tem dado guardado num sistema, e existe para a pessoa não precisar pedir a ninguém. Vale
+  explicar em duas linhas, sem falar de lei nem de formato de arquivo: "é seu, e você baixa quando
+  quiser". Não é exportação de relatório da loja — é o dado da própria pessoa.
 - A conta da empresa e o **primeiro administrador** (nome, e-mail e senha) são criados por mim, o
   fornecedor, que entrega as credenciais direto ao cliente. Não existe autocadastro.
 - **Encerramento automático:** 30 minutos sem usar e a sessão cai. No último minuto aparece um aviso

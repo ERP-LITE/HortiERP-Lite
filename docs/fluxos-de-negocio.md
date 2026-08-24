@@ -226,6 +226,18 @@ Nas tabelas e cartões, campos variáveis que podem receber conteúdo extenso �
 
 Datas, números, status, perfis, badges e ações não usam esse comportamento porque possuem tamanho previsível. No mobile, esse controle de conteúdo convive com o accordion de linha das tabelas (`v-mobile-accordion`), sem substituir a navegação por campos do registro.
 
+## Meus dados pessoais (tela de Perfil)
+
+Qualquer usuário baixa, em **Perfil → Baixar meus dados**, um arquivo com o que o sistema guarda sobre
+ele: o próprio cadastro (nome, e-mail, perfil de acesso, datas) e o histórico das ações que ele mesmo
+registrou. Atende ao direito de acesso e portabilidade do titular sem depender de pedido ao
+administrador.
+
+O escopo é estreito de propósito: só atividade do próprio usuário — atividade de colega não entra —, o
+hash da senha nunca sai, e o histórico técnico (data, hora e IP das requisições) aparece só como
+resumo, com quantidade e período. O detalhamento desses registros é fornecido sob sigilo, mediante
+pedido, porque é o que o Marco Civil exige.
+
 ## Logs
 
 - Tela `/logs/atividades`: somente o `admin` consulta ações de escrita realizadas dentro da própria empresa. O `companyId` não é aceito da interface; é obtido obrigatoriamente da sessão.
