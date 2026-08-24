@@ -11,6 +11,14 @@ const router = createRouter({
       meta: { public: true },
     },
     {
+      // Pública de propósito: a pessoa precisa poder ler o aviso **antes** de entrar no sistema,
+      // e quem não tem conta ainda também tem direito de saber o que é guardado.
+      path: '/privacidade',
+      name: 'privacidade',
+      component: () => import('@/modules/privacidade/PrivacyView.vue'),
+      meta: { public: true },
+    },
+    {
       path: '/',
       name: 'dashboard',
       component: () => import('@/modules/dashboard/DashboardView.vue'),

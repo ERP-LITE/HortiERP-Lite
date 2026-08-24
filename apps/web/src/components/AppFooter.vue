@@ -11,8 +11,15 @@ onBeforeUnmount(() => window.clearInterval(yearCheckInterval))
 
 <template>
   <footer
-    class="shrink-0 px-4 py-3 text-right text-xs text-gray-500 dark:text-gray-400 lg:px-6"
+    class="shrink-0 flex flex-wrap items-center justify-end gap-x-3 gap-y-1 px-4 py-3 text-xs text-gray-500 dark:text-gray-400 lg:px-6"
   >
-    &copy; {{ currentYear }} HortiERP Lite. Todos os direitos reservados.
+    <RouterLink
+      :to="{ name: 'privacidade' }"
+      class="hover:text-gray-700 hover:underline dark:hover:text-gray-200"
+    >
+      Aviso de privacidade
+    </RouterLink>
+    <span aria-hidden="true" class="text-gray-300 dark:text-gray-700">·</span>
+    <span>&copy; {{ currentYear }} HortiERP Lite. Todos os direitos reservados.</span>
   </footer>
 </template>

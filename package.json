@@ -12,7 +12,7 @@
     "dev:web": "npm run dev --workspace=apps/web",
     "build:api": "npm run build --workspace=apps/api",
     "build:web": "npm run build --workspace=apps/web",
-    "test": "npm test --workspace=apps/api && npm test --workspace=apps/web && npm run csp:hash && npm run check:tenant-scope",
+    "test": "npm test --workspace=apps/api && npm test --workspace=apps/web && npm run csp:hash && npm run check:tenant-scope && npm run check:privacy-date",
     "test:load": "sh scripts/run-load-test.sh",
     "db:generate": "npm run db:generate --workspace=apps/api",
     "db:migrate": "npm run db:migrate --workspace=apps/api",
@@ -20,7 +20,9 @@
     "db:seed:platform": "npm run db:seed:platform --workspace=apps/api",
     "invoices:cleanup": "npm run invoices:cleanup --workspace=apps/api --",
     "csp:hash": "node scripts/csp-hash.mjs",
-    "check:tenant-scope": "node scripts/check-tenant-scope.mjs"
+    "check:tenant-scope": "node scripts/check-tenant-scope.mjs",
+    "check:privacy-date": "node scripts/check-privacy-date.mjs",
+    "privacy:date": "node scripts/check-privacy-date.mjs"
   },
   "devDependencies": {
     "esbuild": "^0.28.1",

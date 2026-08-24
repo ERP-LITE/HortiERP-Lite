@@ -208,7 +208,7 @@ manual no painel do provedor. Prometer eliminação instantânea e total seria f
 | Portabilidade | mesmo arquivo, em formato aberto e legível por qualquer programa |
 | Correção | administrador da empresa, na tela de Usuários |
 | Anonimização e eliminação | por prazo (6.1) ou pelo procedimento de encerramento (6.2). Pedido individual é decisão do controlador, respeitados os prazos legais de guarda |
-| Informação sobre uso compartilhado | seção 4 deste documento; precisa constar do aviso de privacidade |
+| Informação sobre uso compartilhado | aviso de privacidade em `/privacidade`, seção "Onde os dados ficam" |
 | Revogação de consentimento | não se aplica: o tratamento não se apoia em consentimento, e sim em execução de contrato e obrigação legal |
 
 O detalhamento dos registros de acesso (a lista de IPs) não vai no arquivo baixado: o titular é
@@ -238,7 +238,7 @@ Em ordem de importância. As três primeiras são jurídicas e não se resolvem 
 | # | Pendência | Quem resolve |
 |---|---|---|
 | 1 | **Contrato de operador com o cliente**, incluindo autorização do acesso de suporte, os suboperadores, a transferência da cópia cifrada e o destino dos dados no encerramento | advogado |
-| 2 | **Aviso de privacidade** acessível dentro do sistema — hoje não existe nada | advogado + implementação |
+| 2 | **Aviso de privacidade** — a tela existe (rota pública `/privacidade`, link no rodapé de todas as telas e na de login) e o texto foi redigido a partir deste registro. **Falta a revisão jurídica do texto** | advogado |
 | 3 | **Procedimento de resposta a incidente** (seção 8) | fornecedor, com revisão jurídica |
 | 4 | **Cláusulas contratuais com a Backblaze** para a transferência internacional | advogado |
 | 5 | **RLS no banco** — a trava de isolamento no próprio banco de dados, hoje substituída por verificação automática do código | fornecedor |
@@ -254,4 +254,5 @@ encarregado, desde que exista canal de contato com o titular.
 
 | Data | O que mudou |
 |---|---|
+| 24/08/2026 | Aviso de privacidade publicado dentro do sistema, em rota pública, redigido a partir deste registro. Pendência 2 passou de "não existe nada" para "falta revisão jurídica do texto" |
 | 24/08/2026 | Primeira versão. Inventário levantado a partir do código; retenção por prazo, anonimização, exclusão definitiva e exportação dos dados do titular implementados nesta mesma data |

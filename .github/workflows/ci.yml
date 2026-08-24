@@ -65,6 +65,9 @@ jobs:
       - name: Check tenant scope on database queries
         run: npm run check:tenant-scope
 
+      - name: Check privacy notice date matches its text
+        run: npm run check:privacy-date
+
   deploy-production:
     name: Deploy to Oracle Cloud
     needs: build-and-test
