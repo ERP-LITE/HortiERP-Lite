@@ -64,7 +64,9 @@ services:
   retention:
     image: hortierp-api:${IMAGE_TAG:-latest}
     restart: unless-stopped
-    environment: *api_environment
+    environment:
+      <<: *api_environment
+      RETENTION_HEARTBEAT_URL: ${RETENTION_HEARTBEAT_URL:-}
     entrypoint: ["/bin/sh", "-c"]
     command:
       - |
@@ -81,6 +83,9 @@ services:
         condition: service_completed_successfully
     networks:
       - backend
+      # `egress` também, senão o sinal de vida não sai: a rede backend é internal e não tem rota
+      # para a internet. Mesmo motivo do backup.
+      - egress
 
   web:
     image: hortierp-web:${IMAGE_TAG:-latest}
