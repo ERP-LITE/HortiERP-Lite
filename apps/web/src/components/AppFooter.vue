@@ -19,7 +19,7 @@ onBeforeUnmount(() => window.clearInterval(yearCheckInterval))
     >
       Aviso de privacidade
     </RouterLink>
-    <span aria-hidden="true" class="text-gray-300 dark:text-gray-700">·</span>
+    <span aria-hidden="true" class="hidden h-3 w-px shrink-0 bg-current opacity-40 sm:block"></span>
     <span>&copy; {{ currentYear }} HortiERP Lite. Todos os direitos reservados.</span>
   </footer>
 </template>
