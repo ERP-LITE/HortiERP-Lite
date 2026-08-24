@@ -109,7 +109,12 @@ services:
       - "443:443"
       - "443:443/udp"
     volumes:
-      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      # Monta o DIRETÓRIO, não o arquivo. Montagem de arquivo único amarra o inode, e o `rsync`
+      # do deploy substitui o arquivo por renomeação — o que cria inode novo. O container continuava
+      # lendo o conteúdo antigo, e o `caddy reload` recarregava a configuração velha reportando
+      # sucesso: job verde, CSP inalterada, ninguém percebia. Diretório resolve o nome a cada
+      # abertura, então o arquivo trocado é visto.
+      - ./deploy/caddy:/etc/caddy:ro
       - caddy_data:/data
       - caddy_config:/config
     depends_on:

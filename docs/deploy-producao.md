@@ -105,7 +105,7 @@ O deploy reconstrói API, frontend e backup. O serviço `migrate` aplica a migra
 dados existentes permanecem no volume `postgres_production_data`. Não execute `docker compose down -v`, pois `-v`
 remove os volumes persistentes do banco, dos anexos e dos backups.
 
-**Configuração do gateway é caso à parte.** O `deploy/Caddyfile` é *montado* do repositório, não copiado para dentro de
+**Configuração do gateway é caso à parte.** O `deploy/caddy/Caddyfile` é *montado* do repositório, não copiado para dentro de
 uma imagem, e o `docker compose up -d` só recria container cujo serviço mudou — imagem ou configuração do Compose.
 Alteração no arquivo montado é invisível para o Compose, então o gateway seguiria servindo com a configuração antiga em
 memória. Por isso `deploy.sh` termina com um `caddy reload`: aplica sem derrubar conexão e, se o arquivo estiver
@@ -217,7 +217,7 @@ git status --short | grep -i env      # não deve listar nada além dos .example
 
 A CSP autoriza o único script inline do `index.html` por `sha256-…`, em vez de liberar
 `'unsafe-inline'` (ver [decisões arquiteturais](./decisoes-arquiteturais.md#csp-sem-unsafe-inline-o-hash-do-script-do-tema)).
-O hash aparece em `deploy/Caddyfile` e duas vezes em `deploy/nginx.conf`.
+O hash aparece em `deploy/caddy/Caddyfile` e duas vezes em `deploy/nginx.conf`.
 
 A falha é silenciosa: hash divergente bloqueia o script e o tema escuro volta a piscar branco no
 carregamento — nada quebra, e ninguém percebe até o cliente reclamar. O CI roda `npm run csp:hash` e
