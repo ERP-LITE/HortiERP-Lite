@@ -415,7 +415,7 @@ Os prazos não são preferência, são consequência de duas leis que empurram e
 | Dado | Prazo | Por quê |
 |---|---|---|
 | `system_logs` | **180 dias** | Piso do Marco Civil da Internet (art. 15): provedor de aplicação com fins econômicos guarda data, hora e IP por 6 meses. A LGPD manda não guardar além do necessário, então o padrão é exatamente o piso. A API **recusa subir** com `TECHNICAL_LOG_RETENTION_DAYS` menor que 180. |
-| `activity_logs` | **5 anos** | Acompanha o prazo de fiscalização tributária. A trilha só tem valor enquanto responde "quem lançou a movimentação deste período". |
+| `activity_logs` | **5 anos** | Acompanha o prazo de fiscalização tributária. A trilha só tem valor enquanto responde "quem lançou a movimentação deste período". Ajustável por `AUDIT_RETENTION_DAYS`, que vale para esta linha e para a seguinte. |
 | Usuário excluído | **5 anos** | Depois disso o nome e o e-mail são substituídos e o vínculo com a pessoa é cortado. O `id` continua, para o histórico não virar um buraco, mas deixa de levar a alguém. |
 
 ```bash
