@@ -3,17 +3,8 @@ import { db } from '../../db/client.js'
 import { activityLogs, systemLogs } from '../../db/schema/index.js'
 import { getUserProfile } from './auth.service.js'
 
-/**
- * Atende ao direito de acesso e portabilidade do titular (LGPD, art. 18, II e V). A pessoa baixa o
- * que o sistema guarda sobre ela mesma, em formato aberto, sem depender de pedido ao administrador.
- *
- * Um cuidado deliberado: nada aqui é dado de outra pessoa. As atividades exportadas são só as que
- * este usuário realizou, e o histórico técnico entra como resumo (quantidade e período), não como
- * lista de endereços IP — o titular tem direito de saber que esse registro existe, e o detalhe fica
- * disponível por pedido, sob o sigilo que o Marco Civil (art. 10) exige.
- */
-
-/** Teto para a resposta não virar um download de dezenas de MB numa conta antiga. */
+// Nada aqui pode ser dado de outra pessoa: as atividades filtram por `actorId`, e o histórico
+// técnico entra como resumo em vez de lista de IPs.
 const MAX_ACTIVITY_ROWS = 5000
 
 export async function exportOwnPersonalData(companyId: string, userId: string) {

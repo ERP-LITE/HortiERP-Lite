@@ -4,7 +4,7 @@ import ThemeToggle from '@/components/ui/ThemeToggle.vue'
 import AppFooter from '@/components/AppFooter.vue'
 
 const atualizadoEm = '24 de agosto de 2026'
-const conteudoRevisado = 'sha256-L6hHueWlg7lngW3KlYCcZ4LmewphkB9GggweSrXgnPc='
+const conteudoRevisado = 'sha256-InHfrWA/0EkNHKlXYA31+vWssGfkpSoKKsEwVTROz/g='
 const suporte = '(47) 99154-0607'
 </script>
 

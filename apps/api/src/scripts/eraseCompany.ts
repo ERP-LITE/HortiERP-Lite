@@ -2,19 +2,10 @@ import { pool } from '../db/client.js'
 import { isPlatformCompany } from '../modules/companies/companies.service.js'
 import { collectCompanyFootprint, eraseCompanyData } from '../modules/companies/erase-company.service.js'
 
-/**
- * Interface de linha de comando para apagar em definitivo os dados de uma empresa.
- *
- * Não existe tela para isso de propósito. Uma rota HTTP seria um botão a um clique de apagar o
- * cliente errado, sem volta; exigir acesso ao servidor e o nome exato da empresa torna o acidente
- * improvável. É operação de encerramento de contrato, feita uma vez, não função do dia a dia.
- *
- * Uso:
- *   node dist/scripts/eraseCompany.js --id=<uuid> --dry-run
- *   node dist/scripts/eraseCompany.js --id=<uuid> --confirm="<nome exato da empresa>"
- */
+// Apaga em definitivo os dados de uma empresa. Sem tela de propósito — ver docs/deploy-producao.md.
+//   node dist/scripts/eraseCompany.js --id=<uuid> --dry-run
+//   node dist/scripts/eraseCompany.js --id=<uuid> --confirm="<nome exato da empresa>"
 
-/** Erro de uso: mensagem pronta para o operador, sem stack trace. */
 class UsageError extends Error {}
 
 function readFlag(name: string) {

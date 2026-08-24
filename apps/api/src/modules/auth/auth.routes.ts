@@ -77,11 +77,6 @@ export async function authRoutes(app: FastifyInstance) {
     }
   })
 
-  /**
-   * Direito de acesso e portabilidade do titular (LGPD, art. 18, II e V): a pessoa baixa os
-   * próprios dados sem depender de pedido ao administrador. Limitado porque é uma consulta pesada
-   * e ninguém precisa exportar os próprios dados mais de uma vez por minuto.
-   */
   app.get(
     '/auth/me/personal-data',
     { preHandler: [authenticate], config: { rateLimit: { max: 5, timeWindow: '1 minute' } } },

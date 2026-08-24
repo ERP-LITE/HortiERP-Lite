@@ -2,19 +2,12 @@ import { and, count, eq, isNotNull, lt, notLike } from 'drizzle-orm'
 import { db } from '../../db/client.js'
 import { activityLogs, systemLogs, users } from '../../db/schema/index.js'
 
-/**
- * Domínio reservado pela RFC 2606: não pode ser registrado por ninguém. Serve para o e-mail
- * anonimizado nunca colidir com o de uma pessoa real nem virar destino de contato por acidente.
- */
+// Domínio reservado pela RFC 2606: nunca poderá ser registrado por ninguém.
 const ANONYMIZED_EMAIL_DOMAIN = 'anonimizado.invalid'
 
 export const ANONYMIZED_USER_NAME = 'Usuário removido'
 
-/**
- * Não tem formato de hash bcrypt, então `bcrypt.compare` nunca casa com senha alguma. O login já
- * ignora usuário com `deletedAt`; isto é a segunda tranca, para o caso de alguém reativar a conta
- * direto no banco sem perceber que ela foi anonimizada.
- */
+// Sem formato bcrypt de propósito: `bcrypt.compare` nunca casa, mesmo se a conta for reativada.
 const ANONYMIZED_PASSWORD_HASH = 'anonimizado'
 
 export interface RetentionSummary {
@@ -23,7 +16,6 @@ export interface RetentionSummary {
   anonymizedUsers: number
 }
 
-/** Corte de retenção. Dia corrido de 24h basta aqui: não é fronteira de dia de negócio. */
 export function daysAgo(days: number, reference = new Date()) {
   return new Date(reference.getTime() - days * 24 * 60 * 60 * 1000)
 }
@@ -52,11 +44,6 @@ export async function purgeActivityLogs(cutoff: Date, dryRun = false) {
   return result.rowCount ?? 0
 }
 
-/**
- * Usuário excluído continua no banco com nome e e-mail: a trilha de auditoria referencia o `id`
- * dele, e apagar a linha inteira quebraria o histórico de quem lançou o quê. Passado o prazo de
- * retenção, o vínculo com a pessoa é cortado — o `id` continua, mas deixa de levar a alguém.
- */
 export async function anonymizeDeletedUsers(cutoff: Date, dryRun = false) {
   const candidates = await db
     .select({ id: users.id })
@@ -65,8 +52,7 @@ export async function anonymizeDeletedUsers(cutoff: Date, dryRun = false) {
       and(
         isNotNull(users.deletedAt),
         lt(users.deletedAt, cutoff),
-        // Já anonimizado não entra de novo na conta. O sufixo é marcador confiável porque só este
-        // código escreve nesse domínio.
+        // Já anonimizado não entra de novo na conta.
         notLike(users.email, `%@${ANONYMIZED_EMAIL_DOMAIN}`),
       ),
     )
@@ -85,8 +71,7 @@ export async function anonymizeDeletedUsers(cutoff: Date, dryRun = false) {
         })
         .where(eq(users.id, id))
 
-      // O log de atividades guarda o nome em `entityLabel`. Sem limpar aqui, anonimizar a conta
-      // não resolveria nada: o nome seguiria legível na tela de histórico de atividades.
+      // O nome também mora em `entityLabel`; sem esta limpeza ele segue legível no histórico.
       await tx
         .update(activityLogs)
         .set({ entityLabel: ANONYMIZED_USER_NAME })

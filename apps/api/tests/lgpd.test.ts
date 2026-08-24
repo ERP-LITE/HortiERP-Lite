@@ -110,7 +110,6 @@ describe('anonimização de usuário excluído', () => {
     await db.update(users).set({ deletedAt: daysAgo(5 * 365 + 30) }).where(eq(users.id, antigo.id))
     await db.update(users).set({ deletedAt: daysAgo(10) }).where(eq(users.id, recente.id))
 
-    // O nome da pessoa também mora no histórico de atividades, em `entityLabel`.
     await insertActivityLog(tenant.companyId, tenant.admin.id, new Date(), {
       entity: 'usuario',
       entityId: antigo.id,
@@ -150,11 +149,6 @@ describe('anonimização de usuário excluído', () => {
     assert.equal(ativo.name, tenant.admin.name, 'usuário ativo não pode ser anonimizado')
   })
 
-  /**
-   * O login já ignora usuário com `deletedAt`, então testar o login logo após a anonimização não
-   * provaria nada. O que precisa valer é a segunda tranca: se alguém reativar a conta direto no
-   * banco, sem saber que ela foi anonimizada, a senha antiga ainda não pode funcionar.
-   */
   test('conta reativada depois de anonimizada não aceita a senha antiga', async () => {
     const bcrypt = (await import('bcryptjs')).default
     const tenant = await createTenant('anonimizacao-login')
@@ -166,13 +160,12 @@ describe('anonimização de usuário excluído', () => {
       .set({ deletedAt: daysAgo(5 * 365 + 1), passwordHash: await bcrypt.hash('senha-conhecida', 10) })
       .where(eq(users.id, saiu.id))
 
-    // Antes de anonimizar, a senha casa — é isso que garante que o teste seguinte tem valor.
     const [antes] = await db.select({ passwordHash: users.passwordHash }).from(users).where(eq(users.id, saiu.id))
     assert.ok(await bcrypt.compare('senha-conhecida', antes.passwordHash))
 
     await anonymizeDeletedUsers(daysAgo(5 * 365))
 
-    // Alguém "ressuscita" a conta no banco.
+    // Alguém reativa a conta no banco, sem saber que ela foi anonimizada.
     await db.update(users).set({ deletedAt: null }).where(eq(users.id, saiu.id))
 
     const resposta = await ctx.app.inject({
@@ -238,7 +231,6 @@ describe('exclusão definitiva dos dados de uma empresa', () => {
     const alvo = await createTenant('erase-alvo', '100')
     const vizinha = await createTenant('erase-vizinha', '100')
 
-    // Movimento real em cada empresa, para haver filho em todas as tabelas.
     for (const tenant of [alvo, vizinha]) {
       await createStockEntry(tenant.companyId, tenant.admin.id, {
         items: [{ productId: tenant.productId, quantity: 5, unitCost: 3 }],
@@ -252,7 +244,6 @@ describe('exclusão definitiva dos dados de uma empresa', () => {
       await insertTechnicalLog(tenant.companyId, tenant.admin.id, new Date())
     }
 
-    // Um anexo de verdade, com arquivo no disco.
     const storedName = `${randomUUID()}.pdf`
     await mkdir(env.INVOICE_STORAGE_PATH, { recursive: true })
     const filePath = join(env.INVOICE_STORAGE_PATH, storedName)
@@ -282,7 +273,6 @@ describe('exclusão definitiva dos dados de uma empresa', () => {
 
     await assert.rejects(access(filePath), 'o arquivo da nota fiscal precisa sair do disco')
 
-    // Nada da empresa apagada pode restar em nenhuma tabela.
     for (const [nome, consulta] of [
       ['companies', db.select({ id: companies.id }).from(companies).where(eq(companies.id, alvo.companyId))],
       ['users', db.select({ id: users.id }).from(users).where(eq(users.companyId, alvo.companyId))],
@@ -313,7 +303,6 @@ describe('exclusão definitiva dos dados de uma empresa', () => {
       .from(stockEntryItems)
     assert.equal(itensOrfaos.length, 1, 'devia restar apenas o item da empresa vizinha')
 
-    // A vizinha continua intacta.
     const [vizinhaViva] = await db
       .select({ id: companies.id })
       .from(companies)

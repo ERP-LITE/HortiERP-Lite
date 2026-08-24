@@ -50,17 +50,8 @@ if [ "$migrate_exit_code" != '0' ]; then
   exit 1
 fi
 
-# A configuração do gateway é montada do repositório, não copiada para dentro de uma imagem. Como o
-# `up -d` acima só recria container cujo serviço mudou (imagem ou configuração do Compose), uma
-# alteração no arquivo montado passa batida e o gateway segue com a configuração antiga em memória.
-# `caddy reload` aplica sem derrubar conexão.
-#
-# Mas recarregar não basta, e esta verificação existe porque o pior caso já aconteceu de verdade: o
-# `rsync` do deploy substitui o arquivo por renomeação, o que cria um inode novo. Enquanto o
-# Caddyfile era montado como arquivo único, o container seguia amarrado ao inode antigo — o
-# `caddy reload` recarregava a configuração velha e retornava **sucesso**. Job verde, CSP antiga no
-# ar, ninguém percebia. A montagem passou a ser de diretório para resolver a causa; esta conferência
-# garante que, se a montagem quebrar de novo por outro motivo, o deploy falha em vez de mentir.
+# Já aconteceu de o `caddy reload` recarregar a configuração antiga e retornar sucesso, com o job
+# verde e a CSP velha no ar. Esta conferência faz esse caso falhar em vez de passar em silêncio.
 echo "Conferindo se o gateway vê a configuração atual..."
 caddyfile_host=$(md5sum < "$repository_dir/deploy/caddy/Caddyfile" | cut -d' ' -f1)
 caddyfile_container=$(IMAGE_TAG="$image_tag" docker compose --env-file "$env_file" -f "$compose_file" \
