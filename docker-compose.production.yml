@@ -68,13 +68,11 @@ services:
     entrypoint: ["/bin/sh", "-c"]
     command:
       - |
-        # O `trap` é obrigatório, não zelo: este shell roda como PID 1, e PID 1 ignora sinal que
-        # não tenha tratador instalado. Sem ele o `compose down` esperava os 10s de carência e
-        # matava o container à força — medido. Com o trap, para em 0,25s.
+        # `trap` + `sleep &` + `wait`: sem isso o shell (PID 1) ignora o SIGTERM e o `compose down`
+        # espera os 10s de carência antes de matar o container.
         trap 'exit 0' TERM INT
         while true; do
           node dist/scripts/retentionPurge.js || echo "[retencao] falhou; nova tentativa em ${RETENTION_INTERVAL_SECONDS:-604800}s" >&2
-          # `sleep &` + `wait` em vez de `sleep` direto: só assim o sinal interrompe a espera.
           sleep ${RETENTION_INTERVAL_SECONDS:-604800} &
           wait $$!
         done
@@ -109,11 +107,8 @@ services:
       - "443:443"
       - "443:443/udp"
     volumes:
-      # Monta o DIRETÓRIO, não o arquivo. Montagem de arquivo único amarra o inode, e o `rsync`
-      # do deploy substitui o arquivo por renomeação — o que cria inode novo. O container continuava
-      # lendo o conteúdo antigo, e o `caddy reload` recarregava a configuração velha reportando
-      # sucesso: job verde, CSP inalterada, ninguém percebia. Diretório resolve o nome a cada
-      # abertura, então o arquivo trocado é visto.
+      # DIRETÓRIO, não arquivo: o `rsync` do deploy troca o inode ao renomear, e montagem de arquivo
+      # único fica presa ao antigo. Não reverter — ver docs/decisoes-arquiteturais.md.
       - ./deploy/caddy:/etc/caddy:ro
       - caddy_data:/data
       - caddy_config:/config

@@ -20,12 +20,6 @@ import {
 } from '../../db/schema/index.js'
 import { env } from '../../shared/config/env.js'
 
-/**
- * Exclusão definitiva dos dados de uma empresa — o que a LGPD (arts. 15 e 16) exige quando a
- * finalidade do tratamento termina, tipicamente no encerramento do contrato. Diferente do
- * `softDelete` usado no dia a dia: aqui a linha sai do banco e o arquivo sai do disco.
- */
-
 async function countBy(table: PgTable, column: PgColumn, value: string) {
   const [{ total }] = await db.select({ total: count() }).from(table).where(eq(column, value))
   return total
@@ -81,9 +75,8 @@ export async function eraseCompanyData(footprint: CompanyFootprint) {
   const { company, entryIds, storedNames } = footprint
 
   await db.transaction(async (tx) => {
-    // Ordem obrigatória: as chaves estrangeiras não têm ON DELETE CASCADE, então cada tabela filha
-    // sai antes daquela que ela referencia. `stock_entry_items` não tem `companyId` — chega pela
-    // entrada a que pertence.
+    // Sem ON DELETE CASCADE: cada filha sai antes da que ela referencia. `stock_entry_items` não
+    // tem `companyId` e só é alcançada pela entrada.
     if (entryIds.length > 0) {
       await tx.delete(stockEntryItems).where(inArray(stockEntryItems.stockEntryId, entryIds))
     }
@@ -101,9 +94,7 @@ export async function eraseCompanyData(footprint: CompanyFootprint) {
     await tx.delete(companies).where(eq(companies.id, company.id))
   })
 
-  // Só depois do commit. Se a transação abortasse com os arquivos já apagados, a nota fiscal
-  // estaria perdida com o registro dela intacto. Arquivo sobrando é recuperável pelo
-  // `invoices:cleanup`; arquivo apagado por engano, não.
+  // Só depois do commit: arquivo sobrando é recuperável pelo `invoices:cleanup`, apagado não.
   let removedFiles = 0
   for (const storedName of storedNames) {
     await rm(join(env.INVOICE_STORAGE_PATH, storedName), { force: true })

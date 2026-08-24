@@ -122,9 +122,11 @@ contra fórmula nas planilhas exportadas) e duas verificações estáticas:
   [decisões arquiteturais](./docs/decisoes-arquiteturais.md#o-verificador-que-substitui-a-rede-de-proteção-por-enquanto).
 
 - `npm run check:privacy-date` — o aviso de privacidade em `/privacidade` traz a data da última revisão, e essa data é
-  o sinal que o leitor usa para saber se as regras mudaram. O verificador guarda um resumo do texto e reprova o CI se o
-  texto mudar sem a data acompanhar; `npm run privacy:date -- --write` atualiza as duas de uma vez. A data não é
-  calculada em tempo de execução de propósito: dizer "atualizado hoje" todos os dias afirmaria uma revisão que não houve.
+  o sinal que o leitor usa para saber se as regras mudaram. O verificador guarda um resumo **do `<template>`**, ou seja
+  só do que o leitor vê, e reprova o CI se esse texto mudar sem a data acompanhar; `npm run privacy:date -- --write`
+  atualiza as duas de uma vez. Mexer em comentário ou no `<script>` não dispara nada, de propósito: alarme que soa sem
+  motivo ensina a ignorar o alarme. A data não é calculada em tempo de execução porque dizer "atualizado hoje" todos os
+  dias afirmaria uma revisão que não houve.
 
 Manutenção de dados pessoais (rodada por linha de comando, não pela interface):
 
