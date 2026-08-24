@@ -164,6 +164,7 @@ Use estes nomes, em negrito, exatamente como estão. Não invente variação nem
 | Filtro de perdas canceladas | **Mostrar perdas canceladas** |
 | Gerar o PDF do relatório | **Gerar PDF** |
 | Baixar os próprios dados pessoais (em Perfil) | **Baixar meus dados** |
+| Link no rodapé de todas as telas | **Aviso de privacidade** |
 
 ---
 
@@ -187,6 +188,11 @@ cliente**, não copie.
   confiança desde o começo — é a diferença entre um problema de dois minutos e uma manhã parada.
 - Cada um troca a própria senha em **Perfil**, informando a senha atual, a nova e a confirmação. O
   acesso a **Perfil** e a **Sair** está no menu do círculo com as iniciais, no canto superior direito.
+- Existe um **Aviso de privacidade** acessível de qualquer tela, pelo link no rodapé — inclusive na
+  tela de login, antes de entrar. Ele explica o que o sistema guarda sobre a pessoa, por quanto tempo
+  e o que ela pode fazer. Mencione em uma frase no capítulo 2 e outra no capítulo 3 (ao descrever o
+  rodapé). Não reproduza o conteúdo dele no manual: o aviso é o documento oficial e pode mudar sem o
+  manual mudar; duplicar o texto criaria duas versões que divergem.
 - Ainda em **Perfil**, existe o botão **Baixar meus dados**. Ele baixa um arquivo com o que o sistema
   guarda sobre aquela pessoa: o cadastro dela e o histórico das ações que ela registrou. É um direito
   de quem tem dado guardado num sistema, e existe para a pessoa não precisar pedir a ninguém. Vale

@@ -226,6 +226,16 @@ Nas tabelas e cartões, campos variáveis que podem receber conteúdo extenso �
 
 Datas, números, status, perfis, badges e ações não usam esse comportamento porque possuem tamanho previsível. No mobile, esse controle de conteúdo convive com o accordion de linha das tabelas (`v-mobile-accordion`), sem substituir a navegação por campos do registro.
 
+## Aviso de privacidade
+
+Rota **pública** (`/privacidade`), alcançável pelo link no rodapé de qualquer tela — inclusive da tela
+de login, sem sessão. Explica, em linguagem de quem trabalha no depósito, o que o sistema guarda, por
+quanto tempo, quem vê, onde os dados ficam e como exercer os direitos.
+
+Ser pública é requisito, não conveniência: a pessoa precisa poder ler **antes** de entrar, e quem
+ainda não tem conta também tem direito de saber. A data de atualização é fixa no código — aviso que
+diz "atualizado hoje" todos os dias não informa nada.
+
 ## Meus dados pessoais (tela de Perfil)
 
 Qualquer usuário baixa, em **Perfil → Baixar meus dados**, um arquivo com o que o sistema guarda sobre

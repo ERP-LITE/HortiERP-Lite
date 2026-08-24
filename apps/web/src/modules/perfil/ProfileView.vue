@@ -107,6 +107,14 @@ async function handleDownloadPersonalData() {
             <Download :size="16" />
             {{ downloading ? 'Preparando...' : 'Baixar meus dados' }}
           </BaseButton>
+          <p class="mt-3 text-xs text-gray-500 dark:text-gray-400">
+            Quer saber o que o sistema guarda e por quanto tempo? Leia o
+            <RouterLink
+              :to="{ name: 'privacidade' }"
+              target="_blank"
+              class="text-primary-700 hover:underline dark:text-primary-400"
+            >aviso de privacidade</RouterLink>.
+          </p>
         </div>
       </div>
 
