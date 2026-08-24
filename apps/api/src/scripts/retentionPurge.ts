@@ -6,6 +6,20 @@ function formatDate(value: Date) {
   return value.toISOString().slice(0, 10)
 }
 
+// Mesma semântica do backup: avisa o monitor externo ao terminar bem, e chama `/fail` ao falhar —
+// assim a falha aparece na hora, sem esperar a janela de tolerância do monitor.
+async function sinalDeVida(sufixo = '') {
+  const base = env.RETENTION_HEARTBEAT_URL
+  if (!base) return
+
+  const url = sufixo ? `${base.replace(/\/$/, '')}${sufixo}` : base
+  try {
+    await fetch(url, { signal: AbortSignal.timeout(10_000) })
+  } catch (error) {
+    console.error(`Não foi possível avisar o monitor em ${url}:`, error)
+  }
+}
+
 async function run() {
   const dryRun = process.argv.includes('--dry-run')
   const prefix = dryRun ? '[dry-run] ' : ''
@@ -33,13 +47,18 @@ async function run() {
 
   if (dryRun) {
     console.log('Nada foi alterado. Rode sem --dry-run para aplicar.')
+    return
   }
 
-  await pool.end()
+  await sinalDeVida()
 }
 
-run().catch(async (error) => {
-  console.error('Falha ao aplicar a retenção de dados:', error)
-  await pool.end().catch(() => {})
-  process.exit(1)
-})
+run()
+  .catch(async (error) => {
+    console.error('Falha ao aplicar a retenção de dados:', error)
+    await sinalDeVida('/fail')
+    process.exitCode = 1
+  })
+  .finally(async () => {
+    await pool.end().catch(() => {})
+  })

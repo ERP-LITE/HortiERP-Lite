@@ -131,7 +131,8 @@ contra fórmula nas planilhas exportadas) e duas verificações estáticas:
 Manutenção de dados pessoais (rodada por linha de comando, não pela interface):
 
 - `npm run data:retention` — apaga log técnico e trilha de auditoria vencidos e anonimiza usuário excluído há mais que o
-  prazo. Aceita `--dry-run`. Deve ser agendado por cron em produção; ver
+  prazo. Aceita `--dry-run`. Em produção roda sozinho, semanalmente, no contêiner `retention`, e avisa um monitor externo
+  quando termina bem ou quando falha (`RETENTION_HEARTBEAT_URL`) — ver
   [deploy em produção](./docs/deploy-producao.md).
 - `npm run data:erase-company` — apaga em definitivo todos os dados de uma empresa e os arquivos de nota fiscal dela.
   Irreversível: exige `--id` e `--confirm` com o nome exato, e não tem equivalente na interface de propósito.

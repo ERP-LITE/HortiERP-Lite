@@ -34,6 +34,12 @@ const envSchema = z
       .min(180, 'TECHNICAL_LOG_RETENTION_DAYS não pode ser menor que 180 dias (Marco Civil, art. 15)')
       .default(180),
     AUDIT_RETENTION_DAYS: z.coerce.number().int().min(1).default(5 * 365),
+    RETENTION_HEARTBEAT_URL: z
+      .string()
+      .trim()
+      .optional()
+      .transform((value) => value || undefined)
+      .pipe(z.string().url('RETENTION_HEARTBEAT_URL deve ser uma URL válida').optional()),
   })
   .superRefine((value, context) => {
     if (value.NODE_ENV !== 'production') return

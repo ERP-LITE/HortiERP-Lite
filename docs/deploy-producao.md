@@ -437,7 +437,20 @@ retenção deixando de existir sem ninguém notar. É o mesmo motivo pelo qual o
 laço num container, e não por cron.
 
 O intervalo é ajustável por `RETENTION_INTERVAL_SECONDS` no `.env.production` (padrão: 604800, uma
-semana). Para acompanhar:
+semana).
+
+**Configure o `RETENTION_HEARTBEAT_URL`.** Crie uma verificação **nova** no monitor, não reaproveite a
+do backup: se as duas apontarem para a mesma URL, o sinal da retenção mascara uma falha de backup — o
+alerta mais importante que existe aqui. O período esperado é semanal, diferente do backup, que é
+diário.
+
+Sem o sinal, uma falha semanal passa em silêncio: o contêiner
+tenta, erra, dorme e tenta de novo, e você só descobriria meses depois pelo tamanho das tabelas. Com
+ele, a retenção chama a URL quando termina bem e a URL seguida de `/fail` quando falha. É o mesmo
+esquema do `BACKUP_HEARTBEAT_URL`, então serve o mesmo monitor externo, só com outro sinal. O
+`--dry-run` não avisa nada, porque não alterou nada.
+
+Para acompanhar:
 
 ```bash
 docker compose --env-file .env.production -f docker-compose.production.yml logs --tail=20 retention
