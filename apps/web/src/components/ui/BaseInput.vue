@@ -24,6 +24,7 @@ const inputElement = ref<HTMLInputElement | null>(null)
 const isPassword = computed(() => props.type === 'password')
 const isDecimal = computed(() => props.decimalPlaces !== undefined)
 const isMasked = computed(() => props.mask !== undefined)
+const numericKeyboard = computed(() => props.decimalPlaces !== undefined || (isMasked.value && props.mask !== 'cnpj'))
 const resolvedType = computed(() => {
   if (isDecimal.value) return 'text'
   if (!isPassword.value) return props.type ?? 'text'
@@ -92,7 +93,7 @@ defineExpose({
         ref="inputElement"
         :value="displayValue"
         :type="resolvedType"
-        :inputmode="isDecimal || isMasked ? 'numeric' : undefined"
+        :inputmode="numericKeyboard ? 'numeric' : undefined"
         :placeholder="placeholder"
         :aria-required="required || undefined"
         :step="step"

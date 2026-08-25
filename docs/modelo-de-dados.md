@@ -44,7 +44,7 @@ Raiz do multiempresa — cada linha é um cliente (frutaria/hortifrúti) contrat
 |---|---|---|
 | `id` | uuid | PK |
 | `name`, `legalName` | text | nome fantasia e razão social; os registros anteriores à migration podem ter `legalName` nulo |
-| `document` | text | CNPJ normalizado (14 dígitos), validado na API e único entre empresas não excluídas |
+| `document` | text | CNPJ normalizado, sem pontuação e em maiúsculas (14 posições, as 12 primeiras podendo ser letra no modelo alfanumérico), validado na API e único entre empresas não excluídas |
 | `stateRegistration` | text | inscrição estadual opcional |
 | `contactName`, `contactEmail`, `phone` | text | responsável e canais de contato; telefone é persistido apenas com dígitos |
 | `postalCode`, `street`, `addressNumber` | text | CEP normalizado, logradouro e número |

@@ -27,6 +27,15 @@ export function formatMonthYear(value: string | Date) {
 
 export type InputMask = 'cnpj' | 'cpf' | 'phone' | 'cep'
 
+/**
+ * CNPJ alfanumérico: as 12 primeiras posições aceitam letra ou dígito, os dois dígitos
+ * verificadores continuam numéricos. Espelha a normalização da API (companies.schema.ts).
+ */
+export function normalizeCnpj(value: string) {
+  const raw = value.replace(/[^0-9A-Za-z]/g, '').toUpperCase()
+  return (raw.slice(0, 12) + raw.slice(12, 14).replace(/\D/g, '')).slice(0, 14)
+}
+
 export function formatInputMask(value: string, mask: InputMask) {
   const limits: Record<InputMask, number> = { cnpj: 14, cpf: 11, phone: 11, cep: 8 }
   const digits = value.replace(/\D/g, '').slice(0, limits[mask])
@@ -43,11 +52,13 @@ export function formatInputMask(value: string, mask: InputMask) {
   }
 
   if (mask === 'cnpj') {
-    return digits
-      .replace(/^(\d{2})(\d)/, '$1.$2')
-      .replace(/^(\d{2})\.(\d{3})(\d)/, '$1.$2.$3')
-      .replace(/^(\d{2})\.(\d{3})\.(\d{3})(\d)/, '$1.$2.$3/$4')
-      .replace(/^(\d{2})\.(\d{3})\.(\d{3})\/(\d{4})(\d)/, '$1.$2.$3/$4-$5')
+    const base = normalizeCnpj(value)
+    let masked = base.slice(0, 2)
+    if (base.length > 2) masked += `.${base.slice(2, 5)}`
+    if (base.length > 5) masked += `.${base.slice(5, 8)}`
+    if (base.length > 8) masked += `/${base.slice(8, 12)}`
+    if (base.length > 12) masked += `-${base.slice(12, 14)}`
+    return masked
   }
 
   if (digits.length <= 10) {

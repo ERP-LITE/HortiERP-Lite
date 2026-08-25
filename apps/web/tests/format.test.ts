@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { describe, test } from 'node:test'
-import { formatCnpj, formatFileSize, formatPhone, formatQuantity } from '../src/lib/format.js'
+import { formatCnpj, formatFileSize, formatInputMask, formatPhone, formatQuantity } from '../src/lib/format.js'
 
 describe('quantidade na tela sai em português', () => {
   test('a string do banco não é lida como milhar', () => {
@@ -42,5 +42,29 @@ describe('formatFileSize', () => {
   test('abaixo de 1 MB fica em KB inteiro', () => {
     assert.equal(formatFileSize(900), '1 KB')
     assert.equal(formatFileSize(1024 * 300), '300 KB')
+  })
+})
+
+describe('máscara de CNPJ com o modelo alfanumérico', () => {
+  test('formata o exemplo oficial da Receita', () => {
+    assert.equal(formatInputMask('12ABC34501DE35', 'cnpj'), '12.ABC.345/01DE-35')
+    assert.equal(formatCnpj('12ABC34501DE35'), '12.ABC.345/01DE-35')
+  })
+
+  test('CNPJ só de dígitos continua igual', () => {
+    assert.equal(formatCnpj('11222333000181'), '11.222.333/0001-81')
+  })
+
+  test('passa para maiúsculas e ignora pontuação digitada', () => {
+    assert.equal(formatInputMask('12.abc.345/01de-35', 'cnpj'), '12.ABC.345/01DE-35')
+  })
+
+  test('letra não entra nos dois dígitos verificadores', () => {
+    assert.equal(formatInputMask('12ABC34501DEAB', 'cnpj'), '12.ABC.345/01DE')
+    assert.equal(formatInputMask('12ABC34501DE3', 'cnpj'), '12.ABC.345/01DE-3')
+  })
+
+  test('não passa de 14 posições', () => {
+    assert.equal(formatInputMask('12ABC34501DE3599', 'cnpj'), '12.ABC.345/01DE-35')
   })
 })

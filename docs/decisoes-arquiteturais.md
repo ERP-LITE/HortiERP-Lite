@@ -667,12 +667,41 @@ CNPJ, telefone e CEP são campos controlados: o `input` mostra o valor do modelo
 tecla passa por `formatInputMask`. O problema é que o Vue só reescreve o DOM quando o valor do modelo
 **muda** — e digitar uma letra, ou um dígito além do limite da máscara, devolve exatamente o mesmo
 valor formatado. Modelo igual, nenhuma re-renderização, e o caractere recusado fica visível no campo.
-Na tela, isso é indistinguível de "a máscara sumiu": aparece `96.946.510/0001-259` ou
-`96.946.510/0001-25a` num campo que supostamente não aceita aquilo.
+Na tela, isso é indistinguível de "a máscara sumiu": aparece `96.946.510/0001-259` num campo que
+supostamente não aceita aquilo.
 
 `BaseInput` agora compara o que está no elemento com o que deveria estar e reescreve o elemento quando
 diferem, além de emitir o valor. Vale para o caminho mascarado e para o de casas decimais, que tinha
 o mesmo furo.
+
+### CNPJ alfanumérico: o dígito verificador conta letra pelo código ASCII
+
+A IN RFB 2.229/2024 criou o CNPJ alfanumérico, que vale para inscrições novas a partir de julho de
+2026: as **12 primeiras posições** aceitam letra maiúscula ou dígito, e os **dois dígitos
+verificadores continuam numéricos**. O exemplo oficial da Receita é `12.ABC.345/01DE-35`.
+
+O sistema recusava esse CNPJ em quatro pontos, e todos precisavam mudar juntos:
+
+1. **Normalização** apagava letra. Era `replace(/\D/g, '')` nas duas pontas, então `12.ABC.345/01DE-35`
+   chegava ao validador como nove dígitos. Hoje é `replace(/[^0-9A-Za-z]/g, '').toUpperCase()`, com a
+   mesma regra na API (`companies.schema.ts`) e no front (`normalizeCnpj`, em `lib/format.ts`).
+2. **Dígito verificador.** O módulo 11 continua com os mesmos pesos; o que muda é o valor de cada
+   posição, que passa a ser o **código ASCII menos 48**. Isso faz `'0'` a `'9'` valerem 0 a 9, ou
+   seja, **o cálculo dos CNPJ só de dígitos que já estão no banco não muda em nada**. É por isso que
+   não existe migration nem revalidação de dado antigo nesta mudança: uma função serve aos dois
+   formatos. `'A'` vale 17, `'Z'` vale 42.
+3. **Máscara.** As 12 primeiras posições passam a aceitar letra; as duas últimas continuam só
+   número, então letra digitada ali é descartada em vez de empurrar o dígito verificador para fora.
+4. **Comprimento no front.** A tela de empresas checava `onlyDigits(document).length !== 14`, o que
+   barrava o CNPJ com letra antes de a requisição sair. Passou a usar `normalizeCnpj`.
+
+Uma armadilha de mobile veio junto: campo com máscara recebia `inputmode="numeric"`, e no celular isso
+abre o teclado **de números**, sem letra. Quem fosse cadastrar um CNPJ alfanumérico pelo telefone não
+tinha como digitar. O `inputmode` numérico agora vale para telefone, CEP e casas decimais, e não para
+o CNPJ.
+
+O que **não** mudou: a coluna `document` já era `text`, e CPF (a máscara `cpf` do `BaseInput`) continua
+só numérico, porque a mudança da Receita é do CNPJ.
 
 ### Campo obrigatório: asterisco na etiqueta, validação em JavaScript
 

@@ -126,6 +126,37 @@ describe('cadastro de empresas', () => {
     assert.equal(result.company.state, 'SP')
   })
 
+  /**
+   * CNPJ alfanumérico da IN RFB 2.229/2024. O exemplo oficial da Receita é 12.ABC.345/01DE-35,
+   * e os dígitos verificadores só fecham com o valor ASCII menos 48 de cada posição.
+   */
+  test('aceita CNPJ alfanumérico, em minúsculas e com pontuação', async () => {
+    const superAdmin = await superAdminFixture('company-cnpj-alfa')
+    const response = await ctx.app.inject({
+      method: 'POST',
+      url: '/api/companies',
+      headers: { cookie: authCookie(ctx.app, superAdmin) },
+      payload: { ...companyPayload, document: '12.abc.345/01de-35', contactEmail: 'alfa@mercado.test', adminEmail: 'admin-alfa@mercado.test' },
+    })
+
+    assert.equal(response.statusCode, 201, response.body)
+    assert.equal(response.json<{ company: { document: string } }>().company.document, '12ABC34501DE35')
+  })
+
+  test('recusa dígito verificador errado no CNPJ alfanumérico e letra no verificador', async () => {
+    const superAdmin = await superAdminFixture('company-cnpj-alfa-invalido')
+    for (const document of ['12.ABC.345/01DE-34', '12.ABC.345/01DE-3A']) {
+      const response = await ctx.app.inject({
+        method: 'POST',
+        url: '/api/companies',
+        headers: { cookie: authCookie(ctx.app, superAdmin) },
+        payload: { ...companyPayload, document },
+      })
+      assert.equal(response.statusCode, 422, `${document} deveria ser recusado`)
+      assert.match(response.body, /CNPJ inválido/)
+    }
+  })
+
   test('rejeita CNPJ inválido e impede CNPJ duplicado', async () => {
     const superAdmin = await superAdminFixture('company-validation')
     const invalid = await ctx.app.inject({
