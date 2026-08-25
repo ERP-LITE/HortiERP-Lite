@@ -23,3 +23,8 @@ Mantenha estes documentos atualizados conforme o sistema evolui — decisões e 
   ao cliente. Os fatos foram conferidos contra o código em 24/08/2026, e o arquivo traz o endereço de acesso e o
   contato do suporte que o manual precisa citar — ao mudar comportamento visível ao usuário, corrija o briefing na
   mesma entrega.
+- [Briefing da proposta comercial](./briefing-proposta-comercial.md) — o que a **proposta enviada ao prospecto** precisa
+  dizer, com os números conferidos no código (limites, prazos de retenção, permissões dos três papéis) e as ressalvas
+  que precisam aparecer, incluindo a transferência internacional das cópias de segurança. Segue a mesma regra do
+  briefing do manual: mudança que o cliente percebe entra aqui na mesma entrega, senão a proposta seguinte nasce
+  errada. **Não** define valores, prazos nem condições comerciais — isso não sai do código.
