@@ -6,8 +6,6 @@ import * as schema from './schema/index.js'
 
 export type Database = NodePgDatabase<typeof schema>
 
-// Papel de aplicação, sem superusuário: é o que faz o RLS valer. O papel dono só aparece em
-// migrate.ts. Ver docs/decisoes-arquiteturais.md.
 export const pool = new Pool({
   connectionString: env.APP_DATABASE_URL,
   max: env.DATABASE_POOL_MAX,
@@ -22,10 +20,8 @@ export interface Escopo {
 
 export const escopoAtual = new AsyncLocalStorage<Escopo>()
 
-// As políticas de RLS leem a empresa de uma variável de sessão, que mora na conexão. Este proxy faz
-// `db` apontar para a conexão reservada do escopo atual quando existe uma, e para o pool quando não —
-// caso em que nenhuma variável está definida e as políticas não devolvem linha nenhuma. É de
-// propósito: quem esquecer de abrir escopo vê zero linhas, não os dados de outra empresa.
+// Sem escopo aberto cai no pool, onde nenhuma variável de sessão está definida e as políticas de RLS
+// não devolvem linha: quem esquecer de abrir escopo vê zero linhas, não os dados de outra empresa.
 export const db = new Proxy(poolDb, {
   get(target, propriedade, receptor) {
     const alvo = escopoAtual.getStore()?.db ?? target

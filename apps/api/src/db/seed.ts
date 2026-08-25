@@ -396,7 +396,6 @@ async function run() {
 
 }
 
-// Escopo de plataforma: o seed cria as empresas, então não existe empresa de sessão ainda.
 comEscopoDePlataforma(run)
   .catch((error) => {
     console.error('Falha ao rodar seed:', error)

@@ -33,8 +33,7 @@ export interface CompanyFootprint {
   volumes: Record<string, number>
 }
 
-// Travessia declarada: apagar uma empresa é ato de fora dela — sob escopo de empresa nem daria para
-// encontrá-la.
+// Travessia declarada: apagar uma empresa é ato de fora dela.
 export async function collectCompanyFootprint(companyId: string): Promise<CompanyFootprint | null> {
   return comEscopoDePlataforma(() => coletar(companyId))
 }

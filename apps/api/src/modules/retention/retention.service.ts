@@ -21,8 +21,7 @@ export function daysAgo(days: number, reference = new Date()) {
   return new Date(reference.getTime() - days * 24 * 60 * 60 * 1000)
 }
 
-// Travessia declarada nas três funções abaixo: o corte é por data e alcança todas as empresas. Fica
-// em cada uma, e não no chamador, para o script e os testes não precisarem lembrar.
+// Travessia declarada nas três funções abaixo: o corte é por data e alcança todas as empresas.
 
 export async function purgeTechnicalLogs(cutoff: Date, dryRun = false) {
   return comEscopoDePlataforma(async () => {

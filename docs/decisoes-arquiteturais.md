@@ -391,6 +391,7 @@ específico, e o lugar foi escolhido para a travessia ficar visível:
 |---|---|---|
 | Login | `authenticateUser` | o e-mail é único global e ainda não existe sessão |
 | Validação de sessão | `authenticate` | durante impersonação a sessão é de uma empresa e o usuário é de outra |
+| Ler a própria conta | `getUserProfile`, `changeOwnPassword`, `exportOwnPersonalData` | mesma razão: a conta de quem está logado mora em outra empresa durante a impersonação |
 | Cobranças e cadastro de empresas | `preHandler` das rotas | módulos inteiros `requireRole('super_admin')`, então a travessia mora ao lado da autorização |
 | Log de requisição | `logs.hook.ts` | requisição sem sessão grava com empresa nula |
 | Retenção | as três funções de `retention.service.ts` | o corte é por data e alcança todas as empresas |
@@ -400,7 +401,7 @@ específico, e o lugar foi escolhido para a travessia ficar visível:
 Nos serviços, a travessia fica **no serviço e não no chamador** — script e teste não precisam lembrar.
 Nas rotas de plataforma, fica na rota, junto do `requireRole`.
 
-### Dois erros que apareceram na construção
+### Três erros que apareceram na construção
 
 **Escopo aninhado desligava o de fora.** `comEscopoDePlataforma` gravava `off` ao sair, em vez de
 restaurar o valor anterior. Duas chamadas aninhadas — que acontece de verdade, `createTenant`
@@ -410,6 +411,13 @@ chamando `createUser` — deixavam a de fora sem travessia no meio do caminho.
 Como a conexão vem do pool, ela podia trazer a travessia ligada de um uso anterior — e um `INSERT` em
 outra empresa passou. Hoje as duas variáveis são definidas na mesma chamada, sempre. Foi o teste de
 gravação cruzada que pegou.
+
+**Ler a própria conta ficou de fora da lista de travessias.** Os 147 testes passaram e o deploy subiu; o
+erro apareceu no uso real, ao **sair do modo suporte**: a conexão estava estreitada para a empresa
+visitada e a conta do super admin, que mora na Plataforma, ficou invisível — a tela dizia que o acesso
+havia sido encerrado. `/auth/me` tinha o mesmo defeito, latente: um F5 durante a impersonação
+derrubaria a sessão. A suíte não pegou porque havia teste de **entrada** em impersonação e nenhum de
+**saída**. Hoje há, e foi conferido nos dois estados: reprova sem a correção, passa com ela.
 
 ### Como isso é provado
 

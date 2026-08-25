@@ -13,12 +13,8 @@ export async function fecharDbDeTeste() {
   if (atual) await liberarEscopoDePlataforma(atual)
 }
 
-/**
- * `db` dos testes: uma conexão em escopo de plataforma, resolvida na hora do uso. Os testes montam
- * fixture e conferem resultado lendo o banco direto, o que as políticas por empresa recusariam — e
- * isso é afordância de teste, não de produção, então não mora em `src/`. As requisições feitas por
- * `app.inject` abrem escopo próprio no hook e continuam sujeitas às políticas.
- */
+// Conexão em escopo de plataforma para os testes montarem fixture e conferirem resultado. As
+// requisições de `app.inject` abrem escopo próprio no hook e seguem sujeitas às políticas.
 export const db = new Proxy({} as Database, {
   get(_alvo, propriedade) {
     if (!escopo) throw new Error('db de teste usado fora do setup — chame setupTestApp().')

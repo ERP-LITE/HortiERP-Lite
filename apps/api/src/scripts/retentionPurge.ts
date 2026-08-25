@@ -54,7 +54,6 @@ async function run() {
   await sinalDeVida()
 }
 
-// Escopo de plataforma: o corte da retenção é por data, não por empresa.
 comEscopoDePlataforma(run)
   .catch(async (error) => {
     console.error('Falha ao aplicar a retenção de dados:', error)
