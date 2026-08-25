@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict'
 import { describe, test } from 'node:test'
 import { eq } from 'drizzle-orm'
-import { db } from '../src/db/client.js'
+import { db } from './db.js'
 import { products, units } from '../src/db/schema/index.js'
-import { createLoss } from '../src/modules/losses/losses.service.js'
+import { createLoss } from './servicos.js'
 import { authCookie, createTenant, setupTestApp, type TenantFixture } from './helpers.js'
 
 const ctx = setupTestApp()

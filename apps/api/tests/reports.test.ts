@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict'
 import { describe, test } from 'node:test'
 import { eq } from 'drizzle-orm'
-import { db } from '../src/db/client.js'
+import { db } from './db.js'
 import { categories } from '../src/db/schema/index.js'
-import { createStockEntry } from '../src/modules/stock-entries/stock-entries.service.js'
+import { createStockEntry } from './servicos.js'
 import { authCookie, createTenant, setupTestApp } from './helpers.js'
 
 const ctx = setupTestApp()

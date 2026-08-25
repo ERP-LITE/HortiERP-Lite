@@ -26,6 +26,7 @@ services:
       # Papel sem superusuário, por onde a API e a retenção falam com o banco. Superusuário
       # ignora RLS em silêncio, então apontar a API para o dono anularia as políticas.
       APP_DATABASE_URL: postgres://${APP_DB_USER:-hortierp_app}:${APP_DB_PASSWORD:?Defina APP_DB_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      DATABASE_POOL_MAX: ${DATABASE_POOL_MAX:-20}
       JWT_SECRET: ${JWT_SECRET:?Defina JWT_SECRET}
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-8h}
       CORS_ORIGIN: https://${APP_DOMAIN:?Defina APP_DOMAIN}

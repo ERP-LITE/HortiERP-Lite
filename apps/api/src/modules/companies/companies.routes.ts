@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify'
 import { authenticate, requireRole } from '../../shared/middlewares/auth.js'
+import { permitirTravessiaDePlataforma } from '../../db/scope.js'
 import { issueSession } from '../../shared/auth/session.js'
 import { getUserProfile } from '../auth/auth.service.js'
 import {
@@ -32,6 +33,7 @@ import { findAddressByCep } from './cep.service.js'
 export async function companiesRoutes(app: FastifyInstance) {
   app.addHook('preHandler', authenticate)
   app.addHook('preHandler', requireRole('super_admin'))
+  app.addHook('preHandler', permitirTravessiaDePlataforma)
 
   app.get('/companies', async (request) => {
     const query = listCompaniesQuerySchema.parse(request.query)

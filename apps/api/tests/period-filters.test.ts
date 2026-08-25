@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
-import { db } from '../src/db/client.js'
+import { db } from './db.js'
 import { losses, stockEntries, stockMovements } from '../src/db/schema/index.js'
 import { authCookie, createTenant, setupTestApp } from './helpers.js'
 

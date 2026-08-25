@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { describe, test } from 'node:test'
 import { and, eq } from 'drizzle-orm'
-import { db } from '../src/db/client.js'
+import { db } from './db.js'
 import {
   activityLogs,
   companies,
@@ -26,8 +26,8 @@ import {
   runRetention,
 } from '../src/modules/retention/retention.service.js'
 import { collectCompanyFootprint, eraseCompanyData } from '../src/modules/companies/erase-company.service.js'
-import { createStockEntry } from '../src/modules/stock-entries/stock-entries.service.js'
-import { createLoss } from '../src/modules/losses/losses.service.js'
+import { createStockEntry } from './servicos.js'
+import { createLoss } from './servicos.js'
 import { authCookie, createTenant, createUser, setupTestApp } from './helpers.js'
 
 const ctx = setupTestApp()

@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import { db, pool } from '../db/client.js'
 import { stockEntryAttachments } from '../db/schema/index.js'
 import { env } from '../shared/config/env.js'
+import { comEscopoDePlataforma } from '../db/scope.js'
 
 const GRACE_PERIOD_MS = 24 * 60 * 60 * 1000
 
@@ -15,7 +16,6 @@ async function run() {
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
       console.log(`Diretório ${env.INVOICE_STORAGE_PATH} não existe — nada a limpar.`)
-      await pool.end()
       return
     }
     throw error
@@ -61,11 +61,14 @@ async function run() {
       `${registered.size} anexo(s) registrado(s) preservado(s).`,
   )
 
-  await pool.end()
 }
 
-run().catch(async (error) => {
-  console.error('Falha ao limpar anexos órfãos:', error)
-  await pool.end().catch(() => {})
-  process.exit(1)
-})
+// Escopo de plataforma: a varredura compara o disco de todas as empresas com o banco.
+comEscopoDePlataforma(run)
+  .catch((error) => {
+    console.error('Falha ao limpar anexos órfãos:', error)
+    process.exitCode = 1
+  })
+  .finally(async () => {
+    await pool.end().catch(() => {})
+  })

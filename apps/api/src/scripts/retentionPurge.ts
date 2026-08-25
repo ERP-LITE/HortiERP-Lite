@@ -1,6 +1,7 @@
 import { pool } from '../db/client.js'
 import { env } from '../shared/config/env.js'
 import { daysAgo, runRetention } from '../modules/retention/retention.service.js'
+import { comEscopoDePlataforma } from '../db/scope.js'
 
 function formatDate(value: Date) {
   return value.toISOString().slice(0, 10)
@@ -53,7 +54,8 @@ async function run() {
   await sinalDeVida()
 }
 
-run()
+// Escopo de plataforma: o corte da retenção é por data, não por empresa.
+comEscopoDePlataforma(run)
   .catch(async (error) => {
     console.error('Falha ao aplicar a retenção de dados:', error)
     await sinalDeVida('/fail')

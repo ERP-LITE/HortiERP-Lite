@@ -230,16 +230,14 @@ Só entrada e perda têm data informada. Ajuste de estoque, estorno de perda e c
 mesmo nos três: o fato **é** o lançamento. Ajustar estoque é o resultado de uma contagem feita agora; estornar uma perda
 antiga é uma decisão de hoje, não um evento do passado.
 
-## Isolamento entre empresas não tem rede de proteção no banco
+## Isolamento entre empresas, em duas camadas
 
-Não há **RLS** (segurança em nível de linha) nas tabelas do sistema: nenhuma `POLICY`, nenhum
-`ENABLE ROW LEVEL SECURITY`. O isolamento é inteiramente da aplicação, pelo `eq(tabela.companyId, …)`
-descrito no começo deste documento. O pré-requisito para as políticas já está no lugar — ver
-"Dois papéis de banco" abaixo — mas as políticas em si ainda não existem. Consequência a encarar de frente: **uma consulta futura que
-esqueça o filtro vaza dados entre clientes e nada no banco impede**. O que segura hoje é o padrão
-repetido em todo service, a revisão de código e os testes de isolamento (`access-control.test.ts`).
+A primeira camada é da aplicação, pelo `eq(tabela.companyId, …)` descrito no começo deste documento —
+é ela que produz a resposta certa. A segunda é **RLS** (segurança em nível de linha) no PostgreSQL,
+com política em 13 tabelas: ela não ajuda a acertar, ela existe para o dia em que a primeira errar.
+Ver "Políticas de RLS por empresa" adiante.
 
-### O verificador que substitui a rede de proteção por enquanto
+### O verificador estático
 
 `npm run check:tenant-scope` (`scripts/check-tenant-scope.mjs`) lê o código da API com o AST do
 TypeScript e acusa consulta a tabela multiempresa que rode numa função que **nunca menciona
@@ -258,8 +256,12 @@ A regra é essa, e não algo mais forte, por medida deliberada:
   função de serviço. Se a função nem recebeu nem usou `companyId`, ela não pensou em empresa.
 
 **O que ele não pega:** função que recebe `companyId` e escreve o filtro errado (com a variável
-trocada, por exemplo). Ele cobre o esquecimento honesto, que é o caso real; não é prova de
-isolamento. Quem prova isolamento de ponta a ponta é `access-control.test.ts`.
+trocada, por exemplo). Ele cobre o esquecimento honesto; não é prova de isolamento. É exatamente esse
+buraco — filtro escrito errado — que as políticas de RLS fecham.
+
+Ele continua valendo depois do RLS por um motivo prático: o erro que o banco produz é **consulta
+vazia**, sintoma que se confunde com "não tem dado cadastrado". O verificador aponta o esquecimento no
+CI, com arquivo e função, antes de virar chamado de cliente.
 
 Na primeira execução ele encontrou uma coisa real: `countAttachments` (`invoice-storage.ts`) contava
 anexos por entrada sem filtrar empresa, apoiado em a rota ter validado a entrada antes. Passou a
@@ -327,9 +329,125 @@ uma tabela descartável e verifica o que a etapa em si precisava demonstrar:
   demonstração direta de por que a API precisava sair do papel dono;
 - ele não cria tabela e não trunca.
 
-**O que falta:** as políticas por empresa. Elas dependem de a empresa da sessão chegar ao banco (um
-`SET LOCAL` por transação a partir do token), e ficaram para uma entrega seguinte, com este deploy no
-ar antes — a troca de papel é a parte que pode quebrar acesso em produção.
+As políticas vieram na entrega seguinte, com esta no ar antes: a troca de papel é a parte que pode
+quebrar acesso em produção, e misturar as duas deixaria sem saber qual delas quebrou.
+
+## Políticas de RLS por empresa
+
+### Como a empresa chega ao banco
+
+A política precisa saber de qual empresa é a consulta, e essa informação vive numa **variável de
+sessão do PostgreSQL** (`app.empresa`), que mora na conexão. Antes, a API pegava uma conexão do pool
+por consulta e devolvia logo — a variável não sobreviveria.
+
+Então cada requisição passa a **reservar uma conexão do início ao fim**:
+
+1. `registerRequestScope` (`db/requestScope.ts`), no `onRequest`, tira uma conexão do pool e guarda o
+   escopo num `AsyncLocalStorage`. A conexão nasce **sem empresa**.
+2. `db` (`db/client.ts`) é um `Proxy`: cada uso resolve para a conexão do escopo atual, ou para o pool
+   quando não há escopo. Os 30 arquivos que usam `db` não mudaram.
+3. No fim do `authenticate`, `usarEmpresa` grava a empresa da sessão na conexão. É o **único** ponto
+   onde isso acontece.
+4. No `onResponse`, `RESET ALL` e a conexão volta para o pool.
+
+O `onResponse` que devolve a conexão é registrado **depois** do hook de log de requisições, porque
+hooks `onResponse` correm na ordem de registro e o log escreve no banco. Há também `onRequestAbort`:
+requisição abortada pelo cliente não passa pelo `onResponse`, e sem isso a conexão ficaria presa.
+
+A alternativa considerada foi passar a conexão como argumento em toda função de serviço. Mais explícito
+e sem máquina escondida, mas mexeria nas 118 consultas de 30 arquivos — diff grande em código que já
+está em produção, com uma chance de regressão por consulta.
+
+### O padrão negar-por-omissão
+
+Duas funções no banco carregam a decisão:
+
+```sql
+app_empresa_atual()  -- NULLIF(current_setting('app.empresa', true), '')::uuid
+app_plataforma()     -- current_setting('app.plataforma', true) = 'on'
+```
+
+E a política, igual nas 13 tabelas:
+
+```sql
+USING      (app_plataforma() OR company_id = app_empresa_atual())
+WITH CHECK (app_plataforma() OR company_id = app_empresa_atual())
+```
+
+`current_setting(…, true)` devolve NULL quando a variável nunca foi definida, e comparação com NULL
+nunca casa. **Código que rode sem abrir escopo vê zero linhas**, e não os dados de todas as empresas.
+Essa direção foi escolhida de propósito: o modo de falhar é resultado vazio, que aparece na tela, e
+não vazamento, que não aparece.
+
+Duas tabelas fogem do formato. `companies` compara pelo próprio `id`. `stock_entry_items` não tem
+coluna de empresa: a política usa `EXISTS` sobre a entrada, que é o único caminho até o item.
+
+### As travessias legítimas ficam declaradas
+
+Algumas operações atravessam empresas por natureza. Cada uma liga `app.plataforma` num lugar
+específico, e o lugar foi escolhido para a travessia ficar visível:
+
+| travessia | onde | por quê |
+|---|---|---|
+| Login | `authenticateUser` | o e-mail é único global e ainda não existe sessão |
+| Validação de sessão | `authenticate` | durante impersonação a sessão é de uma empresa e o usuário é de outra |
+| Cobranças e cadastro de empresas | `preHandler` das rotas | módulos inteiros `requireRole('super_admin')`, então a travessia mora ao lado da autorização |
+| Log de requisição | `logs.hook.ts` | requisição sem sessão grava com empresa nula |
+| Retenção | as três funções de `retention.service.ts` | o corte é por data e alcança todas as empresas |
+| Apagar empresa | `erase-company.service.ts` | é ato de fora da empresa; sob escopo dela nem daria para encontrá-la |
+| Seeds e limpeza de anexos | chamada do `run()` | rodam antes de existir sessão, ou varrem o disco de todas |
+
+Nos serviços, a travessia fica **no serviço e não no chamador** — script e teste não precisam lembrar.
+Nas rotas de plataforma, fica na rota, junto do `requireRole`.
+
+### Dois erros que apareceram na construção
+
+**Escopo aninhado desligava o de fora.** `comEscopoDePlataforma` gravava `off` ao sair, em vez de
+restaurar o valor anterior. Duas chamadas aninhadas — que acontece de verdade, `createTenant`
+chamando `createUser` — deixavam a de fora sem travessia no meio do caminho.
+
+**Abrir escopo definia só metade dele.** A função gravava a empresa e não tocava em `app.plataforma`.
+Como a conexão vem do pool, ela podia trazer a travessia ligada de um uso anterior — e um `INSERT` em
+outra empresa passou. Hoje as duas variáveis são definidas na mesma chamada, sempre. Foi o teste de
+gravação cruzada que pegou.
+
+### Como isso é provado
+
+`tests/rls-politicas.test.ts`, cinco casos:
+
+- **consulta sem filtro de empresa** devolve só a própria — é o caso que o verificador estático não
+  pega, e o que motivou tudo isto;
+- **sem escopo nenhum** a consulta volta vazia;
+- **gravar em outra empresa** é recusado pelo banco;
+- **`UPDATE` apontando direto para o id do vizinho** alcança zero linhas;
+- **item de entrada** de outra empresa não aparece, sem ter coluna de empresa;
+- **seis requisições simultâneas de duas empresas** intercaladas — nenhuma vê o produto da outra. Este
+  é o que guarda a máquina do escopo: se a devolução ao pool deixasse a empresa marcada, ou se duas
+  requisições dividissem conexão, ele reprova.
+
+O erro do banco chega embrulhado pelo Drizzle (`Failed query: …`, com o texto do RLS em `cause`), então
+o teste compara a cadeia inteira. Comparar só a mensagem de fora daria teste que passa sem provar nada.
+
+### O custo medido
+
+Com `DATABASE_POOL_MAX=20`, requisições autenticadas de listagem:
+
+| simultâneas | p50 | p95 |
+|---|---|---|
+| 10 | 24 ms | 37 ms |
+| 20 | 28 ms | 50 ms |
+| 40 | 80 ms | 93 ms |
+| 80 | 64 ms | 97 ms |
+
+O limite de aprovação do teste de carga para leitura é **p95 de 750 ms**, então sobra folga. O pool
+agora dimensiona **requisições simultâneas**, não consultas: se um dia faltar conexão, o sintoma é
+espera na entrada da requisição, e o ajuste é `DATABASE_POOL_MAX`.
+
+### O que o RLS não cobre
+
+Ele fecha uma classe de erro, não todas. Continuam fora do alcance: erro na lógica de impersonação
+(`realCompanyId`), bug que grave a empresa errada na conexão, e as travessias declaradas acima — que
+por serem escopo de plataforma enxergam tudo, por construção.
 
 ## Planilha exportada não pode virar fórmula
 

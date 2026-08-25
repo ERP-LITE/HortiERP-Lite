@@ -2,6 +2,7 @@ import bcrypt from 'bcryptjs'
 import { eq } from 'drizzle-orm'
 import { db, pool } from './client.js'
 import { companies, users } from './schema/index.js'
+import { comEscopoDePlataforma } from './scope.js'
 
 const PLATFORM_COMPANY_NAME = 'Plataforma'
 
@@ -18,7 +19,6 @@ async function run() {
 
   if (existing) {
     console.log('Empresa da plataforma já existe, nada a fazer.')
-    await pool.end()
     return
   }
 
@@ -39,10 +39,14 @@ async function run() {
   console.log('Empresa da plataforma e super admin criados com sucesso.')
   console.log(`Login: ${email}`)
 
-  await pool.end()
 }
 
-run().catch((error) => {
-  console.error('Falha ao rodar seed da plataforma:', error)
-  process.exit(1)
-})
+// Escopo de plataforma: o seed cria a empresa, então não existe empresa de sessão ainda.
+comEscopoDePlataforma(run)
+  .catch((error) => {
+    console.error('Falha ao rodar seed da plataforma:', error)
+    process.exitCode = 1
+  })
+  .finally(async () => {
+    await pool.end().catch(() => {})
+  })

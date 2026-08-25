@@ -1,6 +1,7 @@
 import { pool } from '../db/client.js'
 import { isPlatformCompany } from '../modules/companies/companies.service.js'
 import { collectCompanyFootprint, eraseCompanyData } from '../modules/companies/erase-company.service.js'
+import { comEscopoDePlataforma } from '../db/scope.js'
 
 // Apaga em definitivo os dados de uma empresa. Sem tela de propósito — ver docs/deploy-producao.md.
 //   node dist/scripts/eraseCompany.js --id=<uuid> --dry-run
@@ -44,7 +45,6 @@ async function run() {
   if (dryRun) {
     console.log('\n[dry-run] Nada foi apagado.')
     console.log(`Para apagar de verdade: --id=${company.id} --confirm="${company.name}"`)
-    await pool.end()
     return
   }
 
@@ -60,11 +60,15 @@ async function run() {
     'Atenção: os backups já criados seguem contendo estes dados até expirarem pela retenção do bucket.',
   )
 
-  await pool.end()
 }
 
-run().catch(async (error) => {
-  console.error(error instanceof UsageError ? error.message : `Falha ao apagar a empresa: ${error}`)
-  await pool.end().catch(() => {})
-  process.exit(1)
-})
+// Escopo de plataforma: apagar uma empresa é ato de fora dela, e as políticas por empresa
+// impediriam até de encontrá-la.
+comEscopoDePlataforma(run)
+  .catch((error) => {
+    console.error(error instanceof UsageError ? error.message : `Falha ao apagar a empresa: ${error}`)
+    process.exitCode = 1
+  })
+  .finally(async () => {
+    await pool.end().catch(() => {})
+  })
