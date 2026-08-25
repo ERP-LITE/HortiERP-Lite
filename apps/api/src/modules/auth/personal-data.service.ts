@@ -2,12 +2,18 @@ import { and, count, desc, eq, max, min } from 'drizzle-orm'
 import { db } from '../../db/client.js'
 import { activityLogs, systemLogs } from '../../db/schema/index.js'
 import { getUserProfile } from './auth.service.js'
+import { comEscopoDePlataforma } from '../../db/scope.js'
 
 // Nada aqui pode ser dado de outra pessoa: as atividades filtram por `actorId`, e o histórico
 // técnico entra como resumo em vez de lista de IPs.
 const MAX_ACTIVITY_ROWS = 5000
 
+// Travessia declarada: durante impersonação a conta de quem está logado é de outra empresa.
 export async function exportOwnPersonalData(companyId: string, userId: string) {
+  return comEscopoDePlataforma(() => montarExportacao(companyId, userId))
+}
+
+async function montarExportacao(companyId: string, userId: string) {
   const user = await getUserProfile(companyId, userId)
 
   const [atividades, [totalAtividades], [acessos]] = await Promise.all([

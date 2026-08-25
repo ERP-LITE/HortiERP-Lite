@@ -13,8 +13,7 @@ export function registerSystemLogsHook(app: FastifyInstance) {
     const level = statusCode >= 500 ? 'error' : statusCode >= 400 ? 'warning' : 'info'
 
     try {
-      // Travessia declarada: requisição sem sessão (login recusado, 404) grava com empresa nula, o que
-      // a política por empresa recusaria.
+      // Travessia declarada: requisição sem sessão grava com empresa nula.
       await comEscopoDePlataforma(async () => {
       await db.insert(systemLogs).values({
         companyId: user?.companyId,

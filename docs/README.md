@@ -3,7 +3,7 @@
 Documentação técnica do projeto:
 
 - [Modelo de dados](./modelo-de-dados.md) — tabelas, relacionamentos, enums, empresas e cobranças manuais.
-- [Decisões arquiteturais](./decisoes-arquiteturais.md) — multiempresa, autenticação, papéis, super_admin/impersonação, consulta redundante de CEP, soft delete, planilhas, data do fato x data do lançamento e mensagens de erro em português.
+- [Decisões arquiteturais](./decisoes-arquiteturais.md) — multiempresa e as duas camadas de isolamento (filtro na aplicação e RLS no banco), autenticação, papéis, super_admin/impersonação, consulta redundante de CEP, soft delete, planilhas, data do fato x data do lançamento e mensagens de erro em português.
 - [Fluxos de negócio](./fluxos-de-negocio.md) — estoque, importação por planilha, correção de lançamentos, dashboard, empresas-cliente e controle manual de cobranças.
 - [Deploy de produção](./deploy-producao.md) — imagens, HTTPS, variáveis, migrations, primeiro acesso e rollback.
 

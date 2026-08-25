@@ -18,8 +18,7 @@ export async function authenticate(request: FastifyRequest) {
 
   const realCompanyId = request.user.realCompanyId ?? request.user.companyId
 
-  // Travessia declarada: durante impersonação a sessão é de uma empresa e o usuário validado é de
-  // outra, então a própria validação atravessa. O estreitamento vem no fim desta função.
+  // Travessia declarada: durante impersonação o usuário validado é de outra empresa.
   const { user, targetCompany } = await comEscopoDePlataforma(async () => {
     const [encontrado] = await db
       .select({ role: users.role })
@@ -66,8 +65,7 @@ export async function authenticate(request: FastifyRequest) {
     throw AppError.unauthorized('Sessão inválida ou acesso desativado')
   }
 
-  // Único ponto onde a conexão da requisição ganha uma empresa. Daqui para frente as políticas de RLS
-  // barram qualquer consulta que passe do escopo, mesmo que o filtro da aplicação falhe.
+  // Único ponto onde a conexão da requisição ganha uma empresa.
   await usarEmpresa(request.user.companyId)
 }
 

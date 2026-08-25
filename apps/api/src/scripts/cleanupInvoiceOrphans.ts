@@ -63,7 +63,6 @@ async function run() {
 
 }
 
-// Escopo de plataforma: a varredura compara o disco de todas as empresas com o banco.
 comEscopoDePlataforma(run)
   .catch((error) => {
     console.error('Falha ao limpar anexos órfãos:', error)

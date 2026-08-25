@@ -21,10 +21,9 @@ services:
     environment: &api_environment
       NODE_ENV: production
       PORT: 3333
-      # Papel dono: usado só pelo migrate, que roda DDL e cria o papel de aplicação.
       DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
-      # Papel sem superusuário, por onde a API e a retenção falam com o banco. Superusuário
-      # ignora RLS em silêncio, então apontar a API para o dono anularia as políticas.
+      # Papel sem superusuário: superusuário ignora RLS em silêncio, então apontar a API para o dono
+      # anularia as políticas.
       APP_DATABASE_URL: postgres://${APP_DB_USER:-hortierp_app}:${APP_DB_PASSWORD:?Defina APP_DB_PASSWORD}@postgres:5432/${POSTGRES_DB}
       DATABASE_POOL_MAX: ${DATABASE_POOL_MAX:-20}
       JWT_SECRET: ${JWT_SECRET:?Defina JWT_SECRET}
@@ -139,9 +138,8 @@ services:
     environment: &backup_environment
       PGHOST: postgres
       PGPORT: 5432
-      # Papel dono de propósito, e não o APP_DB_USER da API: `pg_dump` rodando com papel sujeito a
-      # RLS traz só as linhas que as políticas deixam ver, e termina com código zero. Backup verde,
-      # dados faltando. Não unificar com o ambiente da API.
+      # Papel dono de propósito: `pg_dump` com papel sujeito a RLS traz só as linhas que as políticas
+      # deixam ver e sai com código zero — backup verde, dados faltando. Não unificar com a API.
       PGUSER: ${POSTGRES_USER:?Defina POSTGRES_USER}
       PGPASSWORD: ${POSTGRES_PASSWORD:?Defina POSTGRES_PASSWORD}
       PGDATABASE: ${POSTGRES_DB:?Defina POSTGRES_DB}

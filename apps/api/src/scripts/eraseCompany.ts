@@ -62,8 +62,6 @@ async function run() {
 
 }
 
-// Escopo de plataforma: apagar uma empresa é ato de fora dela, e as políticas por empresa
-// impediriam até de encontrá-la.
 comEscopoDePlataforma(run)
   .catch((error) => {
     console.error(error instanceof UsageError ? error.message : `Falha ao apagar a empresa: ${error}`)

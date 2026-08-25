@@ -10,8 +10,8 @@ import { createStockEntry } from './servicos.js'
 
 const ctx = setupTestApp()
 
-// O Drizzle embrulha o erro do banco: a mensagem de fora é "Failed query: …" e o texto do RLS fica em
-// `cause`. Comparar só com a mensagem de fora daria teste que passa sem provar nada.
+// O Drizzle embrulha o erro: a mensagem de fora é "Failed query: …" e o texto do RLS fica em `cause`.
+// Comparar só a de fora daria teste que passa sem provar nada.
 function recusadoPeloRls(erro: unknown) {
   const externa = erro instanceof Error ? erro.message : String(erro)
   const interna = erro instanceof Error && erro.cause instanceof Error ? erro.cause.message : ''
@@ -21,8 +21,6 @@ function recusadoPeloRls(erro: unknown) {
 
 describe('políticas de RLS por empresa', () => {
   it('consulta sem filtro de empresa devolve só a própria empresa', async () => {
-    // Este é o caso que o verificador estático não pega: a consulta existe, roda, e simplesmente não
-    // filtra por empresa. Antes das políticas ela traria o produto do vizinho.
     const minha = await createTenant('rls-sem-filtro-a')
     const vizinha = await createTenant('rls-sem-filtro-b')
 
@@ -37,7 +35,6 @@ describe('políticas de RLS por empresa', () => {
       'produto de outra empresa apareceu numa consulta sem filtro',
     )
 
-    // Sem escopo nenhum — o caso de código rodando fora de requisição — não vem nada.
     const semEscopo = await dbDaAplicacao.select({ id: products.id }).from(products)
     assert.equal(semEscopo.length, 0, 'sem escopo definido a consulta deveria voltar vazia')
   })
@@ -66,7 +63,6 @@ describe('políticas de RLS por empresa', () => {
     const minha = await createTenant('rls-update-a')
     const vizinha = await createTenant('rls-update-b')
 
-    // UPDATE apontando direto para o id do vizinho, sem filtro de empresa nenhum.
     const resultado = await comEscopoDaEmpresa(minha.companyId, () =>
       dbDaAplicacao.update(products).set({ name: 'Renomeado por engano' }).where(eq(products.id, vizinha.productId)),
     )
@@ -99,8 +95,8 @@ describe('políticas de RLS por empresa', () => {
   })
 
   it('duas requisições simultâneas de empresas diferentes não trocam de escopo', async () => {
-    // A conexão é reservada por requisição e volta para o pool no fim. Se a devolução deixasse a
-    // empresa marcada, ou se duas requisições dividissem a mesma conexão, este teste pegaria.
+    // Se a devolução ao pool deixasse a empresa marcada, ou se duas requisições dividissem conexão,
+    // este teste pegaria.
     const primeira = await createTenant('rls-simultaneo-a')
     const segunda = await createTenant('rls-simultaneo-b')
 

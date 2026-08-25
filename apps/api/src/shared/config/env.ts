@@ -19,8 +19,8 @@ const envSchema = z
       .trim()
       .optional()
       .transform((value) => value || undefined),
-    // Cada requisição reserva uma conexão do início ao fim, por causa das políticas de RLS: o pool
-    // precisa caber o número de requisições simultâneas, não o de consultas.
+    // Cada requisição reserva uma conexão do início ao fim: o pool dimensiona requisições
+    // simultâneas, não consultas.
     DATABASE_POOL_MAX: z.coerce.number().int().min(2).default(20),
     JWT_SECRET: z.string().min(1, 'JWT_SECRET é obrigatório'),
     JWT_EXPIRES_IN: z.string().default('8h'),

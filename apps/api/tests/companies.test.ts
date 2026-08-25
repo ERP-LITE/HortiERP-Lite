@@ -38,6 +38,49 @@ describe('impersonação', () => {
     })
     assert.equal(suspendedResponse.statusCode, 401)
   })
+
+  test('a volta ao super admin funciona, e as telas da própria conta também durante o acesso', async () => {
+    // Regressão do RLS: durante a impersonação a conexão está estreitada para a empresa visitada, mas
+    // estas quatro leituras são da conta de quem está logado, que mora na Plataforma. Sem a travessia
+    // declarada, sair do modo suporte derrubava a sessão — e um F5 na tela derrubava também.
+    const target = await createTenant('volta-do-suporte')
+    const [platform] = await db.insert(companies).values({ name: 'Plataforma' }).returning({ id: companies.id })
+    const superAdmin = await createUser(platform.id, 'super_admin', 'volta')
+
+    const entrada = await ctx.app.inject({
+      method: 'POST',
+      url: `/api/companies/${target.companyId}/impersonate`,
+      headers: { cookie: authCookie(ctx.app, superAdmin) },
+    })
+    assert.equal(entrada.statusCode, 200)
+    const cookieDeSuporte = entrada.cookies.find(({ name }) => name === 'token')
+    assert.ok(cookieDeSuporte)
+    const cookie = `token=${cookieDeSuporte.value}`
+
+    const perfil = await ctx.app.inject({ method: 'GET', url: '/api/auth/me', headers: { cookie } })
+    assert.equal(perfil.statusCode, 200, 'recarregar a tela durante o acesso não pode derrubar a sessão')
+    assert.equal(perfil.json().impersonating, true)
+    assert.equal(perfil.json().user.id, superAdmin.id, 'o perfil deve ser o do super admin, não o da empresa visitada')
+
+    const dados = await ctx.app.inject({ method: 'GET', url: '/api/auth/me/personal-data', headers: { cookie } })
+    assert.equal(dados.statusCode, 200)
+
+    const saida = await ctx.app.inject({ method: 'POST', url: '/api/auth/exit-impersonation', headers: { cookie } })
+    assert.equal(saida.statusCode, 200, 'sair do modo suporte não pode derrubar a sessão')
+    assert.equal(saida.json().impersonating, false)
+    assert.equal(saida.json().user.companyId, platform.id)
+
+    // E o cookie devolvido tem que voltar a valer nas telas da plataforma.
+    const voltou = saida.cookies.find(({ name }) => name === 'token')
+    assert.ok(voltou)
+    const empresas = await ctx.app.inject({
+      method: 'GET',
+      url: '/api/companies?page=1&pageSize=30',
+      headers: { cookie: `token=${voltou.value}` },
+    })
+    assert.equal(empresas.statusCode, 200)
+    assert.ok(empresas.json().data.length >= 1)
+  })
 })
 
 describe('cadastro de empresas', () => {

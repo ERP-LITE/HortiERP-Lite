@@ -19,7 +19,7 @@ function assertAccountUsable(user: UserWithCompany | undefined, message: string)
 }
 
 export async function authenticateUser(email: string, password: string) {
-  // Travessia declarada: o e-mail é único global e nesta consulta ainda não existe sessão nem empresa.
+  // Travessia declarada: o e-mail é único global e ainda não existe sessão.
   return comEscopoDePlataforma(() => localizarParaLogin(email, password))
 }
 
@@ -40,7 +40,12 @@ async function localizarParaLogin(email: string, password: string) {
   return user
 }
 
+// Travessia declarada: durante impersonação a conta de quem está logado é de outra empresa.
 export async function getUserProfile(companyId: string, userId: string) {
+  return comEscopoDePlataforma(() => localizarPerfil(companyId, userId))
+}
+
+async function localizarPerfil(companyId: string, userId: string) {
   const found = await db.query.users.findFirst({
     where: and(eq(users.id, userId), eq(users.companyId, companyId), isNull(users.deletedAt)),
     with: { company: true },
@@ -65,8 +70,10 @@ export async function changeOwnPassword(
 
   const passwordHash = await bcrypt.hash(newPassword, 10)
 
-  await db
-    .update(users)
-    .set({ passwordHash, updatedAt: new Date() })
-    .where(and(eq(users.id, userId), eq(users.companyId, companyId)))
+  await comEscopoDePlataforma(() =>
+    db
+      .update(users)
+      .set({ passwordHash, updatedAt: new Date() })
+      .where(and(eq(users.id, userId), eq(users.companyId, companyId))),
+  )
 }
