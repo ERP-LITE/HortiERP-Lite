@@ -13,6 +13,7 @@ import { toastError, toastSuccess } from '@/lib/alerts'
 import { listAllProducts } from '@/services/productsService'
 import { createStockEntry, uploadStockEntryAttachment } from '@/services/stockEntriesService'
 import type { Product } from '@/types'
+import { formatFileSize } from '@/lib/format'
 
 interface ItemRow {
   productId: string
@@ -153,6 +154,7 @@ onMounted(loadProducts)
           :min="oldestEventDateIso()"
           :max="todayIso()"
           :error="entryDateError"
+          required
         />
         <BaseInput v-model="supplierName" label="Fornecedor (opcional)" />
         <BaseInput v-model="notes" label="Observações (opcional)" />
@@ -188,7 +190,7 @@ onMounted(loadProducts)
         <p v-if="invoiceErrors.attachments" class="text-xs text-red-600">{{ invoiceErrors.attachments }}</p>
         <ul v-if="attachments.length" class="space-y-1 text-xs text-gray-500 dark:text-gray-400">
           <li v-for="file in attachments" :key="`${file.name}-${file.size}`" class="break-all">
-            {{ file.name }} · {{ (file.size / 1024 / 1024).toFixed(2) }} MB
+            {{ file.name }} · {{ formatFileSize(file.size) }}
           </li>
         </ul>
       </section>
@@ -217,12 +219,14 @@ onMounted(loadProducts)
               label="Produto"
               :options="productOptions"
               :error="itemErrors[index]?.productId"
+              required
             />
             <BaseInput
               v-model="item.quantity"
               :decimal-places="3"
               label="Quantidade"
               :error="itemErrors[index]?.quantity"
+              required
             />
             <BaseInput v-model="item.unitCost" :decimal-places="2" label="Custo unit. (opcional)" />
             <div class="flex flex-col">

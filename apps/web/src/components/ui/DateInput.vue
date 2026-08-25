@@ -3,8 +3,9 @@ import { computed, nextTick, onBeforeUnmount, ref, watch, type CSSProperties } f
 import { Calendar, ChevronLeft, ChevronRight } from '@lucide/vue'
 import { formatDateOnly, formatMonthYear } from '@/lib/format'
 import { toISODate, todayIso } from '@/lib/period'
+import FieldLabel from './FieldLabel.vue'
 
-const props = defineProps<{ modelValue: string; label?: string; error?: string; min?: string; max?: string }>()
+const props = defineProps<{ modelValue: string; label?: string; required?: boolean; error?: string; min?: string; max?: string }>()
 const emit = defineEmits<{ 'update:modelValue': [value: string] }>()
 
 const container = ref<HTMLElement | null>(null)
@@ -134,7 +135,7 @@ onBeforeUnmount(() => {
 
 <template>
   <div ref="container" class="block">
-    <span v-if="label" class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ label }}</span>
+    <FieldLabel :text="label" :required="required" />
     <button
       ref="trigger"
       type="button"

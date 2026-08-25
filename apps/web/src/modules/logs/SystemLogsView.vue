@@ -4,15 +4,17 @@ import { Eye } from '@lucide/vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import BaseBadge from '@/components/ui/BaseBadge.vue'
 import ExpandableText from '@/components/ui/ExpandableText.vue'
-import BaseButton from '@/components/ui/BaseButton.vue'
+import DetailField from '@/components/ui/DetailField.vue'
 import BaseModal from '@/components/ui/BaseModal.vue'
 import BaseSelect from '@/components/ui/BaseSelect.vue'
 import FilterButton from '@/components/ui/FilterButton.vue'
+import FilterModal from '@/components/ui/FilterModal.vue'
 import Pagination from '@/components/ui/Pagination.vue'
 import PeriodPicker from '@/components/ui/PeriodPicker.vue'
 import PrintButton from '@/components/ui/PrintButton.vue'
 import SearchInput from '@/components/ui/SearchInput.vue'
 import SortableTableHeader from '@/components/ui/SortableTableHeader.vue'
+import { useFilterModal } from '@/composables/useFilterModal'
 import { usePagination } from '@/composables/usePagination'
 import { useTableSort } from '@/composables/useTableSort'
 import { getApiErrorMessage } from '@/services/api'
@@ -21,12 +23,13 @@ import { listAllCompanies } from '@/services/companiesService'
 import { listTechnicalLogs } from '@/services/logsService'
 import type { PeriodValue } from '@/lib/period'
 import { formatDateTime } from '@/lib/format'
+import { roleLabel } from '@/lib/roles'
 import type { Company, SystemLog, SystemLogLevel, SystemLogMethod } from '@/types'
 
 const props = defineProps<{ mode: 'technical' | 'activity' }>()
 const isTechnical = computed(() => props.mode === 'technical')
-const { page, pageSize, total, totalPages, applyMeta, watchSearch } = usePagination()
-const { sortBy, sortOrder, toggleSort } = useTableSort(() => { page.value = 1; return loadLogs() }, 'createdAt', 'desc')
+const { page, pageSize, total, totalPages, applyMeta, reload, watchSearch, paginationProps } = usePagination()
+const { sortBy, sortOrder, toggleSort } = useTableSort(() => reload(loadLogs), 'createdAt', 'desc')
 
 const logs = ref<SystemLog[]>([])
 const companies = ref<Company[]>([])
@@ -46,9 +49,10 @@ function emptyFilters() {
   }
 }
 
-const filters = ref(emptyFilters())
-const draftFilters = ref(emptyFilters())
-const filterModalOpen = ref(false)
+const { filters, draftFilters, filterModalOpen, openFilterModal, applyFilters, clearFilters } = useFilterModal(
+  emptyFilters,
+  () => reload(loadLogs),
+)
 const activeFilterCount = computed(
   () =>
     Number(filters.value.method !== 'todos') +
@@ -59,11 +63,11 @@ const activeFilterCount = computed(
 
 const methodOptions = [
   { value: 'todos', label: 'Todos os métodos' },
-  { value: 'GET', label: 'GET — Consulta' },
-  { value: 'POST', label: 'POST — Criação/ação' },
-  { value: 'PUT', label: 'PUT — Atualização' },
-  { value: 'PATCH', label: 'PATCH — Alteração parcial' },
-  { value: 'DELETE', label: 'DELETE — Exclusão' },
+  { value: 'GET', label: 'GET (consulta)' },
+  { value: 'POST', label: 'POST (criação/ação)' },
+  { value: 'PUT', label: 'PUT (atualização)' },
+  { value: 'PATCH', label: 'PATCH (alteração parcial)' },
+  { value: 'DELETE', label: 'DELETE (exclusão)' },
 ]
 const levelOptions = [
   { value: 'todos', label: 'Todos os níveis' },
@@ -155,32 +159,6 @@ async function loadCompanies() {
   }
 }
 
-function openFilters() {
-  draftFilters.value = {
-    ...filters.value,
-    period: { ...filters.value.period },
-  }
-  filterModalOpen.value = true
-}
-
-function applyFilters() {
-  filters.value = {
-    ...draftFilters.value,
-    period: { ...draftFilters.value.period },
-  }
-  filterModalOpen.value = false
-  page.value = 1
-  loadLogs()
-}
-
-function clearFilters() {
-  filters.value = emptyFilters()
-  draftFilters.value = emptyFilters()
-  filterModalOpen.value = false
-  page.value = 1
-  loadLogs()
-}
-
 watchSearch(search, loadLogs)
 onMounted(() => {
   loadLogs()
@@ -200,7 +178,7 @@ onMounted(() => {
     >
       <template #actions>
         <SearchInput v-model="search" :placeholder="isTechnical ? 'Buscar rota, empresa ou erro...' : 'Buscar ação ou usuário...'" />
-        <FilterButton :active="activeFilterCount" @click="openFilters" />
+        <FilterButton :active="activeFilterCount" @click="openFilterModal" />
         <PrintButton />
       </template>
     </PageHeader>
@@ -216,7 +194,7 @@ onMounted(() => {
             <SortableTableHeader field="actorName" :active-field="sortBy" :order="sortOrder" @sort="toggleSort">Usuário</SortableTableHeader>
             <th class="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500 dark:text-gray-400">Evento</th>
             <SortableTableHeader v-if="isTechnical" field="level" :active-field="sortBy" :order="sortOrder" @sort="toggleSort">Nível</SortableTableHeader>
-            <th class="print:hidden px-4 py-3" />
+            <th data-actions class="print:hidden px-4 py-3 text-right text-xs font-medium uppercase text-gray-500 dark:text-gray-400">Ações</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
@@ -245,17 +223,21 @@ onMounted(() => {
               <ExpandableText :text="log.companyName" :max-length="40" empty-text="Plataforma/visitante" />
             </td>
             <td class="max-w-72 px-4 py-3 text-sm text-gray-600 dark:text-gray-300">
-              <ExpandableText :text="log.actorName" :max-length="40" empty-text="Não identificado" class="font-medium" />
-              <ExpandableText v-if="log.actorEmail" :text="log.actorEmail" :max-length="45" class="text-xs text-gray-400" />
+              <div class="min-w-0">
+                <ExpandableText :text="log.actorName" :max-length="40" empty-text="Não identificado" class="block font-medium" />
+                <ExpandableText v-if="log.actorEmail" :text="log.actorEmail" :max-length="45" class="mt-0.5 block text-xs text-gray-400" />
+              </div>
             </td>
             <td class="min-w-56 px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
-              <span class="font-medium">{{ actionLabel(log) }}</span>
-              <ExpandableText
-                v-if="isTechnical"
-                :text="`${log.method} ${log.path} · HTTP ${log.statusCode} · ${log.durationMs} ms`"
-                :max-length="65"
-                class="mt-0.5 font-mono text-xs text-gray-400"
-              />
+              <div class="min-w-0">
+                <span class="block font-medium">{{ actionLabel(log) }}</span>
+                <ExpandableText
+                  v-if="isTechnical"
+                  :text="`${log.method} ${log.path} · HTTP ${log.statusCode} · ${log.durationMs} ms`"
+                  :max-length="65"
+                  class="mt-0.5 block font-mono text-xs text-gray-400"
+                />
+              </div>
             </td>
             <td v-if="isTechnical" class="whitespace-nowrap px-4 py-3">
               <BaseBadge :variant="levelVariants[log.level]">{{ levelLabels[log.level] }}</BaseBadge>
@@ -272,49 +254,42 @@ onMounted(() => {
           </tr>
         </tbody>
       </table>
-      <Pagination
-        :page="page"
-        :page-size="pageSize"
-        :total="total"
-        :total-pages="totalPages"
-        @update:page="page = $event"
-        @update:page-size="pageSize = $event"
-      />
+      <Pagination v-bind="paginationProps" />
     </div>
 
-    <BaseModal :open="filterModalOpen" title="Filtrar logs" @close="filterModalOpen = false">
-      <form class="space-y-4" @submit.prevent="applyFilters">
-        <BaseSelect v-if="isTechnical" v-model="draftFilters.companyId" label="Empresa" :options="companyOptions" />
-        <BaseSelect v-model="draftFilters.method" label="Método/operação" :options="methodOptions" />
-        <BaseSelect v-if="isTechnical" v-model="draftFilters.level" label="Nível" :options="levelOptions" />
-        <PeriodPicker v-model="draftFilters.period" />
-        <div class="flex items-center justify-between pt-2">
-          <button type="button" class="text-sm text-gray-500 hover:underline dark:text-gray-400" @click="clearFilters">
-            Limpar
-          </button>
-          <div class="flex gap-2">
-            <BaseButton variant="secondary" type="button" @click="filterModalOpen = false">Cancelar</BaseButton>
-            <BaseButton type="submit">Aplicar</BaseButton>
-          </div>
-        </div>
-      </form>
-    </BaseModal>
+    <FilterModal
+      :open="filterModalOpen"
+      title="Filtrar logs"
+      @close="filterModalOpen = false"
+      @apply="applyFilters"
+      @clear="clearFilters"
+    >
+      <BaseSelect v-if="isTechnical" v-model="draftFilters.companyId" label="Empresa" :options="companyOptions" />
+      <BaseSelect v-model="draftFilters.method" label="Método/operação" :options="methodOptions" />
+      <BaseSelect v-if="isTechnical" v-model="draftFilters.level" label="Nível" :options="levelOptions" />
+      <PeriodPicker v-model="draftFilters.period" />
+    </FilterModal>
 
     <BaseModal :open="!!selectedLog" title="Detalhes do log" @close="selectedLog = null">
-      <dl v-if="selectedLog" class="grid grid-cols-1 gap-4 text-sm sm:grid-cols-2">
-        <div><dt class="text-gray-500 dark:text-gray-400">Data e hora</dt><dd class="font-medium dark:text-gray-100">{{ formatDateTime(selectedLog.createdAt) }}</dd></div>
-        <div><dt class="text-gray-500 dark:text-gray-400">Empresa</dt><dd class="font-medium dark:text-gray-100">{{ selectedLog.companyName || 'Plataforma/visitante' }}</dd></div>
-        <div><dt class="text-gray-500 dark:text-gray-400">Usuário</dt><dd class="font-medium dark:text-gray-100">{{ selectedLog.actorName || 'Não identificado' }}</dd></div>
-        <div><dt class="text-gray-500 dark:text-gray-400">Perfil</dt><dd class="font-medium dark:text-gray-100">{{ selectedLog.actorRole || '—' }}</dd></div>
-        <div class="sm:col-span-2"><dt class="text-gray-500 dark:text-gray-400">Evento</dt><dd class="font-medium dark:text-gray-100">{{ actionLabel(selectedLog) }}</dd></div>
+      <dl v-if="selectedLog" class="grid grid-cols-1 gap-x-6 gap-y-5 sm:grid-cols-2">
+        <DetailField label="Data e hora">{{ formatDateTime(selectedLog.createdAt) }}</DetailField>
+        <DetailField label="Empresa">{{ selectedLog.companyName || 'Plataforma/visitante' }}</DetailField>
+        <DetailField label="Usuário">{{ selectedLog.actorName || 'Não identificado' }}</DetailField>
+        <DetailField label="Perfil">{{ roleLabel(selectedLog.actorRole) }}</DetailField>
+        <DetailField label="Evento" wide>{{ actionLabel(selectedLog) }}</DetailField>
         <template v-if="isTechnical">
-          <div class="sm:col-span-2"><dt class="text-gray-500 dark:text-gray-400">Rota</dt><dd class="break-all font-mono text-xs dark:text-gray-100">{{ selectedLog.method }} {{ selectedLog.path }}</dd></div>
-          <div><dt class="text-gray-500 dark:text-gray-400">Resposta</dt><dd class="font-medium dark:text-gray-100">HTTP {{ selectedLog.statusCode }}</dd></div>
-          <div><dt class="text-gray-500 dark:text-gray-400">Duração</dt><dd class="font-medium dark:text-gray-100">{{ selectedLog.durationMs }} ms</dd></div>
-          <div><dt class="text-gray-500 dark:text-gray-400">IP</dt><dd class="font-medium dark:text-gray-100">{{ selectedLog.ip || '—' }}</dd></div>
-          <div><dt class="text-gray-500 dark:text-gray-400">Código do erro</dt><dd class="font-medium dark:text-gray-100">{{ selectedLog.errorCode || '—' }}</dd></div>
-          <div v-if="selectedLog.errorMessage" class="sm:col-span-2"><dt class="text-gray-500 dark:text-gray-400">Mensagem do erro</dt><dd class="mt-1 break-all rounded-lg bg-red-50 p-3 text-red-700 dark:bg-red-950/40 dark:text-red-300">{{ selectedLog.errorMessage }}</dd></div>
-          <div class="sm:col-span-2"><dt class="text-gray-500 dark:text-gray-400">Navegador/cliente</dt><dd class="mt-1 break-all text-xs dark:text-gray-300">{{ selectedLog.userAgent || '—' }}</dd></div>
+          <DetailField label="Rota" wide mono>{{ selectedLog.method }} {{ selectedLog.path }}</DetailField>
+          <DetailField label="Resposta">HTTP {{ selectedLog.statusCode }}</DetailField>
+          <DetailField label="Duração">{{ selectedLog.durationMs }} ms</DetailField>
+          <DetailField label="IP">{{ selectedLog.ip || '—' }}</DetailField>
+          <DetailField label="Código do erro">{{ selectedLog.errorCode || '—' }}</DetailField>
+          <div v-if="selectedLog.errorMessage" class="sm:col-span-2">
+            <dt class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Mensagem do erro</dt>
+            <dd class="mt-1 break-all rounded-lg bg-red-50 p-3 text-sm text-red-700 dark:bg-red-950/40 dark:text-red-300">
+              {{ selectedLog.errorMessage }}
+            </dd>
+          </div>
+          <DetailField label="Navegador/cliente" wide mono>{{ selectedLog.userAgent || '—' }}</DetailField>
         </template>
       </dl>
     </BaseModal>

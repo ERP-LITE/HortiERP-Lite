@@ -4,33 +4,34 @@ import { Building2, MapPin, Pencil, Plus, UserCog, Wand2 } from '@lucide/vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
+import BaseSelect from '@/components/ui/BaseSelect.vue'
 import ExpandableText from '@/components/ui/ExpandableText.vue'
 import BaseModal from '@/components/ui/BaseModal.vue'
-import BaseBadge from '@/components/ui/BaseBadge.vue'
 import BaseToggle from '@/components/ui/BaseToggle.vue'
 import Pagination from '@/components/ui/Pagination.vue'
 import SearchInput from '@/components/ui/SearchInput.vue'
 import SortableTableHeader from '@/components/ui/SortableTableHeader.vue'
+import StatusBadge from '@/components/ui/StatusBadge.vue'
 import { getApiErrorMessage, resolveFormError } from '@/services/api'
 import { toastError, toastSuccess } from '@/lib/alerts'
+import { formatCnpj, formatPhone } from '@/lib/format'
 import { generateRandomPassword } from '@/lib/password'
+import { isValidUf, ufOptions } from '@/lib/ufs'
 import { findAddressByCep } from '@/services/cepService'
 import {
   createCompany,
   listCompanies,
   setCompanyActive,
   updateCompany,
-  type CreateCompanyInput,
   type CompanyDetailsInput,
-  type UpdateCompanyInput,
 } from '@/services/companiesService'
 import { usePagination } from '@/composables/usePagination'
 import { useTableSort } from '@/composables/useTableSort'
 import type { Company } from '@/types'
 import PlatformUsersPanel from './PlatformUsersPanel.vue'
 
-const { page, pageSize, total, totalPages, applyMeta, watchSearch } = usePagination()
-const { sortBy, sortOrder, toggleSort } = useTableSort(() => { page.value = 1; return loadCompanies() }, 'name')
+const { page, pageSize, total, totalPages, applyMeta, reload, watchSearch, paginationProps } = usePagination()
+const { sortBy, sortOrder, toggleSort } = useTableSort(() => reload(loadCompanies), 'name')
 
 const companies = ref<Company[]>([])
 const loading = ref(true)
@@ -63,14 +64,17 @@ const emptyCompanyDetails: CompanyDetailsInput = {
   city: '',
   state: '',
 }
-const emptyCreateForm: CreateCompanyInput = {
-  ...emptyCompanyDetails,
-  adminName: '',
-  adminEmail: '',
-  adminPassword: '',
+const emptyAdmin = { name: '', email: '', password: '', passwordConfirm: '' }
+
+const form = ref<CompanyDetailsInput>({ ...emptyCompanyDetails })
+const adminForm = ref({ ...emptyAdmin })
+
+const generalFields = ['name', 'legalName', 'document', 'stateRegistration', 'contactName', 'contactEmail', 'phone']
+const addressFields = ['postalCode', 'street', 'addressNumber', 'complement', 'district', 'city', 'state']
+
+function onlyDigits(value: string) {
+  return value.replace(/\D/g, '')
 }
-const createForm = ref<CreateCompanyInput>({ ...emptyCreateForm })
-const editForm = ref<UpdateCompanyInput>({ ...emptyCompanyDetails })
 
 async function loadCompanies() {
   loading.value = true
@@ -85,74 +89,78 @@ async function loadCompanies() {
   }
 }
 
-function openCreateModal() {
-  editingId.value = null
-  createForm.value = { ...emptyCreateForm }
+function openModal(company: Company | null) {
+  editingId.value = company?.id ?? null
+  form.value = company
+    ? {
+        name: company.name,
+        legalName: company.legalName ?? '',
+        document: company.document ?? '',
+        stateRegistration: company.stateRegistration ?? '',
+        contactName: company.contactName ?? '',
+        contactEmail: company.contactEmail ?? '',
+        phone: company.phone ?? '',
+        postalCode: company.postalCode ?? '',
+        street: company.street ?? '',
+        addressNumber: company.addressNumber ?? '',
+        complement: company.complement ?? '',
+        district: company.district ?? '',
+        city: company.city ?? '',
+        state: company.state ?? '',
+      }
+    : { ...emptyCompanyDetails }
+  adminForm.value = { ...emptyAdmin }
   fieldErrors.value = {}
   modalTab.value = 'company'
-  lastLookedUpCep = ''
+  lastLookedUpCep = onlyDigits(form.value.postalCode)
   modalOpen.value = true
 }
 
-function openEditModal(company: Company) {
-  editingId.value = company.id
-  editForm.value = {
-    name: company.name,
-    legalName: company.legalName ?? '',
-    document: company.document ?? '',
-    stateRegistration: company.stateRegistration ?? '',
-    contactName: company.contactName ?? '',
-    contactEmail: company.contactEmail ?? '',
-    phone: company.phone ?? '',
-    postalCode: company.postalCode ?? '',
-    street: company.street ?? '',
-    addressNumber: company.addressNumber ?? '',
-    complement: company.complement ?? '',
-    district: company.district ?? '',
-    city: company.city ?? '',
-    state: company.state ?? '',
-  }
+function validate(): boolean {
+  const values = form.value
   fieldErrors.value = {}
-  modalTab.value = 'company'
-  lastLookedUpCep = ''
-  modalOpen.value = true
-}
+  if (!values.name.trim()) fieldErrors.value.name = 'Informe o nome fantasia'
+  if (!values.legalName.trim()) fieldErrors.value.legalName = 'Informe a razão social'
+  if (onlyDigits(values.document).length !== 14) fieldErrors.value.document = 'Informe um CNPJ válido'
+  if (!values.contactName.trim()) fieldErrors.value.contactName = 'Informe o responsável'
+  if (!values.contactEmail.trim()) fieldErrors.value.contactEmail = 'Informe o e-mail de contato'
+  if (onlyDigits(values.phone).length < 10) fieldErrors.value.phone = 'Informe um telefone válido'
+  if (onlyDigits(values.postalCode).length !== 8) fieldErrors.value.postalCode = 'Informe um CEP válido'
+  if (!values.street.trim()) fieldErrors.value.street = 'Informe o logradouro'
+  if (!values.addressNumber.trim()) fieldErrors.value.addressNumber = 'Informe o número'
+  if (!values.district.trim()) fieldErrors.value.district = 'Informe o bairro'
+  if (!values.city.trim()) fieldErrors.value.city = 'Informe a cidade'
+  if (!isValidUf(values.state)) fieldErrors.value.state = 'Selecione a UF'
 
-function validateCompany(details: CompanyDetailsInput): boolean {
-  fieldErrors.value = {}
-  if (!details.name.trim()) fieldErrors.value.name = 'Informe o nome fantasia'
-  if (!details.legalName.trim()) fieldErrors.value.legalName = 'Informe a razão social'
-  if (details.document.replace(/\D/g, '').length !== 14) fieldErrors.value.document = 'Informe um CNPJ válido'
-  if (!details.contactName.trim()) fieldErrors.value.contactName = 'Informe o responsável'
-  if (!details.contactEmail.trim()) fieldErrors.value.contactEmail = 'Informe o e-mail de contato'
-  if (details.phone.replace(/\D/g, '').length < 10) fieldErrors.value.phone = 'Informe um telefone válido'
-  if (details.postalCode.replace(/\D/g, '').length !== 8) fieldErrors.value.postalCode = 'Informe um CEP válido'
-  if (!details.street.trim()) fieldErrors.value.street = 'Informe o logradouro'
-  if (!details.addressNumber.trim()) fieldErrors.value.addressNumber = 'Informe o número'
-  if (!details.district.trim()) fieldErrors.value.district = 'Informe o bairro'
-  if (!details.city.trim()) fieldErrors.value.city = 'Informe a cidade'
-  if (details.state.trim().length !== 2) fieldErrors.value.state = 'Informe a UF'
-  const generalFields = ['name', 'legalName', 'document', 'stateRegistration', 'contactName', 'contactEmail', 'phone']
-  modalTab.value = generalFields.some((field) => fieldErrors.value[field]) ? 'company' : 'address'
+  if (!editingId.value) {
+    const admin = adminForm.value
+    if (!admin.name.trim()) fieldErrors.value.adminName = 'Informe o nome do administrador'
+    if (!admin.email.trim()) fieldErrors.value.adminEmail = 'Informe o e-mail do administrador'
+    if (!admin.password.trim() || admin.password.length < 8) {
+      fieldErrors.value.adminPassword = 'A senha deve ter ao menos 8 caracteres'
+    } else if (admin.password !== admin.passwordConfirm) {
+      fieldErrors.value.adminPasswordConfirm = 'A confirmação não confere com a senha'
+    }
+  }
+
+  focusTabWithError()
   return Object.keys(fieldErrors.value).length === 0
 }
 
-function validateCreate(): boolean {
-  const companyValid = validateCompany(createForm.value)
-  if (!createForm.value.adminName.trim()) fieldErrors.value.adminName = 'Informe o nome do administrador'
-  if (!createForm.value.adminEmail.trim()) fieldErrors.value.adminEmail = 'Informe o e-mail do administrador'
-  if (!createForm.value.adminPassword.trim() || createForm.value.adminPassword.length < 8) {
-    fieldErrors.value.adminPassword = 'A senha deve ter ao menos 8 caracteres'
-  }
-  if (companyValid && (fieldErrors.value.adminName || fieldErrors.value.adminEmail || fieldErrors.value.adminPassword)) {
-    modalTab.value = 'admin'
-  }
-  return Object.keys(fieldErrors.value).length === 0
+function focusTabWithError() {
+  const fields = Object.keys(fieldErrors.value)
+  if (!fields.length) return
+  if (fields.some((field) => generalFields.includes(field))) modalTab.value = 'company'
+  else if (fields.some((field) => addressFields.includes(field))) modalTab.value = 'address'
+  else modalTab.value = editingId.value ? 'company' : 'admin'
 }
 
 async function handleGeneratePassword() {
   const password = generateRandomPassword()
-  createForm.value.adminPassword = password
+  adminForm.value.password = password
+  adminForm.value.passwordConfirm = password
+  delete fieldErrors.value.adminPassword
+  delete fieldErrors.value.adminPasswordConfirm
 
   try {
     await navigator.clipboard.writeText(password)
@@ -163,21 +171,20 @@ async function handleGeneratePassword() {
 }
 
 async function handleSubmit() {
+  if (!validate()) return
+
   saving.value = true
   try {
     if (editingId.value) {
-      if (!validateCompany(editForm.value)) {
-        saving.value = false
-        return
-      }
-      await updateCompany(editingId.value, editForm.value)
+      await updateCompany(editingId.value, form.value)
       toastSuccess('Empresa atualizada com sucesso')
     } else {
-      if (!validateCreate()) {
-        saving.value = false
-        return
-      }
-      const result = await createCompany(createForm.value)
+      const result = await createCompany({
+        ...form.value,
+        adminName: adminForm.value.name,
+        adminEmail: adminForm.value.email,
+        adminPassword: adminForm.value.password,
+      })
       toastSuccess(`Empresa criada. Login do admin: ${result.admin.email}`)
     }
     modalOpen.value = false
@@ -185,46 +192,39 @@ async function handleSubmit() {
   } catch (error) {
     const result = resolveFormError(error, 'Não foi possível salvar a empresa')
     fieldErrors.value = result.fieldErrors
+    focusTabWithError()
     if (result.message) toastError(result.message)
   } finally {
     saving.value = false
   }
 }
 
-function formatCnpj(value: string | null) {
-  if (!value) return ''
-  return value.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5')
-}
-
-async function lookupCep(form: CompanyDetailsInput) {
-  const cep = form.postalCode.replace(/\D/g, '')
+async function lookupCep() {
+  const cep = onlyDigits(form.value.postalCode)
   if (cep.length !== 8 || cep === lastLookedUpCep) return
   const sequence = ++cepLookupSequence
   lookingUpCep.value = true
   try {
     const address = await findAddressByCep(cep)
-    if (sequence !== cepLookupSequence || form.postalCode.replace(/\D/g, '') !== cep) return
-    form.street = address.street
-    form.district = address.district
-    form.city = address.city
-    form.state = address.state
-    if (address.complement && !form.complement) form.complement = address.complement
+    if (sequence !== cepLookupSequence || onlyDigits(form.value.postalCode) !== cep) return
+    form.value.street = address.street
+    form.value.district = address.district
+    form.value.city = address.city
+    form.value.state = isValidUf(address.state) ? address.state.toUpperCase() : ''
+    if (address.complement && !form.value.complement) form.value.complement = address.complement
     lastLookedUpCep = cep
-    delete fieldErrors.value.postalCode
     toastSuccess('Endereço preenchido pelo CEP')
   } catch (error) {
-    if (sequence !== cepLookupSequence || form.postalCode.replace(/\D/g, '') !== cep) return
+    if (sequence !== cepLookupSequence || onlyDigits(form.value.postalCode) !== cep) return
     fieldErrors.value.postalCode = error instanceof Error ? error.message : 'Não foi possível consultar o CEP'
   } finally {
     if (sequence === cepLookupSequence) lookingUpCep.value = false
   }
 }
 
-watch(() => createForm.value.postalCode, () => {
-  if (!editingId.value) void lookupCep(createForm.value)
-})
-watch(() => editForm.value.postalCode, () => {
-  if (editingId.value) void lookupCep(editForm.value)
+watch(() => form.value.postalCode, () => {
+  delete fieldErrors.value.postalCode
+  void lookupCep()
 })
 
 async function handleToggleActive(company: Company, active: boolean) {
@@ -246,7 +246,7 @@ onMounted(loadCompanies)
     <PageHeader title="Empresas" subtitle="Cadastre e gerencie as empresas-cliente do sistema">
       <template #actions>
         <SearchInput v-model="search" placeholder="Buscar por nome ou CNPJ..." />
-        <BaseButton class="!px-2.5 sm:!px-4" title="Nova empresa" aria-label="Nova empresa" @click="openCreateModal">
+        <BaseButton class="!px-2.5 sm:!px-4" title="Nova empresa" aria-label="Nova empresa" @click="openModal(null)">
           <Plus :size="16" /> <span class="hidden sm:inline">Nova empresa</span>
         </BaseButton>
       </template>
@@ -261,8 +261,8 @@ onMounted(loadCompanies)
             <SortableTableHeader field="name" :active-field="sortBy" :order="sortOrder" @sort="toggleSort">Nome fantasia</SortableTableHeader>
             <SortableTableHeader field="document" :active-field="sortBy" :order="sortOrder" @sort="toggleSort">CNPJ</SortableTableHeader>
             <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Contato</th>
-            <SortableTableHeader field="active" :active-field="sortBy" :order="sortOrder" @sort="toggleSort">Status</SortableTableHeader>
-            <th class="px-4 py-3" />
+            <SortableTableHeader field="active" :active-field="sortBy" :order="sortOrder" @sort="toggleSort">Situação</SortableTableHeader>
+            <th data-actions class="px-4 py-3 text-right text-xs font-medium uppercase text-gray-500 dark:text-gray-400">Ações</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
@@ -280,7 +280,7 @@ onMounted(loadCompanies)
             :key="company.id"
             class="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/40"
             title="Duplo clique para editar"
-            @dblclick="openEditModal(company)"
+            @dblclick="openModal(company)"
           >
             <td class="max-w-72 px-4 py-3 text-sm font-medium text-gray-900 dark:text-gray-100">
               <ExpandableText :text="company.name" :max-length="45" />
@@ -289,13 +289,11 @@ onMounted(loadCompanies)
               <ExpandableText :text="formatCnpj(company.document)" :max-length="35" />
             </td>
             <td class="max-w-64 px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
-              <ExpandableText :text="company.contactEmail || company.phone" :max-length="35" />
+              <ExpandableText :text="company.contactEmail || formatPhone(company.phone)" :max-length="35" />
             </td>
             <td class="px-4 py-3 whitespace-nowrap" @dblclick.stop @click.stop>
               <div class="flex items-center gap-2">
-                <BaseBadge :variant="company.active ? 'success' : 'neutral'">
-                  {{ company.active ? 'Ativo' : 'Suspenso' }}
-                </BaseBadge>
+                <StatusBadge :active="company.active" inactive-text="Suspenso" />
                 <BaseToggle
                   :model-value="company.active"
                   @update:model-value="(value) => handleToggleActive(company, value)"
@@ -306,7 +304,7 @@ onMounted(loadCompanies)
               <button
                 class="inline-flex items-center justify-center h-8 w-8 rounded-lg text-primary-600 hover:bg-primary-50 dark:text-primary-400 dark:hover:bg-primary-900/30"
                 title="Editar"
-                @click="openEditModal(company)"
+                @click="openModal(company)"
               >
                 <Pencil :size="16" />
               </button>
@@ -314,14 +312,7 @@ onMounted(loadCompanies)
           </tr>
         </tbody>
       </table>
-      <Pagination
-        :page="page"
-        :page-size="pageSize"
-        :total="total"
-        :total-pages="totalPages"
-        @update:page="page = $event"
-        @update:page-size="pageSize = $event"
-      />
+      <Pagination v-bind="paginationProps" />
     </div>
 
     <PlatformUsersPanel />
@@ -370,97 +361,65 @@ onMounted(loadCompanies)
         </button>
       </div>
 
-      <form v-if="editingId" class="space-y-5" novalidate @submit.prevent="handleSubmit">
+      <form class="space-y-5" novalidate @submit.prevent="handleSubmit">
         <div v-show="modalTab === 'company'" class="space-y-5">
           <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Identificação</p>
           <div class="grid gap-4 sm:grid-cols-2">
-            <BaseInput v-model="editForm.name" label="Nome fantasia" :error="fieldErrors.name" required />
-            <BaseInput v-model="editForm.legalName" label="Razão social" :error="fieldErrors.legalName" required />
-            <BaseInput v-model="editForm.document" mask="cnpj" label="CNPJ" placeholder="00.000.000/0000-00" :error="fieldErrors.document" required />
-            <BaseInput v-model="editForm.stateRegistration" label="Inscrição estadual (opcional)" :error="fieldErrors.stateRegistration" />
+            <BaseInput v-model="form.name" label="Nome fantasia" :error="fieldErrors.name" required />
+            <BaseInput v-model="form.legalName" label="Razão social" :error="fieldErrors.legalName" required />
+            <BaseInput v-model="form.document" mask="cnpj" label="CNPJ" placeholder="00.000.000/0000-00" :error="fieldErrors.document" required />
+            <BaseInput v-model="form.stateRegistration" label="Inscrição estadual (opcional)" :error="fieldErrors.stateRegistration" />
           </div>
           <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Contato</p>
           <div class="grid gap-4 sm:grid-cols-2">
-            <BaseInput v-model="editForm.contactName" label="Responsável" :error="fieldErrors.contactName" required />
-            <BaseInput v-model="editForm.contactEmail" type="email" label="E-mail" :error="fieldErrors.contactEmail" required />
-            <BaseInput v-model="editForm.phone" mask="phone" label="Telefone / WhatsApp" placeholder="(00) 00000-0000" :error="fieldErrors.phone" required />
+            <BaseInput v-model="form.contactName" label="Responsável" :error="fieldErrors.contactName" required />
+            <BaseInput v-model="form.contactEmail" type="email" label="E-mail de contato" :error="fieldErrors.contactEmail" required />
+            <BaseInput v-model="form.phone" mask="phone" label="Telefone / WhatsApp" placeholder="(00) 00000-0000" :error="fieldErrors.phone" required />
           </div>
         </div>
         <div v-show="modalTab === 'address'" class="space-y-5">
           <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Endereço</p>
           <div class="grid gap-4 sm:grid-cols-2">
             <div>
-              <BaseInput v-model="editForm.postalCode" mask="cep" label="CEP" placeholder="00000-000" :error="fieldErrors.postalCode" required />
+              <BaseInput v-model="form.postalCode" mask="cep" label="CEP" placeholder="00000-000" :error="fieldErrors.postalCode" required />
               <span v-if="lookingUpCep" class="mt-1 block text-xs text-gray-500 dark:text-gray-400">Buscando endereço...</span>
             </div>
-            <BaseInput v-model="editForm.street" label="Logradouro" :error="fieldErrors.street" required />
-            <BaseInput v-model="editForm.addressNumber" label="Número" :error="fieldErrors.addressNumber" required />
-            <BaseInput v-model="editForm.complement" label="Complemento (opcional)" :error="fieldErrors.complement" />
-            <BaseInput v-model="editForm.district" label="Bairro" :error="fieldErrors.district" required />
-            <BaseInput v-model="editForm.city" label="Cidade" :error="fieldErrors.city" required />
-            <BaseInput v-model="editForm.state" label="UF" placeholder="SC" :error="fieldErrors.state" required />
+            <BaseInput v-model="form.street" label="Logradouro" :error="fieldErrors.street" required />
+            <BaseInput v-model="form.addressNumber" label="Número" :error="fieldErrors.addressNumber" required />
+            <BaseInput v-model="form.complement" label="Complemento (opcional)" :error="fieldErrors.complement" />
+            <BaseInput v-model="form.district" label="Bairro" :error="fieldErrors.district" required />
+            <BaseInput v-model="form.city" label="Cidade" :error="fieldErrors.city" required />
+            <BaseSelect v-model="form.state" label="UF" :options="ufOptions" placeholder="Selecione a UF" :error="fieldErrors.state" required />
           </div>
         </div>
-        <div class="flex justify-between gap-2 pt-2">
-          <BaseButton variant="secondary" type="button" @click="modalOpen = false">Cancelar</BaseButton>
-          <div class="flex gap-2">
-            <BaseButton v-if="modalTab === 'address'" variant="secondary" type="button" @click="modalTab = 'company'">Voltar</BaseButton>
-            <BaseButton v-if="modalTab === 'company'" type="button" @click="modalTab = 'address'">Continuar</BaseButton>
-            <BaseButton v-else type="submit" :disabled="saving">{{ saving ? 'Salvando...' : 'Salvar' }}</BaseButton>
-          </div>
-        </div>
-      </form>
-      <form v-else class="space-y-5" novalidate @submit.prevent="handleSubmit">
-        <div v-show="modalTab === 'company'" class="space-y-5">
-          <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Identificação</p>
-          <div class="grid gap-4 sm:grid-cols-2">
-            <BaseInput v-model="createForm.name" label="Nome fantasia" :error="fieldErrors.name" required />
-            <BaseInput v-model="createForm.legalName" label="Razão social" :error="fieldErrors.legalName" required />
-            <BaseInput v-model="createForm.document" mask="cnpj" label="CNPJ" placeholder="00.000.000/0000-00" :error="fieldErrors.document" required />
-            <BaseInput v-model="createForm.stateRegistration" label="Inscrição estadual (opcional)" :error="fieldErrors.stateRegistration" />
-          </div>
-          <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Contato</p>
-          <div class="grid gap-4 sm:grid-cols-2">
-            <BaseInput v-model="createForm.contactName" label="Responsável" :error="fieldErrors.contactName" required />
-            <BaseInput v-model="createForm.contactEmail" type="email" label="E-mail de contato" :error="fieldErrors.contactEmail" required />
-            <BaseInput v-model="createForm.phone" mask="phone" label="Telefone / WhatsApp" placeholder="(00) 00000-0000" :error="fieldErrors.phone" required />
-          </div>
-        </div>
-        <div v-show="modalTab === 'address'" class="space-y-5">
-          <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Endereço</p>
-          <div class="grid gap-4 sm:grid-cols-2">
-            <div>
-              <BaseInput v-model="createForm.postalCode" mask="cep" label="CEP" placeholder="00000-000" :error="fieldErrors.postalCode" required />
-              <span v-if="lookingUpCep" class="mt-1 block text-xs text-gray-500 dark:text-gray-400">Buscando endereço...</span>
-            </div>
-            <BaseInput v-model="createForm.street" label="Logradouro" :error="fieldErrors.street" required />
-            <BaseInput v-model="createForm.addressNumber" label="Número" :error="fieldErrors.addressNumber" required />
-            <BaseInput v-model="createForm.complement" label="Complemento (opcional)" :error="fieldErrors.complement" />
-            <BaseInput v-model="createForm.district" label="Bairro" :error="fieldErrors.district" required />
-            <BaseInput v-model="createForm.city" label="Cidade" :error="fieldErrors.city" required />
-            <BaseInput v-model="createForm.state" label="UF" placeholder="SC" :error="fieldErrors.state" required />
-          </div>
-        </div>
-        <div v-show="modalTab === 'admin'" class="space-y-5">
+        <div v-if="!editingId" v-show="modalTab === 'admin'" class="space-y-5">
           <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Administrador da empresa</p>
           <div class="grid gap-4 sm:grid-cols-2">
-            <BaseInput v-model="createForm.adminName" label="Nome" :error="fieldErrors.adminName" />
-            <BaseInput v-model="createForm.adminEmail" type="email" label="E-mail" :error="fieldErrors.adminEmail" />
+            <BaseInput v-model="adminForm.name" label="Nome" :error="fieldErrors.adminName" required />
+            <BaseInput v-model="adminForm.email" type="email" label="E-mail" :error="fieldErrors.adminEmail" required />
           </div>
-          <div>
-            <BaseInput v-model="createForm.adminPassword" type="password" label="Senha" :error="fieldErrors.adminPassword" />
-            <button type="button" class="mt-1.5 inline-flex items-center gap-1 text-xs text-primary-600 hover:underline dark:text-primary-400" @click="handleGeneratePassword">
-              <Wand2 :size="12" /> Gerar senha aleatória
-            </button>
+          <div class="grid gap-4 sm:grid-cols-2">
+            <div>
+              <BaseInput v-model="adminForm.password" type="password" label="Senha" :error="fieldErrors.adminPassword" required />
+              <button type="button" class="mt-1.5 inline-flex items-center gap-1 text-xs text-primary-600 hover:underline dark:text-primary-400" @click="handleGeneratePassword">
+                <Wand2 :size="12" /> Gerar senha aleatória
+              </button>
+            </div>
+            <BaseInput
+              v-model="adminForm.passwordConfirm"
+              type="password"
+              label="Confirmar senha"
+              :error="fieldErrors.adminPasswordConfirm"
+              required
+            />
           </div>
         </div>
         <div class="flex justify-between gap-2 pt-2">
           <BaseButton variant="secondary" type="button" @click="modalOpen = false">Cancelar</BaseButton>
           <div class="flex gap-2">
-            <BaseButton v-if="modalTab === 'address'" variant="secondary" type="button" @click="modalTab = 'company'">Voltar</BaseButton>
-            <BaseButton v-if="modalTab === 'admin'" variant="secondary" type="button" @click="modalTab = 'address'">Voltar</BaseButton>
+            <BaseButton v-if="modalTab !== 'company'" variant="secondary" type="button" @click="modalTab = modalTab === 'admin' ? 'address' : 'company'">Voltar</BaseButton>
             <BaseButton v-if="modalTab === 'company'" type="button" @click="modalTab = 'address'">Continuar</BaseButton>
-            <BaseButton v-else-if="modalTab === 'address'" type="button" @click="modalTab = 'admin'">Continuar</BaseButton>
+            <BaseButton v-else-if="modalTab === 'address' && !editingId" type="button" @click="modalTab = 'admin'">Continuar</BaseButton>
             <BaseButton v-else type="submit" :disabled="saving">{{ saving ? 'Salvando...' : 'Salvar' }}</BaseButton>
           </div>
         </div>

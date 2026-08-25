@@ -444,6 +444,7 @@ Isso **desliga** o RLS sem apagar as políticas: elas voltam a valer com um
 |---|---|---|
 | `0003` — `losses.cancelled_at`, `cancelled_by`, `cancel_reason` | **Sim** | Três colunas nuláveis. O Drizzle lista as colunas explicitamente no `select`, então a versão anterior simplesmente não as enxerga, e o `insert` antigo as deixa nulas. Rollback por troca de imagem é seguro, sem tocar no banco. |
 | `0005` — `stock_movements.movement_date` | **Sim** | Coluna `not null`, mas com `default now()`: o `insert` da versão anterior a omite e o banco preenche com o instante do lançamento, que é o comportamento dela. Rollback por troca de imagem é seguro. A ressalva é de leitura, não de escrita — a versão anterior filtra período por `created_at`, então movimentações lançadas com data retroativa aparecem no dia em que foram digitadas enquanto ela estiver no ar. |
+| `0008` — `categories.active`, `units.active` | **Sim** | Duas colunas `not null` com `default true`: o `insert` da versão anterior as omite e nascem ativas, que é o comportamento dela. Rollback por troca de imagem é seguro. A ressalva é de leitura: enquanto a versão anterior estiver no ar, cadastro inativado volta a aparecer nas opções de produto novo, porque ela não conhece a coluna. |
 
 O sentido inverso **não** é compatível e vale para qualquer migration: restaurar um dump anterior à migration e apontar
 o código **atual** para ele quebra toda consulta que use as colunas novas. Depois de restaurar um backup antigo, rode as

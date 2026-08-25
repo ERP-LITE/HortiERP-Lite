@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import BaseSelect from './BaseSelect.vue'
+import FieldLabel from './FieldLabel.vue'
 
 const props = defineProps<{
   modelValue: string
   label?: string
+  required?: boolean
   error?: string
 }>()
 
@@ -46,12 +48,11 @@ function updatePart(part: 'month' | 'year', value: string) {
 
 <template>
   <div>
-    <span v-if="label" class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ label }}</span>
+    <FieldLabel :text="label" :required="required" />
     <div class="grid grid-cols-[minmax(0,1fr)_7rem] gap-2">
       <BaseSelect
         :model-value="selectedMonth"
         :options="monthOptions"
-        :searchable="false"
         :invalid="Boolean(error)"
         placeholder="Mês"
         aria-label="Mês da competência"
@@ -60,7 +61,6 @@ function updatePart(part: 'month' | 'year', value: string) {
       <BaseSelect
         :model-value="selectedYear"
         :options="yearOptions"
-        :searchable="false"
         :invalid="Boolean(error)"
         placeholder="Ano"
         aria-label="Ano da competência"

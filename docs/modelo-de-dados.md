@@ -48,7 +48,7 @@ Raiz do multiempresa — cada linha é um cliente (frutaria/hortifrúti) contrat
 | `stateRegistration` | text | inscrição estadual opcional |
 | `contactName`, `contactEmail`, `phone` | text | responsável e canais de contato; telefone é persistido apenas com dígitos |
 | `postalCode`, `street`, `addressNumber` | text | CEP normalizado, logradouro e número |
-| `complement`, `district`, `city`, `state` | text | complemento opcional, bairro, cidade e UF com duas letras |
+| `complement`, `district`, `city`, `state` | text | complemento opcional, bairro, cidade e UF (sigla de duas letras, validada contra a lista das 27) |
 | `active` | boolean | default `true` — `false` = empresa suspensa, bloqueia login e requisições de todos os usuários dela sem alterar `users.active` |
 | `createdAt`/`updatedAt`/`deletedAt` | timestamp | |
 
@@ -97,10 +97,14 @@ A unicidade vem do índice parcial `users_email_active_unique`, sobre `lower(ema
 O bloqueio de uma empresa suspensa vem de `companies.active`, verificado no login e em toda requisição autenticada — `users.active` não espelha esse valor, para que reativar a empresa não devolva acesso a quem foi desativado à mão.
 
 ### `categories`
-Classificação de produtos (ex: Frutas, Verduras). `id`, `companyId`, `name`, `description?`, timestamps, auditBy.
+Classificação de produtos (ex: Frutas, Verduras). `id`, `companyId`, `name`, `description?`, `active`, timestamps, auditBy.
 
 ### `units`
-Unidade de medida (ex: kg, un, dz). `id`, `companyId`, `name`, `abbreviation`, timestamps, auditBy.
+Unidade de medida (ex: kg, un, dz). `id`, `companyId`, `name`, `abbreviation`, `active`, timestamps, auditBy.
+
+`active` (padrão `true`, migration `0008`) é o jeito de aposentar um cadastro em uso: inativo continua
+valendo para os produtos que já apontam para ele e sai das opções de produto novo. Exclusão de categoria
+ou unidade em uso é recusada com `409` (`assertNotUsedByProducts`).
 
 ### `products`
 | Coluna | Tipo | Observação |
@@ -117,7 +121,7 @@ Unidade de medida (ex: kg, un, dz). `id`, `companyId`, `name`, `abbreviation`, t
 | `active` | boolean | default `true` |
 | timestamps, auditBy | | |
 
-`categoryId`/`unitId` são validados na criação/edição do produto para garantir que pertencem à mesma empresa (`assertCategoryAndUnitBelongToCompany`, em `products.service.ts`).
+`categoryId`/`unitId` são validados na criação/edição do produto para garantir que pertencem à mesma empresa e que não estão inativos (`assertCategoryAndUnitUsable`, em `products.service.ts`). Produto que já usa um cadastro inativo continua editável: a validação só recusa quando o id muda.
 
 ### `stock_entries` + `stock_entry_items`
 Entrada de mercadoria (cabeçalho + itens), ver [fluxo de entrada](./fluxos-de-negocio.md#entrada-de-mercadoria).

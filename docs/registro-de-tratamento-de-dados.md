@@ -9,7 +9,7 @@
 > técnica de quem construiu o sistema e precisam ser confirmadas — sobretudo porque quem define
 > finalidade e base legal é o controlador, não o operador.
 >
-> Revisão: 24/08/2026.
+> Revisão: 25/08/2026.
 
 ---
 
@@ -255,5 +255,6 @@ encarregado, desde que exista canal de contato com o titular.
 
 | Data | O que mudou |
 |---|---|
+| 25/08/2026 | Aviso de privacidade revisado **só na pontuação** (travessões trocados por ponto, dois-pontos ou parêntese). Nenhuma finalidade, prazo, base legal ou direito mudou. A data de "atualizado em" acompanhou o texto porque o verificador de integridade do aviso exige isso: ele compara o resumo do texto com a data, para o leitor nunca ver texto novo com data velha |
 | 24/08/2026 | Aviso de privacidade publicado dentro do sistema, em rota pública, redigido a partir deste registro. Pendência 2 passou de "não existe nada" para "falta revisão jurídica do texto" |
 | 24/08/2026 | Primeira versão. Inventário levantado a partir do código; retenção por prazo, anonimização, exclusão definitiva e exportação dos dados do titular implementados nesta mesma data |

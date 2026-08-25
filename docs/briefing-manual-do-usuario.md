@@ -11,9 +11,14 @@
 > do PDF (seção 7.11). Se o comportamento do sistema mudar, corrija aqui também — é este arquivo que
 > gera o manual.
 >
-> **Revisão de 25/08/2026:** entrou o lugar onde as mensagens de erro aparecem (seção 7.1) e o prazo
-> de guarda do histórico (seção 7.13). O **manual gerado antes desta data está incompleto**: falta o
-> aviso de privacidade e o botão "Baixar meus dados", que já constam das seções 6.1 e 7.1.
+> **Revisão de 25/08/2026:** entrou o lugar onde as mensagens de erro aparecem (seção 7.1), o prazo
+> de guarda do histórico (seção 7.13), o asterisco de campo obrigatório e a coluna Ações (seção 7.1),
+> a confirmação de senha no cadastro de usuário (seção 7.12), a conferência linha por linha da
+> importação (seção 7.4), a trava de exclusão e a inativação de categoria e unidade (seção 7.2), o
+> filtro por unidade na tela de produtos (seção 7.3), a coluna de unidade na tela de estoque
+> (seção 7.8) e o campo de lista com busca, junto do nome **Situação** padronizado (seção 7.1).
+> O **manual gerado antes desta data está incompleto**: falta o aviso de privacidade e o botão
+> "Baixar meus dados", que já constam das seções 6.1 e 7.1.
 
 ---
 
@@ -209,6 +214,17 @@ cliente**, não copie.
   **aviso no canto superior direito da tela**, por cima da janela aberta, com um X para fechar. Ele
   desaparece sozinho depois de alguns segundos. Isso vale a pena dizer no manual porque o aviso surge
   fora do formulário, e quem não souber olhar para o canto pode achar que o clique não fez nada.
+- **Campo obrigatório tem asterisco vermelho** ao lado do nome do campo. Campo sem asterisco pode
+  ficar vazio. Vale uma frase logo no capítulo que apresenta as telas: economiza a descoberta por
+  tentativa e erro em todo formulário do sistema.
+- Nas listagens, a última coluna se chama **Ações** e é onde ficam os ícones de ver, editar, excluir ou
+  bloquear. No celular esses botões aparecem no pé do cartão do registro. Uma frase basta: sem ela o
+  ícone parece decoração.
+- **Todo campo de escolher numa lista funciona igual** em qualquer tela: clica, a lista abre com um
+  campo **Buscar** em cima, e dá para digitar parte do nome em vez de rolar até achar. Isso vale
+  também nos filtros. Diga isso uma vez, no capítulo das telas, e não repita em cada formulário.
+- Onde a listagem mostra se o registro está ativo ou inativo, a coluna e o filtro se chamam
+  **Situação**, com o mesmo nome em todas as telas.
 - **Encerramento automático:** 30 minutos sem usar e a sessão cai. No último minuto aparece um aviso
   com contagem regressiva. Para continuar conectado é preciso **clicar no botão do aviso** — só mexer
   o mouse não resolve, e isso é de propósito: assim ninguém deixa o sistema aberto e destravado num
@@ -222,6 +238,16 @@ cliente**, não copie.
   vêm primeiro no manual.
 - Nomes não podem repetir dentro da empresa, e a comparação ignora maiúsculas: "Frutas" e "frutas"
   são a mesma coisa.
+- **Categoria e unidade podem ser inativadas.** É o caminho para aposentar um cadastro que não se usa
+  mais: a inativa continua valendo para os produtos que já usam ela (nada muda no estoque nem no
+  histórico) e deixa de aparecer na hora de cadastrar produto novo. As duas telas mostram a situação em
+  etiqueta e têm filtro por situação. Explique com o exemplo que o cliente vive: parou de comprar em
+  caixa, inativa "Caixa", e os produtos antigos que estavam em caixa continuam certos.
+- **Categoria e unidade que já estão em algum produto não podem ser excluídas.** O sistema recusa e diz
+  quantos produtos usam aquele cadastro. Para excluir, é preciso primeiro trocar a categoria ou a
+  unidade desses produtos. Vale explicar o motivo em uma linha: sem essa trava o produto ficaria
+  apontando para um cadastro que não existe mais e não seria mais possível salvá-lo. Isso vale também
+  para a exclusão em lote, que recusa a seleção inteira se um dos itens estiver em uso.
 - Nas listas de categorias, unidades e produtos é possível **marcar vários com a caixinha e excluir
   de uma vez**. Administrador e gerente podem.
 
@@ -241,6 +267,8 @@ cliente**, não copie.
   manual precisa avisar antes, senão o cliente liga achando que o sistema está errado.
 - **Custo** é o que alimenta o "valor em estoque" do painel e o valor das perdas. Produto sem custo
   entra nas contas valendo zero — outro **Atenção** importante.
+- O filtro da tela de produtos tem **categoria, unidade e situação**. Vale citar a unidade: é como
+  responder "quais produtos eu vendo por quilo?" sem olhar linha por linha.
 
 ### 7.4 Importar produtos por planilha
 
@@ -265,8 +293,13 @@ carregamento do cadastro. Limite de **2000 linhas** por vez.
 - **É tudo ou nada.** Se uma linha estiver errada, nada é importado. Vale explicar o motivo: se o
   sistema importasse só as linhas boas, na segunda tentativa as já importadas voltariam como
   duplicadas, e ninguém entende mais o que entrou.
-- Antes de confirmar, o sistema mostra uma **prévia** com o que vai acontecer e a lista de erros por
-  número de linha. Se houver muitos erros, ele mostra os primeiros e informa quantos ficaram de fora.
+- Antes de confirmar, o sistema mostra uma **prévia** com o que vai acontecer: os contadores (linhas
+  lidas, prontas, com problema), etiquetas com o que é novo (categoria, unidade, produto sem custo) e
+  uma **lista linha por linha do que vai entrar**, com produto, categoria, unidade, custo e estoque
+  inicial. Havendo erro, a lista é dos problemas, por número de linha. Nos dois casos, se for muita
+  linha o sistema mostra as primeiras e informa quantas ficaram de fora. Vale destacar essa conferência
+  no manual: é o momento de revisar antes de gravar, e no primeiro carregamento do cadastro é o que
+  evita importar 300 produtos com a categoria errada.
 - Existe a opção de **criar as categorias e unidades que faltarem** durante a importação, útil no
   primeiro carregamento.
 - **O estoque informado na planilha entra como saldo inicial** e aparece no histórico como um ajuste,
@@ -356,7 +389,10 @@ Uma perda já cancelada não aceita mais correção, e a linha dela nem abre no 
 
 ### 7.8 Consulta de estoque e movimentações
 
-- **Estoque** lista os produtos com o saldo atual e tem o filtro **Somente estoque baixo**.
+- **Estoque** lista os produtos com o saldo atual e tem o filtro **Somente estoque baixo**. As colunas
+  são produto, categoria, **unidade**, estoque atual e estoque mínimo: a unidade fica em coluna própria
+  e as duas colunas de quantidade trazem só o número, alinhado à direita, para dar para comparar de
+  cima a baixo. No celular, onde não há colunas, a unidade continua junto do número.
 - **Movimentações** é o histórico completo e imutável de tudo que mexeu no estoque, com três tipos:
   **entrada**, **perda** e **ajuste**. Filtra por produto, tipo e período, e mostra o usuário
   responsável por cada movimento.
@@ -453,7 +489,11 @@ vírgula — diga que abre direto no Excel, sem falar em CSV, ponto e vírgula o
 
 Só o administrador. Cadastra nome, e-mail, perfil e senha, e pode desativar quem saiu da empresa. A
 senha precisa ter **no mínimo 8 caracteres** — informe isso, senão o administrador topa com o aviso
-sem entender.
+sem entender. A senha é digitada duas vezes, no campo **Senha** e em **Confirmar senha**: quem digita
+não é quem vai usar, e o campo é mascarado, então o erro de digitação só apareceria na hora em que o
+funcionário não conseguisse entrar. Existe também um **Gerar senha aleatória**, que preenche os dois
+campos e copia a senha para a área de transferência — é o caminho recomendado, junto de "mande a senha
+para a pessoa e peça para ela trocar em Perfil".
 
 Duas travas que parecem defeito e não são, e por isso entram no manual:
 

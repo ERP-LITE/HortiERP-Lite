@@ -60,3 +60,24 @@ export function formatInputMask(value: string, mask: InputMask) {
     .replace(/^(\d{2})(\d)/, '($1) $2')
     .replace(/^(\(\d{2}\) \d{5})(\d)/, '$1-$2')
 }
+
+export function formatCnpj(value: string | null | undefined) {
+  return value ? formatInputMask(value, 'cnpj') : ''
+}
+
+export function formatPhone(value: string | null | undefined) {
+  return value ? formatInputMask(value, 'phone') : ''
+}
+
+export function formatQuantity(value: string | number | null | undefined) {
+  if (value === null || value === undefined || value === '') return '0'
+  return Number(value).toLocaleString('pt-BR', { maximumFractionDigits: 3 })
+}
+
+export function formatChartNumber(value: number) {
+  return value.toLocaleString('pt-BR', { maximumFractionDigits: 1 })
+}
+
+export function formatFileSize(bytes: number) {
+  return bytes >= 1024 * 1024 ? `${(bytes / 1024 / 1024).toFixed(2)} MB` : `${Math.ceil(bytes / 1024)} KB`
+}

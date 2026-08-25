@@ -5,6 +5,10 @@ import PageHeader from '@/components/ui/PageHeader.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
 import BaseModal from '@/components/ui/BaseModal.vue'
+import BaseSelect from '@/components/ui/BaseSelect.vue'
+import BaseToggle from '@/components/ui/BaseToggle.vue'
+import FilterButton from '@/components/ui/FilterButton.vue'
+import FilterModal from '@/components/ui/FilterModal.vue'
 import Pagination from '@/components/ui/Pagination.vue'
 import SearchInput from '@/components/ui/SearchInput.vue'
 import PrintButton from '@/components/ui/PrintButton.vue'
@@ -12,8 +16,10 @@ import BulkSelectionBar from '@/components/ui/BulkSelectionBar.vue'
 import TableCheckbox from '@/components/ui/TableCheckbox.vue'
 import SortableTableHeader from '@/components/ui/SortableTableHeader.vue'
 import ExpandableText from '@/components/ui/ExpandableText.vue'
+import StatusBadge from '@/components/ui/StatusBadge.vue'
 import { getApiErrorMessage, resolveFormError } from '@/services/api'
 import { confirmDelete, toastError, toastSuccess } from '@/lib/alerts'
+import { statusFilterOptionsFor } from '@/lib/status'
 import {
   createCategory,
   deleteCategories,
@@ -25,14 +31,15 @@ import {
 import { useAuthStore } from '@/stores/auth'
 import { usePagination } from '@/composables/usePagination'
 import { useBulkSelection } from '@/composables/useBulkSelection'
+import { useFilterModal } from '@/composables/useFilterModal'
 import { useTableSort } from '@/composables/useTableSort'
 import type { Category } from '@/types'
 
 const auth = useAuthStore()
 const canManage = computed(() => auth.user?.role === 'admin' || auth.user?.role === 'gerente')
 
-const { page, pageSize, total, totalPages, applyMeta, watchSearch } = usePagination()
-const { sortBy, sortOrder, toggleSort } = useTableSort(() => { page.value = 1; return loadCategories() }, 'name')
+const { page, pageSize, total, totalPages, applyMeta, reload, watchSearch, paginationProps } = usePagination()
+const { sortBy, sortOrder, toggleSort } = useTableSort(() => reload(loadCategories), 'name')
 
 const categories = ref<Category[]>([])
 const { selectedIds, allVisibleSelected, toggleOne, toggleAllVisible, clearSelection } = useBulkSelection(() =>
@@ -43,17 +50,31 @@ const loading = ref(true)
 const errorMessage = ref('')
 
 const search = ref('')
+const { filters, draftFilters, filterModalOpen, openFilterModal, applyFilters, clearFilters } = useFilterModal(
+  () => ({ active: 'todos' }),
+  () => reload(loadCategories),
+)
+const activeFilterCount = computed(() => Number(filters.value.active !== 'todos'))
+const statusFilterOptions = statusFilterOptionsFor('f')
 
 const modalOpen = ref(false)
 const editingId = ref<string | null>(null)
-const form = ref<CategoryInput>({ name: '', description: '' })
+const emptyForm: Required<CategoryInput> = { name: '', description: '', active: true }
+const form = ref<Required<CategoryInput>>({ ...emptyForm })
 const saving = ref(false)
 const fieldErrors = ref<Record<string, string>>({})
 
 async function loadCategories() {
   loading.value = true
   try {
-    const result = await listCategories({ page: page.value, pageSize: pageSize.value, search: search.value || undefined, sortBy: sortBy.value, sortOrder: sortOrder.value })
+    const result = await listCategories({
+      page: page.value,
+      pageSize: pageSize.value,
+      search: search.value || undefined,
+      active: filters.value.active === 'todos' ? undefined : filters.value.active === 'true',
+      sortBy: sortBy.value,
+      sortOrder: sortOrder.value,
+    })
     categories.value = result.data
     clearSelection()
     applyMeta(result)
@@ -66,14 +87,14 @@ async function loadCategories() {
 
 function openCreateModal() {
   editingId.value = null
-  form.value = { name: '', description: '' }
+  form.value = { ...emptyForm }
   fieldErrors.value = {}
   modalOpen.value = true
 }
 
 function openEditModal(category: Category) {
   editingId.value = category.id
-  form.value = { name: category.name, description: category.description ?? '' }
+  form.value = { name: category.name, description: category.description ?? '', active: category.active }
   fieldErrors.value = {}
   modalOpen.value = true
 }
@@ -152,6 +173,7 @@ onMounted(loadCategories)
     <PageHeader title="Categorias" subtitle="Organize seus produtos por categoria">
       <template #actions>
         <SearchInput v-model="search" placeholder="Buscar por nome..." />
+        <FilterButton :active="activeFilterCount" @click="openFilterModal" />
         <PrintButton />
         <BaseButton v-if="canManage" class="!px-2.5 sm:!px-4" title="Nova categoria" aria-label="Nova categoria" @click="openCreateModal">
           <Plus :size="16" /> <span class="hidden sm:inline">Nova categoria</span>
@@ -182,15 +204,16 @@ onMounted(loadCategories)
             </th>
             <SortableTableHeader field="name" :active-field="sortBy" :order="sortOrder" @sort="toggleSort">Nome</SortableTableHeader>
             <SortableTableHeader field="description" :active-field="sortBy" :order="sortOrder" class="hidden sm:table-cell" @sort="toggleSort">Descrição</SortableTableHeader>
-            <th class="print:hidden px-4 py-3" />
+            <SortableTableHeader field="active" :active-field="sortBy" :order="sortOrder" @sort="toggleSort">Situação</SortableTableHeader>
+            <th data-actions class="print:hidden px-4 py-3 text-right text-xs font-medium uppercase text-gray-500 dark:text-gray-400">Ações</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
           <tr v-if="loading">
-            <td :colspan="canManage ? 4 : 3" class="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">Carregando...</td>
+            <td :colspan="canManage ? 5 : 4" class="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">Carregando...</td>
           </tr>
           <tr v-else-if="categories.length === 0">
-            <td :colspan="canManage ? 4 : 3" class="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">
+            <td :colspan="canManage ? 5 : 4" class="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">
               Nenhuma categoria cadastrada.
             </td>
           </tr>
@@ -216,6 +239,9 @@ onMounted(loadCategories)
             <td class="max-w-80 px-4 py-3 text-sm text-gray-500 dark:text-gray-400 hidden sm:table-cell">
               <ExpandableText :text="category.description" />
             </td>
+            <td class="px-4 py-3 whitespace-nowrap">
+              <StatusBadge :active="category.active" genero="f" />
+            </td>
             <td v-if="canManage" class="print:hidden px-4 py-3 text-right space-x-1 whitespace-nowrap" @dblclick.stop>
               <button
                 class="inline-flex items-center justify-center h-8 w-8 rounded-lg text-primary-600 hover:bg-primary-50 dark:text-primary-400 dark:hover:bg-primary-900/30"
@@ -236,20 +262,28 @@ onMounted(loadCategories)
           </tr>
         </tbody>
       </table>
-      <Pagination
-        :page="page"
-        :page-size="pageSize"
-        :total="total"
-        :total-pages="totalPages"
-        @update:page="page = $event"
-        @update:page-size="pageSize = $event"
-      />
+      <Pagination v-bind="paginationProps" />
     </div>
+
+    <FilterModal
+      :open="filterModalOpen"
+      title="Filtrar categorias"
+      @close="filterModalOpen = false"
+      @apply="applyFilters"
+      @clear="clearFilters"
+    >
+      <BaseSelect v-model="draftFilters.active" label="Situação" :options="statusFilterOptions" />
+    </FilterModal>
 
     <BaseModal :open="modalOpen" :title="editingId ? 'Editar categoria' : 'Nova categoria'" @close="modalOpen = false">
       <form class="space-y-4" @submit.prevent="handleSubmit">
-        <BaseInput v-model="form.name" label="Nome" :error="fieldErrors.name" />
+        <BaseInput v-model="form.name" label="Nome" :error="fieldErrors.name" required />
         <BaseInput v-model="form.description" label="Descrição" />
+        <BaseToggle v-model="form.active" label="Categoria ativa" />
+        <p class="text-xs text-gray-500 dark:text-gray-400">
+          Categoria inativa continua valendo para os produtos que já usam ela, e deixa de aparecer na hora de
+          cadastrar produto novo.
+        </p>
         <div class="flex justify-end gap-2 pt-2">
           <BaseButton variant="secondary" type="button" @click="modalOpen = false">Cancelar</BaseButton>
           <BaseButton type="submit" :disabled="saving">{{ saving ? 'Salvando...' : 'Salvar' }}</BaseButton>

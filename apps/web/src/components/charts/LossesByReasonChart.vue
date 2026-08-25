@@ -4,6 +4,8 @@ import { useCategoricalPalette } from './palette'
 import type { LossReason } from '@/types'
 import ChartTooltip from './ChartTooltip.vue'
 import type { DashboardProductQuantity, DashboardQuantityByUnit } from '@/types'
+import { reasonLabels } from '@/lib/losses'
+import { formatChartNumber } from '@/lib/format'
 
 const props = defineProps<{
   data: {
@@ -19,24 +21,12 @@ const palette = useCategoricalPalette()
 const chartContainer = ref<HTMLElement | null>(null)
 const tooltip = ref({ visible: false, x: 0, y: 0, title: '', label: '', value: '', color: '', details: [] as string[] })
 
-const reasonLabels: Record<LossReason, string> = {
-  vencido: 'Vencido',
-  avariado: 'Avariado',
-  roubo_furto: 'Roubo/Furto',
-  erro_operacional: 'Erro operacional',
-  outro: 'Outro',
-}
-
 const sorted = computed(() => {
   const max = Math.max(1, ...props.data.map((d) => d.lossesCount))
   return [...props.data]
     .sort((a, b) => b.lossesCount - a.lossesCount)
     .map((item) => ({ ...item, percent: (item.lossesCount / max) * 100 }))
 })
-
-function formatNumber(value: number) {
-  return value.toLocaleString('pt-BR', { maximumFractionDigits: 1 })
-}
 
 function showTooltip(event: MouseEvent | FocusEvent, item: (typeof sorted.value)[number], color: string) {
   const bounds = chartContainer.value?.getBoundingClientRect()
@@ -59,8 +49,8 @@ function buildDetails(
   products: DashboardProductQuantity[],
   otherProductsCount: number,
 ) {
-  const lines = totals.map((item) => `Total: ${formatNumber(item.quantity)} ${item.unitAbbreviation}`)
-  lines.push(...products.map((item) => `${item.productName}: ${formatNumber(item.quantity)} ${item.unitAbbreviation}`))
+  const lines = totals.map((item) => `Total: ${formatChartNumber(item.quantity)} ${item.unitAbbreviation}`)
+  lines.push(...products.map((item) => `${item.productName}: ${formatChartNumber(item.quantity)} ${item.unitAbbreviation}`))
   if (otherProductsCount > 0) lines.push(`+ ${otherProductsCount} outros produtos`)
   return lines
 }

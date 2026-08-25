@@ -7,18 +7,20 @@ import BaseInput from '@/components/ui/BaseInput.vue'
 import ExpandableText from '@/components/ui/ExpandableText.vue'
 import BaseSelect from '@/components/ui/BaseSelect.vue'
 import BaseModal from '@/components/ui/BaseModal.vue'
-import BaseBadge from '@/components/ui/BaseBadge.vue'
 import BaseToggle from '@/components/ui/BaseToggle.vue'
 import Pagination from '@/components/ui/Pagination.vue'
 import FilterButton from '@/components/ui/FilterButton.vue'
+import FilterModal from '@/components/ui/FilterModal.vue'
 import PrintButton from '@/components/ui/PrintButton.vue'
 import SearchInput from '@/components/ui/SearchInput.vue'
 import BulkSelectionBar from '@/components/ui/BulkSelectionBar.vue'
 import TableCheckbox from '@/components/ui/TableCheckbox.vue'
 import SortableTableHeader from '@/components/ui/SortableTableHeader.vue'
+import StatusBadge from '@/components/ui/StatusBadge.vue'
 import { getApiErrorMessage, resolveFormError } from '@/services/api'
 import { confirmDelete, toastError, toastSuccess } from '@/lib/alerts'
 import { generateRandomPassword } from '@/lib/password'
+import { statusFilterOptionsFor } from '@/lib/status'
 import { createUser, deleteUser, deleteUsers, listUsers, updateUser } from '@/services/usersService'
 import { usePagination } from '@/composables/usePagination'
 import { useBulkSelection } from '@/composables/useBulkSelection'
@@ -32,14 +34,10 @@ const roleOptions: { value: UserRole; label: string }[] = [
   { value: 'operador', label: 'Operador' },
 ]
 const roleFilterOptions = [{ value: 'todos', label: 'Todos os perfis' }, ...roleOptions]
-const statusFilterOptions = [
-  { value: 'todos', label: 'Todos' },
-  { value: 'true', label: 'Ativo' },
-  { value: 'false', label: 'Inativo' },
-]
+const statusFilterOptions = statusFilterOptionsFor()
 
-const { page, pageSize, total, totalPages, applyMeta, watchSearch } = usePagination()
-const { sortBy, sortOrder, toggleSort } = useTableSort(() => { page.value = 1; return loadUsers() }, 'name')
+const { page, pageSize, total, totalPages, applyMeta, reload, watchSearch, paginationProps } = usePagination()
+const { sortBy, sortOrder, toggleSort } = useTableSort(() => reload(loadUsers), 'name')
 
 const users = ref<User[]>([])
 const { selectedIds, allVisibleSelected, toggleOne, toggleAllVisible, clearSelection } = useBulkSelection(() =>
@@ -52,10 +50,7 @@ const errorMessage = ref('')
 const search = ref('')
 const { filters, draftFilters, filterModalOpen, openFilterModal, applyFilters, clearFilters } = useFilterModal(
   () => ({ role: 'todos', active: 'todos' }),
-  () => {
-    page.value = 1
-    loadUsers()
-  },
+  () => reload(loadUsers),
 )
 const activeFilterCount = computed(
   () => Number(filters.value.role !== 'todos') + Number(filters.value.active !== 'todos'),
@@ -68,6 +63,7 @@ const fieldErrors = ref<Record<string, string>>({})
 
 const emptyForm = { name: '', email: '', password: '', role: 'operador' as UserRole, active: true }
 const form = ref({ ...emptyForm })
+const passwordConfirm = ref('')
 
 async function loadUsers() {
   loading.value = true
@@ -94,6 +90,7 @@ async function loadUsers() {
 function openCreateModal() {
   editingId.value = null
   form.value = { ...emptyForm }
+  passwordConfirm.value = ''
   fieldErrors.value = {}
   modalOpen.value = true
 }
@@ -101,6 +98,7 @@ function openCreateModal() {
 function openEditModal(user: User) {
   editingId.value = user.id
   form.value = { name: user.name, email: user.email, password: '', role: user.role, active: user.active }
+  passwordConfirm.value = ''
   fieldErrors.value = {}
   modalOpen.value = true
 }
@@ -110,12 +108,18 @@ function validate(): boolean {
   if (!form.value.name.trim()) fieldErrors.value.name = 'Informe o nome'
   if (!form.value.email.trim()) fieldErrors.value.email = 'Informe o e-mail'
   if (!editingId.value && !form.value.password.trim()) fieldErrors.value.password = 'Informe a senha'
+  else if (form.value.password && form.value.password !== passwordConfirm.value) {
+    fieldErrors.value.passwordConfirm = 'A confirmação não confere com a senha'
+  }
   return Object.keys(fieldErrors.value).length === 0
 }
 
 async function handleGeneratePassword() {
   const password = generateRandomPassword()
   form.value.password = password
+  passwordConfirm.value = password
+  delete fieldErrors.value.password
+  delete fieldErrors.value.passwordConfirm
 
   try {
     await navigator.clipboard.writeText(password)
@@ -225,8 +229,8 @@ onMounted(loadUsers)
             <SortableTableHeader field="name" :active-field="sortBy" :order="sortOrder" @sort="toggleSort">Nome</SortableTableHeader>
             <SortableTableHeader field="email" :active-field="sortBy" :order="sortOrder" @sort="toggleSort">E-mail</SortableTableHeader>
             <SortableTableHeader field="role" :active-field="sortBy" :order="sortOrder" @sort="toggleSort">Perfil</SortableTableHeader>
-            <SortableTableHeader field="active" :active-field="sortBy" :order="sortOrder" @sort="toggleSort">Status</SortableTableHeader>
-            <th class="print:hidden px-4 py-3" />
+            <SortableTableHeader field="active" :active-field="sortBy" :order="sortOrder" @sort="toggleSort">Situação</SortableTableHeader>
+            <th data-actions class="print:hidden px-4 py-3 text-right text-xs font-medium uppercase text-gray-500 dark:text-gray-400">Ações</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
@@ -263,9 +267,7 @@ onMounted(loadUsers)
               {{ user.role }}
             </td>
             <td class="px-4 py-3 whitespace-nowrap">
-              <BaseBadge :variant="user.active ? 'success' : 'neutral'">
-                {{ user.active ? 'Ativo' : 'Inativo' }}
-              </BaseBadge>
+              <StatusBadge :active="user.active" />
             </td>
             <td class="print:hidden px-4 py-3 text-right space-x-1 whitespace-nowrap" @dblclick.stop>
               <button
@@ -286,26 +288,20 @@ onMounted(loadUsers)
           </tr>
         </tbody>
       </table>
-      <Pagination
-        :page="page"
-        :page-size="pageSize"
-        :total="total"
-        :total-pages="totalPages"
-        @update:page="page = $event"
-        @update:page-size="pageSize = $event"
-      />
+      <Pagination v-bind="paginationProps" />
     </div>
 
     <BaseModal :open="modalOpen" :title="editingId ? 'Editar usuário' : 'Novo usuário'" @close="modalOpen = false">
       <form class="space-y-4" @submit.prevent="handleSubmit">
-        <BaseInput v-model="form.name" label="Nome" :error="fieldErrors.name" />
-        <BaseInput v-model="form.email" type="email" label="E-mail" :error="fieldErrors.email" />
+        <BaseInput v-model="form.name" label="Nome" :error="fieldErrors.name" required />
+        <BaseInput v-model="form.email" type="email" label="E-mail" :error="fieldErrors.email" required />
         <div>
           <BaseInput
             v-model="form.password"
             type="password"
             :label="editingId ? 'Nova senha (opcional)' : 'Senha'"
             :error="fieldErrors.password"
+            :required="!editingId"
           />
           <button
             type="button"
@@ -315,6 +311,13 @@ onMounted(loadUsers)
             <Wand2 :size="12" /> Gerar senha aleatória
           </button>
         </div>
+        <BaseInput
+          v-model="passwordConfirm"
+          type="password"
+          :label="editingId ? 'Confirmar nova senha' : 'Confirmar senha'"
+          :error="fieldErrors.passwordConfirm"
+          :required="!editingId"
+        />
         <BaseSelect v-model="form.role" label="Perfil" :options="roleOptions" required />
 
         <BaseToggle v-model="form.active" label="Usuário ativo" />
@@ -326,21 +329,15 @@ onMounted(loadUsers)
       </form>
     </BaseModal>
 
-    <BaseModal :open="filterModalOpen" title="Filtrar usuários" @close="filterModalOpen = false">
-      <form class="space-y-4" @submit.prevent="applyFilters">
-        <BaseSelect v-model="draftFilters.role" label="Perfil" :options="roleFilterOptions" />
-        <BaseSelect v-model="draftFilters.active" label="Status" :options="statusFilterOptions" />
-
-        <div class="flex justify-between items-center pt-2">
-          <button type="button" class="text-sm text-gray-500 hover:underline dark:text-gray-400" @click="clearFilters">
-            Limpar
-          </button>
-          <div class="flex gap-2">
-            <BaseButton variant="secondary" type="button" @click="filterModalOpen = false">Cancelar</BaseButton>
-            <BaseButton type="submit">Aplicar</BaseButton>
-          </div>
-        </div>
-      </form>
-    </BaseModal>
+    <FilterModal
+      :open="filterModalOpen"
+      title="Filtrar usuários"
+      @close="filterModalOpen = false"
+      @apply="applyFilters"
+      @clear="clearFilters"
+    >
+      <BaseSelect v-model="draftFilters.role" label="Perfil" :options="roleFilterOptions" />
+      <BaseSelect v-model="draftFilters.active" label="Situação" :options="statusFilterOptions" />
+    </FilterModal>
   </div>
 </template>

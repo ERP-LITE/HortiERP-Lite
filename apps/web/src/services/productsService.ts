@@ -19,6 +19,7 @@ export interface ListProductsParams {
   pageSize: number
   search?: string
   categoryId?: string
+  unitId?: string
   active?: boolean
   sortBy?: string
   sortOrder?: 'asc' | 'desc'
@@ -77,8 +78,28 @@ export interface ImportProductsResult {
     initialStockWithoutCost: number
     newCategories: string[]
     newUnits: string[]
+    inactive: number
+    initialStockValue: number
   }
   errors: { line: number; name: string; errors: string[] }[]
+  preview: {
+    line: number
+    name: string
+    categoryName: string
+    unitName: string
+    sku: string | null
+    barcode: string | null
+    costPrice: number | null
+    salePrice: number | null
+    minStock: number
+    initialStock: number
+    active: boolean
+    newCategory: boolean
+    newUnit: boolean
+    inactiveCategory: boolean
+    inactiveUnit: boolean
+  }[]
+  omittedPreview: number
 }
 
 export async function importProducts(payload: {

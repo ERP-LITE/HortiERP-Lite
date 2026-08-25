@@ -5,12 +5,14 @@ import { fetchAllPages } from './paginatedOptions'
 export interface UnitInput {
   name: string
   abbreviation: string
+  active?: boolean
 }
 
 export interface ListUnitsParams {
   page: number
   pageSize: number
   search?: string
+  active?: boolean
   sortBy?: string
   sortOrder?: 'asc' | 'desc'
 }

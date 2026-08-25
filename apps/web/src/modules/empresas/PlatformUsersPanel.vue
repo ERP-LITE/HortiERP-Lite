@@ -23,8 +23,8 @@ import { useAuthStore } from '@/stores/auth'
 import type { User } from '@/types'
 
 const auth = useAuthStore()
-const { page, pageSize, total, totalPages, applyMeta, watchSearch } = usePagination()
-const { sortBy, sortOrder, toggleSort } = useTableSort(() => { page.value = 1; return loadUsers() }, 'name')
+const { page, pageSize, total, totalPages, applyMeta, reload, watchSearch, paginationProps } = usePagination()
+const { sortBy, sortOrder, toggleSort } = useTableSort(() => reload(loadUsers), 'name')
 const users = ref<User[]>([])
 const search = ref('')
 const loading = ref(true)
@@ -35,6 +35,7 @@ const saving = ref(false)
 const fieldErrors = ref<Record<string, string>>({})
 const emptyForm = { name: '', email: '', password: '' }
 const form = ref({ ...emptyForm })
+const passwordConfirm = ref('')
 
 async function loadUsers() {
   loading.value = true
@@ -59,6 +60,7 @@ async function loadUsers() {
 function openCreateModal() {
   editingId.value = null
   form.value = { ...emptyForm }
+  passwordConfirm.value = ''
   fieldErrors.value = {}
   modalOpen.value = true
 }
@@ -66,6 +68,7 @@ function openCreateModal() {
 function openEditModal(user: User) {
   editingId.value = user.id
   form.value = { name: user.name, email: user.email, password: '' }
+  passwordConfirm.value = ''
   fieldErrors.value = {}
   modalOpen.value = true
 }
@@ -78,6 +81,8 @@ function validate() {
     fieldErrors.value.password = 'A senha deve ter ao menos 8 caracteres'
   } else if (form.value.password && form.value.password.length < 8) {
     fieldErrors.value.password = 'A senha deve ter ao menos 8 caracteres'
+  } else if (form.value.password && form.value.password !== passwordConfirm.value) {
+    fieldErrors.value.passwordConfirm = 'A confirmação não confere com a senha'
   }
   return Object.keys(fieldErrors.value).length === 0
 }
@@ -85,6 +90,9 @@ function validate() {
 async function handleGeneratePassword() {
   const password = generateRandomPassword()
   form.value.password = password
+  passwordConfirm.value = password
+  delete fieldErrors.value.password
+  delete fieldErrors.value.passwordConfirm
   try {
     await navigator.clipboard.writeText(password)
     toastSuccess('Senha gerada e copiada para a área de transferência')
@@ -167,7 +175,7 @@ onMounted(loadUsers)
           <tr>
             <SortableTableHeader field="name" :active-field="sortBy" :order="sortOrder" @sort="toggleSort">Nome</SortableTableHeader>
             <SortableTableHeader field="email" :active-field="sortBy" :order="sortOrder" @sort="toggleSort">E-mail</SortableTableHeader>
-            <th class="px-4 py-3" />
+            <th data-actions class="px-4 py-3 text-right text-xs font-medium uppercase text-gray-500 dark:text-gray-400">Ações</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
@@ -214,26 +222,20 @@ onMounted(loadUsers)
           </tr>
         </tbody>
       </table>
-      <Pagination
-        :page="page"
-        :page-size="pageSize"
-        :total="total"
-        :total-pages="totalPages"
-        @update:page="page = $event"
-        @update:page-size="pageSize = $event"
-      />
+      <Pagination v-bind="paginationProps" />
     </div>
 
     <BaseModal :open="modalOpen" :title="editingId ? 'Editar super administrador' : 'Novo super administrador'" @close="modalOpen = false">
       <form class="space-y-4" @submit.prevent="handleSubmit">
-        <BaseInput v-model="form.name" label="Nome" :error="fieldErrors.name" />
-        <BaseInput v-model="form.email" type="email" label="E-mail" :error="fieldErrors.email" />
+        <BaseInput v-model="form.name" label="Nome" :error="fieldErrors.name" required />
+        <BaseInput v-model="form.email" type="email" label="E-mail" :error="fieldErrors.email" required />
         <div>
           <BaseInput
             v-model="form.password"
             type="password"
             :label="editingId ? 'Nova senha (opcional)' : 'Senha'"
             :error="fieldErrors.password"
+            :required="!editingId"
           />
           <button
             type="button"
@@ -243,6 +245,13 @@ onMounted(loadUsers)
             <Wand2 :size="12" /> Gerar senha aleatória
           </button>
         </div>
+        <BaseInput
+          v-model="passwordConfirm"
+          type="password"
+          :label="editingId ? 'Confirmar nova senha' : 'Confirmar senha'"
+          :error="fieldErrors.passwordConfirm"
+          :required="!editingId"
+        />
         <div class="flex justify-end gap-2 pt-2">
           <BaseButton variant="secondary" type="button" @click="modalOpen = false">Cancelar</BaseButton>
           <BaseButton type="submit" :disabled="saving">{{ saving ? 'Salvando...' : 'Salvar' }}</BaseButton>

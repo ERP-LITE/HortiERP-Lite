@@ -2,11 +2,10 @@
 import { computed, onMounted, ref } from 'vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import BaseBadge from '@/components/ui/BaseBadge.vue'
-import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseSelect from '@/components/ui/BaseSelect.vue'
-import BaseModal from '@/components/ui/BaseModal.vue'
 import Pagination from '@/components/ui/Pagination.vue'
 import FilterButton from '@/components/ui/FilterButton.vue'
+import FilterModal from '@/components/ui/FilterModal.vue'
 import PrintButton from '@/components/ui/PrintButton.vue'
 import ExportCsvButton from '@/components/ui/ExportCsvButton.vue'
 import SearchInput from '@/components/ui/SearchInput.vue'
@@ -14,7 +13,7 @@ import PeriodPicker from '@/components/ui/PeriodPicker.vue'
 import ExpandableText from '@/components/ui/ExpandableText.vue'
 import SortableTableHeader from '@/components/ui/SortableTableHeader.vue'
 import type { PeriodValue } from '@/lib/period'
-import { formatDate, formatDateTime } from '@/lib/format'
+import { formatDate, formatDateTime, formatQuantity } from '@/lib/format'
 import { getApiErrorMessage } from '@/services/api'
 import { listAllStockMovements, listStockMovements } from '@/services/stockService'
 import { csvNumber } from '@/lib/csv'
@@ -24,7 +23,7 @@ import { useFilterModal } from '@/composables/useFilterModal'
 import { useTableSort } from '@/composables/useTableSort'
 import type { MovementType, Product, StockMovement } from '@/types'
 
-const { page, pageSize, total, totalPages, applyMeta, watchSearch } = usePagination()
+const { page, pageSize, total, totalPages, applyMeta, reload, watchSearch, paginationProps } = usePagination()
 
 function isBackdated(movement: StockMovement) {
   return formatDate(movement.movementDate) !== formatDate(movement.createdAt)
@@ -35,7 +34,7 @@ function movementDateLabel(movement: StockMovement) {
   return isBackdated(movement) ? formatDate(movement.movementDate) : formatDateTime(movement.movementDate)
 }
 
-const { sortBy, sortOrder, toggleSort } = useTableSort(() => { page.value = 1; return loadMovements() }, 'movementDate', 'desc')
+const { sortBy, sortOrder, toggleSort } = useTableSort(() => reload(loadMovements), 'movementDate', 'desc')
 
 const movements = ref<StockMovement[]>([])
 const products = ref<Product[]>([])
@@ -67,10 +66,7 @@ function emptyFilters() {
 }
 const { filters, draftFilters, filterModalOpen, openFilterModal, applyFilters, clearFilters } = useFilterModal(
   emptyFilters,
-  () => {
-    page.value = 1
-    loadMovements()
-  },
+  () => reload(loadMovements),
 )
 const activeFilterCount = computed(
   () =>
@@ -159,7 +155,7 @@ onMounted(() => {
 
     <p v-if="errorMessage" class="text-sm text-red-600 dark:text-red-400 mb-4">{{ errorMessage }}</p>
 
-    <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700">
+    <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-x-auto">
       <div class="divide-y divide-gray-100 dark:divide-gray-700 sm:hidden">
         <div v-if="loading" class="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">Carregando...</div>
         <div v-else-if="movements.length === 0" class="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">
@@ -194,12 +190,12 @@ onMounted(() => {
             <div>
               <dt class="text-xs text-gray-500 dark:text-gray-400">Quantidade</dt>
               <dd class="mt-0.5 text-sm font-semibold text-gray-900 dark:text-gray-100">
-                {{ Number(movement.quantity) }}
+                {{ formatQuantity(movement.quantity) }}
               </dd>
             </div>
             <div>
               <dt class="text-xs text-gray-500 dark:text-gray-400">Saldo após</dt>
-              <dd class="mt-0.5 text-sm text-gray-700 dark:text-gray-300">{{ Number(movement.balanceAfter) }}</dd>
+              <dd class="mt-0.5 text-sm text-gray-700 dark:text-gray-300">{{ formatQuantity(movement.balanceAfter) }}</dd>
             </div>
           </dl>
           <ExpandableText
@@ -262,10 +258,10 @@ onMounted(() => {
               <BaseBadge :variant="typeVariant[movement.type]">{{ typeLabels[movement.type] }}</BaseBadge>
             </td>
             <td class="px-4 py-3 text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap">
-              {{ Number(movement.quantity) }}
+              {{ formatQuantity(movement.quantity) }}
             </td>
             <td class="px-4 py-3 text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">
-              {{ Number(movement.balanceAfter) }}
+              {{ formatQuantity(movement.balanceAfter) }}
             </td>
             <td class="max-w-80 px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
               <ExpandableText :text="movement.notes" />
@@ -273,32 +269,19 @@ onMounted(() => {
           </tr>
         </tbody>
       </table>
-      <Pagination
-        :page="page"
-        :page-size="pageSize"
-        :total="total"
-        :total-pages="totalPages"
-        @update:page="page = $event"
-        @update:page-size="pageSize = $event"
-      />
+      <Pagination v-bind="paginationProps" />
     </div>
 
-    <BaseModal :open="filterModalOpen" title="Filtrar movimentações" @close="filterModalOpen = false">
-      <form class="space-y-4" @submit.prevent="applyFilters">
-        <BaseSelect v-model="draftFilters.productId" label="Produto" :options="productFilterOptions" />
-        <BaseSelect v-model="draftFilters.type" label="Tipo" :options="typeFilterOptions" />
-        <PeriodPicker v-model="draftFilters.period" />
-
-        <div class="flex justify-between items-center pt-2">
-          <button type="button" class="text-sm text-gray-500 hover:underline dark:text-gray-400" @click="clearFilters">
-            Limpar
-          </button>
-          <div class="flex gap-2">
-            <BaseButton variant="secondary" type="button" @click="filterModalOpen = false">Cancelar</BaseButton>
-            <BaseButton type="submit">Aplicar</BaseButton>
-          </div>
-        </div>
-      </form>
-    </BaseModal>
+    <FilterModal
+      :open="filterModalOpen"
+      title="Filtrar movimentações"
+      @close="filterModalOpen = false"
+      @apply="applyFilters"
+      @clear="clearFilters"
+    >
+      <BaseSelect v-model="draftFilters.productId" label="Produto" :options="productFilterOptions" />
+      <BaseSelect v-model="draftFilters.type" label="Tipo" :options="typeFilterOptions" />
+      <PeriodPicker v-model="draftFilters.period" />
+    </FilterModal>
   </div>
 </template>

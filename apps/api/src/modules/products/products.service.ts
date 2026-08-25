@@ -46,27 +46,34 @@ function assertUniqueSku(companyId: string, sku: string | null | undefined, excl
   })
 }
 
-async function assertCategoryAndUnitBelongToCompany(
+async function assertCategoryAndUnitUsable(
   companyId: string,
   categoryId?: string,
   unitId?: string,
+  current?: { categoryId: string; unitId: string },
 ) {
   if (categoryId) {
     const [category] = await db
-      .select({ id: categories.id })
+      .select({ id: categories.id, active: categories.active })
       .from(categories)
       .where(and(eq(categories.id, categoryId), eq(categories.companyId, companyId), isNull(categories.deletedAt)))
 
     if (!category) throw AppError.notFound('Categoria não encontrada')
+    if (!category.active && categoryId !== current?.categoryId) {
+      throw AppError.conflict('Esta categoria está inativa. Reative a categoria ou escolha outra.')
+    }
   }
 
   if (unitId) {
     const [unit] = await db
-      .select({ id: units.id })
+      .select({ id: units.id, active: units.active })
       .from(units)
       .where(and(eq(units.id, unitId), eq(units.companyId, companyId), isNull(units.deletedAt)))
 
     if (!unit) throw AppError.notFound('Unidade de medida não encontrada')
+    if (!unit.active && unitId !== current?.unitId) {
+      throw AppError.conflict('Esta unidade está inativa. Reative a unidade ou escolha outra.')
+    }
   }
 }
 
@@ -82,6 +89,7 @@ export async function listProducts(companyId: string, query: ListProductsQuery) 
     )
   }
   if (query.categoryId) conditions.push(eq(products.categoryId, query.categoryId))
+  if (query.unitId) conditions.push(eq(products.unitId, query.unitId))
   if (query.active !== undefined) conditions.push(eq(products.active, query.active))
   const where = and(...conditions)
   const orderBy = orderByColumn(query.sortBy ? products[query.sortBy] : products.name, query.sortOrder)
@@ -112,7 +120,7 @@ export async function getProduct(companyId: string, id: string) {
 }
 
 export async function createProduct(companyId: string, userId: string, data: CreateProductInput) {
-  await assertCategoryAndUnitBelongToCompany(companyId, data.categoryId, data.unitId)
+  await assertCategoryAndUnitUsable(companyId, data.categoryId, data.unitId)
   await assertUniqueName(companyId, data.name)
   await assertUniqueSku(companyId, data.sku)
 
@@ -146,8 +154,8 @@ export async function createProduct(companyId: string, userId: string, data: Cre
 }
 
 export async function updateProduct(companyId: string, userId: string, id: string, data: UpdateProductInput) {
-  await getProduct(companyId, id)
-  await assertCategoryAndUnitBelongToCompany(companyId, data.categoryId, data.unitId)
+  const atual = await getProduct(companyId, id)
+  await assertCategoryAndUnitUsable(companyId, data.categoryId, data.unitId, atual)
   if (data.name) await assertUniqueName(companyId, data.name, id)
   if (data.sku !== undefined) await assertUniqueSku(companyId, data.sku, id)
 
@@ -231,11 +239,11 @@ const lower = (value: string) => value.trim().toLocaleLowerCase('pt-BR')
 export async function importProducts(companyId: string, userId: string, input: ImportProductsInput) {
   const [existingCategories, existingUnits, existingProducts] = await Promise.all([
     db
-      .select({ id: categories.id, name: categories.name })
+      .select({ id: categories.id, name: categories.name, active: categories.active })
       .from(categories)
       .where(and(eq(categories.companyId, companyId), isNull(categories.deletedAt))),
     db
-      .select({ id: units.id, name: units.name, abbreviation: units.abbreviation })
+      .select({ id: units.id, name: units.name, abbreviation: units.abbreviation, active: units.active })
       .from(units)
       .where(and(eq(units.companyId, companyId), isNull(units.deletedAt))),
     db
@@ -250,6 +258,10 @@ export async function importProducts(companyId: string, userId: string, input: I
     unitByName.set(lower(unit.name), unit.id)
     if (!unitByName.has(lower(unit.abbreviation))) unitByName.set(lower(unit.abbreviation), unit.id)
   }
+  const inactiveCategories = new Set(existingCategories.filter((item) => !item.active).map((item) => lower(item.name)))
+  const inactiveUnits = new Set(
+    existingUnits.filter((item) => !item.active).flatMap((item) => [lower(item.name), lower(item.abbreviation)]),
+  )
 
   const takenNames = new Set(existingProducts.map((item) => lower(item.name)))
   const takenSkus = new Set(existingProducts.filter((item) => item.sku).map((item) => lower(item.sku!)))
@@ -259,7 +271,10 @@ export async function importProducts(companyId: string, userId: string, input: I
   const newUnits = new Map<string, string>()
   const errors: ImportRowError[] = []
   const accepted: {
+    line: number
     name: string
+    categoryName: string
+    unitName: string
     categoryKey: string
     unitKey: string
     sku?: string
@@ -316,7 +331,10 @@ export async function importProducts(companyId: string, userId: string, input: I
     if (sku) takenSkus.add(lower(sku))
 
     accepted.push({
+      line: row.line,
       name,
+      categoryName,
+      unitName,
       categoryKey: lower(categoryName),
       unitKey: lower(unitName),
       sku,
@@ -341,9 +359,31 @@ export async function importProducts(companyId: string, userId: string, input: I
     omittedErrors: Math.max(0, input.rows.length - accepted.length - errors.length),
     newCategories: [...newCategories.values()],
     newUnits: [...newUnits.values()],
+    inactive: accepted.filter((item) => !item.active).length,
+    initialStockValue:
+      Math.round(comEstoque.reduce((total, item) => total + item.initialStock * (item.costPrice ?? 0), 0) * 100) / 100,
   }
 
-  if (input.dryRun || summary.invalid > 0) return { summary, errors }
+  const preview = accepted.slice(0, MAX_REPORTED_ROWS).map((item) => ({
+    line: item.line,
+    name: item.name,
+    categoryName: item.categoryName,
+    unitName: item.unitName,
+    sku: item.sku ?? null,
+    barcode: item.barcode ?? null,
+    costPrice: item.costPrice ?? null,
+    salePrice: item.salePrice ?? null,
+    minStock: item.minStock,
+    initialStock: item.initialStock,
+    active: item.active,
+    newCategory: newCategories.has(item.categoryKey),
+    newUnit: newUnits.has(item.unitKey),
+    inactiveCategory: inactiveCategories.has(item.categoryKey),
+    inactiveUnit: inactiveUnits.has(item.unitKey),
+  }))
+  const omittedPreview = Math.max(0, accepted.length - preview.length)
+
+  if (input.dryRun || summary.invalid > 0) return { summary, errors, preview, omittedPreview }
 
   await db.transaction(async (tx) => {
     for (const [key, name] of newCategories) {
@@ -427,7 +467,7 @@ export async function importProducts(companyId: string, userId: string, input: I
   })
 
   summary.imported = accepted.length
-  return { summary, errors }
+  return { summary, errors, preview, omittedPreview }
 }
 
 export async function deleteProduct(companyId: string, userId: string, id: string) {

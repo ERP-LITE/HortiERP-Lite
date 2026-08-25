@@ -1,4 +1,4 @@
-import { ref, watch, type Ref } from 'vue'
+import { computed, ref, watch, type Ref } from 'vue'
 
 const PAGE_SIZE_STORAGE_KEY = 'hortierp_page_size'
 const DEFAULT_PAGE_SIZE = 15
@@ -33,13 +33,28 @@ export function usePagination() {
     totalPages.value = meta.totalPages
   }
 
+  function reload(load: () => void | Promise<void>) {
+    if (page.value !== 1) page.value = 1
+    else void load()
+  }
+
   function watchSearch(search: Ref<string>, load: () => void) {
-    watch(search, () => {
-      if (page.value !== 1) page.value = 1
-      else load()
-    })
+    watch(search, () => reload(load))
     watch([page, pageSize], load)
   }
 
-  return { page, pageSize, total, totalPages, applyMeta, watchSearch }
+  const paginationProps = computed(() => ({
+    page: page.value,
+    pageSize: pageSize.value,
+    total: total.value,
+    totalPages: totalPages.value,
+    'onUpdate:page': (value: number) => {
+      page.value = value
+    },
+    'onUpdate:pageSize': (value: number) => {
+      pageSize.value = value
+    },
+  }))
+
+  return { page, pageSize, total, totalPages, applyMeta, reload, watchSearch, paginationProps }
 }

@@ -34,8 +34,8 @@ import { resolveFormError } from '@/services/api'
 import { formatCurrency, formatDateOnly, formatMonthYear } from '@/lib/format'
 import { todayIso, type PeriodValue } from '@/lib/period'
 
-const { page, pageSize, total, totalPages, applyMeta, watchSearch } = usePagination()
-const { sortBy, sortOrder, toggleSort } = useTableSort(() => { page.value = 1; return loadBillings() }, 'dueDate', 'desc')
+const { page, pageSize, total, totalPages, applyMeta, reload, watchSearch, paginationProps } = usePagination()
+const { sortBy, sortOrder, toggleSort } = useTableSort(() => reload(loadBillings), 'dueDate', 'desc')
 const billings = ref<Billing[]>([])
 const companies = ref<{ value: string; label: string }[]>([])
 const loading = ref(true)
@@ -52,10 +52,7 @@ function emptyFilters() {
 }
 const { filters, draftFilters, filterModalOpen, openFilterModal, applyFilters, clearFilters } = useFilterModal(
   emptyFilters,
-  () => {
-    page.value = 1
-    loadBillings()
-  },
+  () => reload(loadBillings),
 )
 const activeFilterCount = computed(
   () => Number(filters.value.status !== 'todos') + Number(filters.value.period.preset !== 'todos'),
@@ -83,7 +80,7 @@ const emptyForm = (): BillingForm => ({
 const form = ref<BillingForm>(emptyForm())
 
 const statusOptions = [
-  { value: 'todos', label: 'Todos os status' },
+  { value: 'todos', label: 'Todas as situações' },
   { value: 'pending', label: 'Pendentes' },
   { value: 'paid', label: 'Pagos' },
   { value: 'overdue', label: 'Atrasados' },
@@ -185,7 +182,7 @@ async function save() {
 async function removeBilling(billing: Billing) {
   const confirmed = await confirmDelete({
     title: 'Excluir cobrança?',
-    text: `${billing.companyName} — ${formatMonthYear(billing.referenceMonth)}`,
+    text: `${billing.companyName} · ${formatMonthYear(billing.referenceMonth)}`,
   })
   if (!confirmed) return
   try {
@@ -240,8 +237,8 @@ onMounted(async () => {
             <SortableTableHeader field="dueDate" :active-field="sortBy" :order="sortOrder" @sort="toggleSort">Vencimento</SortableTableHeader>
             <SortableTableHeader field="amount" :active-field="sortBy" :order="sortOrder" @sort="toggleSort">Valor</SortableTableHeader>
             <SortableTableHeader field="paidAt" :active-field="sortBy" :order="sortOrder" @sort="toggleSort">Pagamento</SortableTableHeader>
-            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Status</th>
-            <th class="print:hidden px-4 py-3" />
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Situação</th>
+            <th data-actions class="print:hidden px-4 py-3 text-right text-xs font-medium uppercase text-gray-500 dark:text-gray-400">Ações</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
@@ -301,24 +298,24 @@ onMounted(async () => {
           </tr>
         </tbody>
       </table>
-      <Pagination v-model:page="page" v-model:page-size="pageSize" :total="total" :total-pages="totalPages" />
+      <Pagination v-bind="paginationProps" />
     </div>
 
     <BaseModal :open="modalOpen" :title="editingId ? 'Editar cobrança' : 'Nova cobrança'" @close="modalOpen = false">
       <form class="space-y-4" novalidate @submit.prevent="save">
-        <BaseSelect v-model="form.companyId" label="Empresa" :options="companies" :error="fieldErrors.companyId" />
+        <BaseSelect v-model="form.companyId" label="Empresa" :options="companies" :error="fieldErrors.companyId" required />
         <div class="grid gap-4 sm:grid-cols-2">
-          <MonthInput v-model="form.referenceMonth" label="Competência" :error="fieldErrors.referenceMonth" />
-          <DateInput v-model="form.dueDate" label="Vencimento" :error="fieldErrors.dueDate" />
-          <BaseInput v-model="form.amount" :decimal-places="2" label="Valor da mensalidade (R$)" :error="fieldErrors.amount" />
+          <MonthInput v-model="form.referenceMonth" label="Competência" :error="fieldErrors.referenceMonth" required />
+          <DateInput v-model="form.dueDate" label="Vencimento" :error="fieldErrors.dueDate" required />
+          <BaseInput v-model="form.amount" :decimal-places="2" label="Valor da mensalidade (R$)" :error="fieldErrors.amount" required />
         </div>
         <div class="flex items-center gap-3 rounded-lg bg-gray-50 p-3 dark:bg-gray-900/50">
           <BaseToggle v-model="markedPaid" />
           <span class="text-sm text-gray-700 dark:text-gray-300">Pagamento recebido</span>
         </div>
         <div v-if="markedPaid" class="grid gap-4 sm:grid-cols-2">
-          <BaseInput v-model="form.paidAmount" :decimal-places="2" label="Valor pago (R$)" :error="fieldErrors.paidAmount" />
-          <DateInput v-model="form.paidAt" label="Data do pagamento" :error="fieldErrors.paidAt" />
+          <BaseInput v-model="form.paidAmount" :decimal-places="2" label="Valor pago (R$)" :error="fieldErrors.paidAmount" required />
+          <DateInput v-model="form.paidAt" label="Data do pagamento" :error="fieldErrors.paidAt" required />
         </div>
         <BaseInput v-model="form.notes" label="Observações (opcional)" />
         <div class="flex justify-end gap-2 pt-2">
@@ -330,7 +327,7 @@ onMounted(async () => {
 
     <BaseModal :open="filterModalOpen" title="Filtrar cobranças" @close="filterModalOpen = false">
       <form class="space-y-4" @submit.prevent="applyFilters">
-        <BaseSelect v-model="draftFilters.status" label="Status" :options="statusOptions" :searchable="false" />
+        <BaseSelect v-model="draftFilters.status" label="Situação" :options="statusOptions" />
         <PeriodPicker v-model="draftFilters.period" />
 
         <div class="flex items-center justify-between pt-2">
