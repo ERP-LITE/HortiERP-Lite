@@ -1,9 +1,10 @@
 import { z } from 'zod'
-import { paginationQuerySchema } from '../../shared/schemas/pagination.schema.js'
+import { booleanQueryParam, paginationQuerySchema } from '../../shared/schemas/pagination.schema.js'
 
 export const listUnitsQuerySchema = paginationQuerySchema.extend({
   search: z.string().trim().min(1).optional(),
-  sortBy: z.enum(['name', 'abbreviation']).optional(),
+  active: booleanQueryParam,
+  sortBy: z.enum(['name', 'abbreviation', 'active']).optional(),
 })
 
 export type ListUnitsQuery = z.infer<typeof listUnitsQuerySchema>
@@ -11,6 +12,7 @@ export type ListUnitsQuery = z.infer<typeof listUnitsQuerySchema>
 export const createUnitSchema = z.object({
   name: z.string().min(1, 'Nome é obrigatório'),
   abbreviation: z.string().min(1, 'Abreviação é obrigatória').max(10),
+  active: z.boolean().optional(),
 })
 
 export const updateUnitSchema = createUnitSchema.partial()

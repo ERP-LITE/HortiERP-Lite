@@ -4,7 +4,9 @@ import { Download, FileSpreadsheet, Upload } from '@lucide/vue'
 import BaseModal from '@/components/ui/BaseModal.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseToggle from '@/components/ui/BaseToggle.vue'
+import BaseBadge from '@/components/ui/BaseBadge.vue'
 import { downloadCsv, parseCsv, readSpreadsheetFile, toCsv } from '@/lib/csv'
+import { formatCurrency, formatQuantity } from '@/lib/format'
 import { getApiErrorMessage } from '@/services/api'
 import { toastSuccess } from '@/lib/alerts'
 import { importProducts, type ImportProductRow, type ImportProductsResult } from '@/services/productsService'
@@ -184,30 +186,100 @@ function downloadErrors() {
           </div>
         </div>
 
-        <p
-          v-if="result.summary.newCategories.length || result.summary.newUnits.length"
-          class="rounded-lg bg-amber-50 p-3 text-sm text-amber-800 dark:bg-amber-900/30 dark:text-amber-200"
-        >
-          <span v-if="result.summary.newCategories.length">
-            Serão criadas {{ result.summary.newCategories.length }} categoria(s):
-            {{ result.summary.newCategories.join(', ') }}.
-          </span>
-          <span v-if="result.summary.newUnits.length">
-            Serão criadas {{ result.summary.newUnits.length }} unidade(s): {{ result.summary.newUnits.join(', ') }}.
-          </span>
-        </p>
+        <div v-if="result.preview?.length && result.summary.invalid === 0" class="space-y-2">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100">O que vai ser importado</h3>
+            <div class="flex flex-wrap gap-1.5">
+              <BaseBadge variant="success">{{ result.summary.valid }} produto(s)</BaseBadge>
+              <BaseBadge v-if="result.summary.newCategories.length" variant="warning">
+                {{ result.summary.newCategories.length }} categoria(s) nova(s)
+              </BaseBadge>
+              <BaseBadge v-if="result.summary.newUnits.length" variant="warning">
+                {{ result.summary.newUnits.length }} unidade(s) nova(s)
+              </BaseBadge>
+              <BaseBadge v-if="result.summary.withInitialStock" variant="neutral">
+                {{ result.summary.withInitialStock }} com estoque inicial
+              </BaseBadge>
+              <BaseBadge v-if="result.summary.initialStockWithoutCost" variant="danger">
+                {{ result.summary.initialStockWithoutCost }} sem custo
+              </BaseBadge>
+              <BaseBadge v-if="result.summary.inactive" variant="danger">
+                {{ result.summary.inactive }} inativo(s)
+              </BaseBadge>
+            </div>
+          </div>
 
-        <p
-          v-if="result.summary.withInitialStock > 0"
-          class="rounded-lg bg-primary-50 p-3 text-sm text-primary-800 dark:bg-primary-900/30 dark:text-primary-200"
-        >
-          {{ result.summary.withInitialStock }} produto(s) entram com estoque inicial, registrado no histórico como
-          ajuste com o motivo “carga inicial”.
-          <span v-if="result.summary.initialStockWithoutCost > 0" class="block mt-1 font-medium">
-            Atenção: {{ result.summary.initialStockWithoutCost }} deles estão sem custo preenchido — esse estoque vai
-            valer R$ 0,00 nos relatórios e no painel até você informar o custo do produto.
-          </span>
-        </p>
+          <div class="app-modal-scrollbar max-h-80 overflow-auto rounded-lg border border-gray-200 sm:max-h-64 dark:border-gray-700">
+            <table class="w-full min-w-[44rem] text-sm">
+              <thead class="sticky top-0 bg-gray-50 dark:bg-gray-900">
+                <tr>
+                  <th class="px-3 py-2 text-left text-xs font-medium uppercase text-gray-500">Linha</th>
+                  <th class="px-3 py-2 text-left text-xs font-medium uppercase text-gray-500">Produto</th>
+                  <th class="px-3 py-2 text-left text-xs font-medium uppercase text-gray-500">Categoria</th>
+                  <th class="px-3 py-2 text-left text-xs font-medium uppercase text-gray-500">Unidade</th>
+                  <th class="px-3 py-2 text-right text-xs font-medium uppercase text-gray-500">Custo</th>
+                  <th class="px-3 py-2 text-right text-xs font-medium uppercase text-gray-500">Venda</th>
+                  <th class="px-3 py-2 text-right text-xs font-medium uppercase text-gray-500">Mínimo</th>
+                  <th class="px-3 py-2 text-right text-xs font-medium uppercase text-gray-500">Inicial</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
+                <tr v-for="item in result.preview" :key="item.line">
+                  <td class="px-3 py-2 align-top text-gray-500 dark:text-gray-400">{{ item.line }}</td>
+                  <td class="px-3 py-2 align-top">
+                    <span class="block font-medium text-gray-900 dark:text-gray-100">
+                      {{ item.name }}
+                      <BaseBadge v-if="!item.active" variant="danger" class="ml-1">inativo</BaseBadge>
+                    </span>
+                    <span v-if="item.sku || item.barcode" class="mt-0.5 block text-xs text-gray-500 dark:text-gray-400">
+                      {{ [item.sku, item.barcode].filter(Boolean).join(' · ') }}
+                    </span>
+                  </td>
+                  <td class="px-3 py-2 align-top text-gray-600 dark:text-gray-300">
+                    {{ item.categoryName }}
+                    <BaseBadge v-if="item.newCategory" variant="warning" class="ml-1">nova</BaseBadge>
+                    <BaseBadge v-else-if="item.inactiveCategory" variant="danger" class="ml-1">inativa</BaseBadge>
+                  </td>
+                  <td class="px-3 py-2 align-top text-gray-600 dark:text-gray-300">
+                    {{ item.unitName }}
+                    <BaseBadge v-if="item.newUnit" variant="warning" class="ml-1">nova</BaseBadge>
+                    <BaseBadge v-else-if="item.inactiveUnit" variant="danger" class="ml-1">inativa</BaseBadge>
+                  </td>
+                  <td
+                    class="whitespace-nowrap px-3 py-2 text-right align-top"
+                    :class="item.costPrice === null && item.initialStock > 0 ? 'text-red-600 dark:text-red-400' : 'text-gray-600 dark:text-gray-300'"
+                  >
+                    {{ item.costPrice === null ? 'sem custo' : formatCurrency(item.costPrice) }}
+                  </td>
+                  <td class="whitespace-nowrap px-3 py-2 text-right align-top text-gray-600 dark:text-gray-300">
+                    {{ item.salePrice === null ? '—' : formatCurrency(item.salePrice) }}
+                  </td>
+                  <td class="whitespace-nowrap px-3 py-2 text-right align-top text-gray-600 dark:text-gray-300">
+                    {{ formatQuantity(item.minStock) }}
+                  </td>
+                  <td class="whitespace-nowrap px-3 py-2 text-right align-top text-gray-600 dark:text-gray-300">
+                    {{ formatQuantity(item.initialStock) }}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <p v-if="(result.omittedPreview ?? 0) > 0" class="text-xs text-gray-500 dark:text-gray-400">
+            e mais {{ result.omittedPreview }} produto(s) não listados aqui.
+          </p>
+          <p v-if="result.summary.newCategories.length || result.summary.newUnits.length" class="text-xs text-gray-500 dark:text-gray-400">
+            Serão criadas junto com a importação:
+            {{ [...result.summary.newCategories, ...result.summary.newUnits].join(', ') }}.
+          </p>
+          <p v-if="result.summary.withInitialStock > 0" class="text-xs text-gray-500 dark:text-gray-400">
+            O estoque inicial entra no histórico como ajuste, com o motivo “carga inicial”, e soma
+            {{ formatCurrency(result.summary.initialStockValue) }} pelo custo da planilha.
+            <span v-if="result.summary.initialStockWithoutCost > 0" class="font-medium text-red-600 dark:text-red-400">
+              Sem custo, esse estoque vale R$ 0,00 nos relatórios e no painel até o custo ser informado.
+            </span>
+          </p>
+        </div>
 
         <div v-if="result.errors.length" class="space-y-2">
           <div class="flex items-center justify-between">
@@ -242,8 +314,8 @@ function downloadErrors() {
             e mais {{ result.summary.omittedErrors }} linha(s) com problema não listadas aqui.
           </p>
           <p class="text-xs text-gray-500 dark:text-gray-400">
-            Nada é importado enquanto houver linha com problema — corrija a planilha e envie de novo. Assim você não
-            corre o risco de importar metade dos produtos e duplicar o resto na segunda tentativa.
+            Nada é importado enquanto houver linha com problema. Corrija a planilha e envie de novo: assim você não
+            importa metade dos produtos e duplica o resto na segunda tentativa.
           </p>
         </div>
       </template>

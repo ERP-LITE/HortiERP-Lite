@@ -92,6 +92,41 @@ Endpoints envolvidos: `POST /companies/:id/impersonate` (super_admin only — en
 - **Falha de auditoria nunca derruba a operação do usuário.** `recordActivity` aceita um `executor` para participar da mesma transação da operação auditada — numa entrada de mercadoria que falha no meio, o histórico não pode ficar afirmando que a entrada foi criada. Fora de transação, as versões `recordActivitySafe`/`recordActivitiesSafe` engolem o erro: perder uma linha de histórico é ruim, impedir o lançamento de uma perda é pior.
 - Os quatro módulos compartilham `softDeleteManyWithActivity` (`shared/db/softDelete.ts`), que lê os rótulos, exclui e registra o histórico. Antes cada service repetia esse corpo quase idêntico, e o registro saía num laço de até 100 `insert` separados — hoje é um `insert` só, via `recordActivitiesSafe`. Os nomes continuam sendo lidos **antes** do `UPDATE`: depois da exclusão o histórico não teria como dizer o que saiu, que é justamente o que se quer auditar.
 
+### Categoria e unidade em uso não podem ser excluídas
+
+`assertNotUsedByProducts` (`shared/db/assertNotUsedByProducts.ts`) conta os produtos não excluídos que
+apontam para os ids e responde `409` antes de qualquer `UPDATE`, na exclusão individual e na em lote.
+Em lote é tudo ou nada: uma unidade em uso na seleção recusa a operação inteira, pelo mesmo motivo da
+importação de planilha, que é não deixar o usuário sem saber o que entrou e o que não entrou.
+
+O que acontecia antes merece registro, porque o estrago não era visível. `products` guarda `unitId` e
+`categoryId`, e as consultas que trazem o produto com a unidade usam a relação do Drizzle
+(`with: { unit: true }`), que **não filtra `deletedAt`**. Então excluir uma unidade em uso não sujava
+nenhuma lista: estoque, relatórios e painel seguiam mostrando "kg" como antes. A conta só chegava na
+edição do produto, onde as opções de unidade vêm de `listAllUnits` (que filtra excluídas): o campo
+abria vazio, a validação exigia unidade e o produto não salvava mais sem trocar a unidade dele.
+
+### Inativar é o caminho para aposentar categoria e unidade
+
+Bloquear a exclusão resolve a integridade, mas deixava um beco sem saída: cadastro em uso não podia sair
+das opções de produto novo de jeito nenhum. Daí a coluna `active` em `units` e `categories`
+(migration `0008`), com três regras:
+
+- **Produto novo não aceita cadastro inativo** (`409`). Quem valida é `assertCategoryAndUnitUsable`.
+- **Produto que já usa o cadastro inativo continua editável.** É a regra que exige cuidado: a tela manda
+  o formulário inteiro no `PUT`, incluindo a unidade atual, então uma checagem ingênua recusaria salvar
+  qualquer alteração naquele produto. `updateProduct` passa os ids atuais para a validação, que só
+  recusa inativo quando o id **mudou**.
+- **A importação de planilha enxerga as inativas.** Ela casa unidade por nome e abreviação; sem ver as
+  inativas, `createMissingRefs` tentaria criar uma unidade com nome repetido e bateria no índice único
+  (`units_company_name_active_unique`, que ignora só as excluídas). A linha é aceita, reaproveitando o
+  cadastro, e a conferência antes de confirmar marca a unidade com a etiqueta "inativa" para ninguém
+  importar 300 produtos numa unidade aposentada sem perceber.
+
+Nas opções de produto, o `select` mostra as ativas mais a do próprio produto quando ela está inativa,
+com o rótulo dizendo isso. A exclusão continua bloqueada para cadastro em uso, e a mensagem agora
+oferece a alternativa: trocar a unidade dos produtos, ou apenas inativar.
+
 ## Paginação
 
 Padrão único em todo módulo de listagem: `paginationQuerySchema` (Zod, `shared/schemas/pagination.schema.ts`) valida `page`/`pageSize` (máx. 100), e `buildPaginatedResult` (`shared/db/paginate.ts`) monta a resposta `{ data, page, pageSize, total, totalPages }`. Nenhum módulo reimplementa isso na mão.
@@ -121,8 +156,11 @@ que a tela e o usuário passa a arrastar na horizontal para ler qualquer coisa. 
 
 - **`v-mobile-accordion`** (padrão, usado pela maioria das listagens): a diretiva converte cada `<tr>` em cartão,
   esconde o `<thead>` e prefixa cada célula com o rótulo da coluna correspondente. A primeira célula com rótulo vira o
-  resumo clicável; as demais aparecem ao expandir. A célula de ações só é reconhecida como tal se o `<th>`
-  correspondente estiver **vazio** — daí a ausência de um cabeçalho "Ações" nas tabelas.
+  resumo clicável; as demais aparecem ao expandir. A célula de ações é reconhecida pelo **rótulo vazio**, e é isso que
+  a transforma na barra de botões alinhada à direita, sem prefixo. Por causa disso o cabeçalho "Ações", que existe no
+  desktop para a coluna de ícones não ficar sem nome, é marcado com `data-actions` no `<th>`: a diretiva lê esse
+  atributo e trata a coluna como se o título fosse vazio. Sem o atributo, acrescentar o título transformaria a barra de
+  ações em mais uma linha rotulada do cartão.
 - **Cartões próprios** (`StockView`, `StockMovementsView`, `StockEntryDetailsView`): um bloco `sm:hidden` com
   `<article>` por registro e a tabela marcada como `hidden sm:table`. Vale quando o cartão precisa de um arranjo
   diferente da ordem das colunas.
@@ -186,6 +224,40 @@ telas — ajustar tamanho por view era o que fazia os botões saírem desalinhad
 Formulários com validação própria usam `novalidate`: mensagens nativas do navegador não competem com o retorno
 padronizado da aplicação. Campos inválidos recebem borda vermelha e uma mensagem em vermelho logo abaixo do
 componente, inclusive selects, competência e calendário.
+
+### Peças compartilhadas das listagens
+
+Toda listagem é montada com as mesmas peças, e a regra é: se a coisa aparece igual em duas telas, ela
+mora num componente ou num composable, não copiada nas duas.
+
+- **`FilterModal`** embrulha o modal de filtro inteiro (o formulário, o "Limpar" à esquerda e o par
+  "Cancelar"/"Aplicar" à direita). A tela só declara os campos dentro dele. Antes esse rodapé estava
+  copiado em 11 telas, com duas variações de ordem de classe que ninguém tinha notado. Os eventos
+  (`apply`, `clear`, `close`) casam com o que o `useFilterModal` devolve, então a ligação é direta.
+- **`useFilterModal`** é o único caminho para filtro em rascunho. O `SystemLogsView` mantinha uma
+  cópia própria das três funções porque o filtro dele tem um objeto dentro (o período) e a cópia rasa
+  do composable fazia rascunho e filtro aplicado compartilharem a mesma referência: mexer no rascunho
+  já alterava a listagem. Agora a cópia é `structuredClone(toRaw(...))` no composable, e existe teste
+  (`tests/filterModal.test.ts`) fixando as três garantias: rascunho isolado, aplicar copiando e
+  limpar voltando ao padrão nos dois lados.
+- **`usePagination().reload(load)`** é como se volta para a página 1. A forma antiga
+  (`page.value = 1` seguido de `load()`) estava repetida em 21 lugares e fazia **duas** requisições
+  quando o usuário não estava na primeira página: a explícita mais a do observador de `page`. O
+  `reload` mexe na página quando ela não é 1 e deixa o observador recarregar, ou chama a carga direto
+  quando já está na 1. Uma requisição em qualquer caso.
+- **`usePagination().paginationProps`** entrega os quatro valores e os dois handlers da paginação de
+  uma vez, usados como `<Pagination v-bind="paginationProps" />`. Além das 15 repetições do mesmo
+  bloco de propriedades, isso resolveu duas telas fora do padrão: uma escutava `@change`, evento que
+  o `Pagination` não emite (era código morto, quem recarregava era o observador de `page`), e outra
+  não tinha handler nenhum.
+- **`StatusBadge`** e `lib/status.ts` guardam as palavras e a cor de ativo/inativo. A etiqueta, a
+  opção do filtro e a coluna do CSV saem do mesmo lugar, com o gênero como parâmetro (unidade é
+  "Inativa", produto é "Inativo") e um texto alternativo para o caso de Empresas, onde inativo se
+  chama "Suspenso".
+
+Vale a contrapartida: a ligação de propriedades de um componente compartilhado **não** é duplicação a
+ser eliminada a qualquer custo. O que foi extraído tinha decisão dentro (texto, cor, ordem dos botões,
+quantas requisições disparar). Onde só há fiação, ela ficou explícita na tela.
 
 ## Ordenação das listagens
 
@@ -501,6 +573,12 @@ visível.
 
 ## Mensagens de erro sempre em português
 
+Duas regras de escrita valem para todo texto de tela, não só para erro: **sem travessão** (`—`) e sem
+palavra em inglês. O travessão saiu de aviso, rótulo de filtro, título de modal e do aviso de
+privacidade; onde ele separava uma explicação, virou ponto, dois-pontos ou parêntese. Onde só juntava
+dois dados (empresa e competência, rota e status), o separador é o ponto médio `·`, que já era o padrão
+das listagens.
+
 Toda mensagem que chega ao cliente é em português. Isso é fácil de garantir nos erros que o próprio sistema levanta (`AppError` e Zod), e é justamente onde a regra vazava: **erros do Fastify e dos seus plugins nascem em inglês**, e o `errorHandler` repassava `error.message` sem olhar em qualquer 4xx que não fosse `AppError`. Foi assim que `Rate limit exceeded, retry in 53 seconds` apareceu na tela do usuário.
 
 A tradução mora em `shared/errors/frameworkMessages.ts`, e `frameworkErrorMessage` resolve em duas camadas: primeiro pelo código do erro (`FST_REQ_FILE_TOO_LARGE`, `FST_ERR_CTP_INVALID_MEDIA_TYPE`, …), e, sem código conhecido, pela mensagem genérica do status HTTP. A função **nunca devolve `undefined`** — é o que garante que um plugin novo, com códigos que ninguém mapeou, degrade para um texto genérico em português em vez de voltar a vazar inglês.
@@ -531,12 +609,105 @@ A divisão hoje é pela origem do erro:
 O critério prático no código: `resolveFormError` é submit, `getApiErrorMessage` num carregamento é
 página.
 
-### Quantidade em mensagem de erro precisa ser formatada
+### Quantidade precisa ser formatada, em mensagem e em tela
 
 `numeric(_, 3)` chega da consulta como string: um saldo de 50 vira `"50.000"`, que em português se lê
 como cinquenta mil — a mensagem dizia que 51 era maior que "50.000". `formatQuantity`
 (`shared/utils/quantity.ts`) resolve com `toLocaleString('pt-BR')`, e é por onde toda quantidade em
 mensagem de erro deve passar.
+
+O mesmo valia para a tela, por outro caminho: dezesseis lugares renderizavam `{{ Number(quantidade) }}`,
+e `Number(38.5).toString()` devolve `"38.5"`, com ponto decimal de outro idioma. Todos passam agora pelo
+`formatQuantity` do front (`lib/format.ts`), gêmeo do da API. Quantidade que aparece ao usuário não sai
+de `Number()` cru.
+
+### Campo com máscara precisa reescrever o campo quando o modelo não muda
+
+CNPJ, telefone e CEP são campos controlados: o `input` mostra o valor do modelo já mascarado, e cada
+tecla passa por `formatInputMask`. O problema é que o Vue só reescreve o DOM quando o valor do modelo
+**muda** — e digitar uma letra, ou um dígito além do limite da máscara, devolve exatamente o mesmo
+valor formatado. Modelo igual, nenhuma re-renderização, e o caractere recusado fica visível no campo.
+Na tela, isso é indistinguível de "a máscara sumiu": aparece `96.946.510/0001-259` ou
+`96.946.510/0001-25a` num campo que supostamente não aceita aquilo.
+
+`BaseInput` agora compara o que está no elemento com o que deveria estar e reescreve o elemento quando
+diferem, além de emitir o valor. Vale para o caminho mascarado e para o de casas decimais, que tinha
+o mesmo furo.
+
+### Campo obrigatório: asterisco na etiqueta, validação em JavaScript
+
+O `required` de `BaseInput`, `BaseSelect`, `DateInput` e `MonthInput` **não chega ao elemento nativo**.
+Ele vira o asterisco vermelho ao lado da etiqueta (`FieldLabel`, um componente só para isso, porque a
+etiqueta estava duplicada nos quatro) e um `aria-required` para leitor de tela. Quem valida é o
+`validate()` de cada tela, que escreve em `fieldErrors` e mostra a mensagem em vermelho sob o campo.
+
+O motivo de não usar o `required` do navegador: ele barra o submit antes do JavaScript e mostra a
+bolha dele, que não é o padrão de erro do sistema; num modal com abas o campo vazio pode estar numa
+aba escondida, e aí o formulário simplesmente não envia sem ninguém entender por quê; e o efeito
+dependia de o `<form>` ter ou não `novalidate` — metade das telas tinha, metade não. Duas telas
+dependiam do `required` nativo para barrar campo vazio (`Meu perfil` e o estoque mínimo em Produtos);
+as duas ganharam a checagem em JavaScript na mesma mudança.
+
+A consequência prática é uma regra: **`required` é uma afirmação sobre a etiqueta, não sobre a
+validação**. Se o `validate()` da tela não cobre o campo, o asterisco está mentindo.
+
+### Um jeito só de escolher numa lista
+
+O `BaseSelect` tinha dois modos: o normal (botão com a seta que gira, lista flutuante e campo de
+busca) e um modo `searchable: false` que caía num `<select>` nativo. O segundo modo era usado nos
+filtros de Categorias, Unidades, Logs de atividades e Cobranças, e nos seletores de mês e ano do
+`MonthInput`. Resultado: campos com aparência e comportamento diferentes na mesma tela, e o
+operador não conseguia digitar para achar a opção em uns e conseguia em outros.
+
+O modo nativo foi removido. Toda escolha em lista no sistema é o mesmo componente, com busca. Como
+o gatilho do ano tem 7rem de largura, a lista flutuante ganhou largura mínima de 224px (o campo de
+busca não caberia na largura do gatilho), sempre limitada à largura da tela para não criar rolagem
+horizontal no celular.
+
+O `<select>` nativo que sobra é o "por página" da paginação: ali são três números num rodapé
+compacto, não um campo de formulário.
+
+Uma consequência de vocabulário na mesma mudança: a coluna e o filtro de ativo/inativo se chamam
+**Situação** em todas as telas (era "Status" em Produtos, Usuários, Empresas e Cobranças, e
+"Situação" em Categorias e Unidades), e a opção que não filtra nada se chama "Todas as situações".
+Opção de "todos" com nome genérico atrapalha, porque é ela que aparece no campo fechado: o filtro
+precisa dizer o que ele filtra mesmo quando ninguém escolheu nada.
+
+### UF sai de lista fechada, não de texto livre
+
+O campo era texto de duas letras, então `XX` passava no front e na API. Hoje o formulário usa
+`BaseSelect` com as 27 UFs (`lib/ufs.ts`, encontrável pela sigla ou pelo nome do estado) e a API
+valida com `ufSchema` (`shared/schemas/uf.schema.ts`), que passa para maiúsculas antes de comparar —
+`sp` continua entrando como `SP`.
+
+A lista é constante em código, e não tabela no banco. Tabela de UF pediria migration, carga inicial,
+política de RLS (é tabela sem `company_id`, e o verificador de escopo cobraria uma exceção declarada)
+e uma rota só para lê-la — para um cadastro que muda quando o país cria um estado. O objetivo, que é
+não gravar UF inválida, vem da validação.
+
+### Consulta de CEP: provedor fora do ar não é CEP inexistente
+
+Três comportamentos diferentes apareciam como a mesma frase, "CEP não encontrado nos serviços
+disponíveis":
+
+- **Abrir o cadastro disparava consulta.** O modal de edição preenchia o formulário, o `watch` do CEP
+  via valor novo e buscava: o endereço ajustado à mão era sobrescrito pelo do provedor e aparecia o
+  aviso "Endereço preenchido pelo CEP" sem ninguém ter pedido nada. O modal agora abre marcando o CEP
+  gravado como já consultado; só CEP alterado dispara busca.
+- **O erro do CEP anterior ficava na tela** enquanto o CEP novo era digitado, porque só uma consulta
+  bem-sucedida limpava a mensagem. Agora a primeira tecla apaga o erro.
+- **Provedor fora do ar respondia como "não existe".** As três consultas em cadeia eram tentadas dentro
+  de um `try` vazio, e falha de rede caía no mesmo `404` de CEP inexistente — um CEP válido aparecia
+  como inválido sempre que o servidor ficava sem internet. `findAddressByCep` agora distingue
+  "provedor respondeu que não achou" de "nenhum provedor respondeu", e o segundo caso é `503` com
+  "Não foi possível consultar o CEP agora. Preencha o endereço à mão."
+
+### Confirmação de senha onde alguém digita a senha de outra pessoa
+
+Nova empresa (senha do administrador), Novo usuário e Novo super administrador: quem digita não é quem
+vai usar, o campo é mascarado, e um erro de digitação só aparece do outro lado, na forma de alguém que
+não consegue entrar. Os três têm **Confirmar senha**, validada no `validate()` da tela. O botão de
+gerar senha aleatória preenche os dois campos — senão a comodidade brigaria com a confirmação.
 
 ## Logs técnicos e auditoria por empresa
 
@@ -550,6 +721,19 @@ Um hook global `onResponse` registra em `system_logs` as requisições da API, s
 As ações registradas em `activity_logs` são `criou`, `alterou`, `excluiu`, `importou`, `ajustou` e `cancelou`. A coluna é `text` livre no banco, mas o conjunto é fechado em três lugares que precisam andar juntos: o tipo `ActivityAction` (backend), o `activityActionSchema` do filtro e os mapas de rótulo e cor da tela de auditoria (`ActivityLogsView.vue`) — o `vue-tsc` acusa se algum ficar para trás, porque os mapas são `Record<ActivityAction, …>`.
 
 `system_logs` e `activity_logs` são as tabelas que mais crescem e dominam o tamanho do backup. A limpeza é automática, semanal, com prazos vindos de duas leis que empurram em sentidos opostos — ver "Retenção de dados pessoais" em [deploy-producao.md](./deploy-producao.md).
+
+### "Informações adicionais" do log não é JSON na tela
+
+O campo `details` de `activity_logs` é um objeto livre, e a tela imprimia o `JSON.stringify` dele:
+`{"motivo":"roubo_furto","quantidadeEstornada":"50.000"}`. `describeActivityDetails`
+(`lib/activityDetails.ts`) traduz a chave, traduz o valor quando ele é código de perfil ou motivo de
+perda, troca `true`/`false` por Sim/Não, junta lista com vírgula e passa quantidade `numeric` pelo
+`toLocaleString('pt-BR')` — pelo mesmo motivo da seção da quantidade acima, "50.000" não pode ser lido
+como cinquenta mil. Chave que ninguém traduziu ainda aparece legível (`comEstoqueInicial` → "Com
+estoque inicial") em vez de sumir, e a exportação em planilha usa o mesmo texto.
+
+Os dois detalhes de log (atividade e técnico) usam `DetailField` para etiqueta e valor, e o perfil de
+acesso passa por `roleLabel` — antes o log técnico mostrava `super_admin` cru na tela.
 
 ## Correção de lançamentos operacionais
 

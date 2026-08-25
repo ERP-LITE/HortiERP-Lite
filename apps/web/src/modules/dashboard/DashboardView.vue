@@ -4,14 +4,13 @@ import { AlertTriangle, Coins, Package, TrendingDown } from '@lucide/vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import StatCard from '@/components/ui/StatCard.vue'
 import BaseBadge from '@/components/ui/BaseBadge.vue'
-import BaseButton from '@/components/ui/BaseButton.vue'
-import BaseModal from '@/components/ui/BaseModal.vue'
 import FilterButton from '@/components/ui/FilterButton.vue'
+import FilterModal from '@/components/ui/FilterModal.vue'
 import PrintButton from '@/components/ui/PrintButton.vue'
 import PeriodPicker from '@/components/ui/PeriodPicker.vue'
 import ExpandableText from '@/components/ui/ExpandableText.vue'
 import { rangeForPreset, type PeriodValue } from '@/lib/period'
-import { formatCurrency, formatDate, formatDateOnly } from '@/lib/format'
+import { formatCurrency, formatDate, formatDateOnly, formatQuantity } from '@/lib/format'
 import { useFilterModal } from '@/composables/useFilterModal'
 import DonutChart from '@/components/charts/DonutChart.vue'
 import MovementsTrendChart from '@/components/charts/MovementsTrendChart.vue'
@@ -165,7 +164,7 @@ onMounted(loadSummary)
                   <ExpandableText :text="product.name" :max-length="45" />
                 </td>
                 <td class="px-4 py-3 text-sm text-gray-500 dark:text-gray-400 text-right whitespace-nowrap">
-                  {{ Number(product.currentStock) }} / mín. {{ Number(product.minStock) }}
+                  {{ formatQuantity(product.currentStock) }} / mín. {{ formatQuantity(product.minStock) }}
                 </td>
               </tr>
             </tbody>
@@ -212,20 +211,14 @@ onMounted(loadSummary)
       </div>
     </template>
 
-    <BaseModal :open="filterModalOpen" title="Filtrar por período" @close="filterModalOpen = false">
-      <form class="space-y-4" @submit.prevent="applyFilters">
-        <PeriodPicker v-model="draftPeriod" :include-all-time="false" />
-
-        <div class="flex justify-between items-center pt-2">
-          <button type="button" class="text-sm text-gray-500 hover:underline dark:text-gray-400" @click="clearFilters">
-            Limpar
-          </button>
-          <div class="flex gap-2">
-            <BaseButton variant="secondary" type="button" @click="filterModalOpen = false">Cancelar</BaseButton>
-            <BaseButton type="submit">Aplicar</BaseButton>
-          </div>
-        </div>
-      </form>
-    </BaseModal>
+    <FilterModal
+      :open="filterModalOpen"
+      title="Filtrar por período"
+      @close="filterModalOpen = false"
+      @apply="applyFilters"
+      @clear="clearFilters"
+    >
+      <PeriodPicker v-model="draftPeriod" :include-all-time="false" />
+    </FilterModal>
   </div>
 </template>

@@ -153,6 +153,19 @@ describe('cadastro de empresas', () => {
     assert.equal(duplicate.statusCode, 409)
     assert.match(duplicate.body, /CNPJ/)
   })
+
+  test('recusa UF que não existe', async () => {
+    const superAdmin = await superAdminFixture('company-uf')
+    const response = await ctx.app.inject({
+      method: 'POST',
+      url: '/api/companies',
+      headers: { cookie: authCookie(ctx.app, superAdmin) },
+      payload: { ...companyPayload, state: 'XX' },
+    })
+
+    assert.equal(response.statusCode, 422)
+    assert.match(response.body, /UF/)
+  })
 })
 
 describe('proteção da empresa Plataforma', () => {

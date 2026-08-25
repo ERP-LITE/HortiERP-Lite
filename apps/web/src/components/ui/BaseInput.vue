@@ -2,6 +2,7 @@
 import { computed, ref } from 'vue'
 import { Eye, EyeOff } from '@lucide/vue'
 import { formatInputMask, type InputMask } from '@/lib/format'
+import FieldLabel from './FieldLabel.vue'
 
 const props = defineProps<{
   modelValue: string | number | null | undefined
@@ -44,10 +45,16 @@ const displayValue = computed(() => {
   })
 })
 
+function emitirValor(input: HTMLInputElement, valor: string, exibido: string) {
+  if (input.value !== exibido) input.value = exibido
+  emit('update:modelValue', valor)
+}
+
 function handleInput(event: Event) {
   const input = event.target as HTMLInputElement
   if (isMasked.value) {
-    emit('update:modelValue', formatInputMask(input.value, props.mask!))
+    const formatado = formatInputMask(input.value, props.mask!)
+    emitirValor(input, formatado, formatado)
     return
   }
   if (!isDecimal.value) {
@@ -55,17 +62,21 @@ function handleInput(event: Event) {
     return
   }
 
+  const places = props.decimalPlaces ?? 2
   const digits = input.value.replace(/\D/g, '')
   if (!digits) {
-    emit('update:modelValue', '')
+    emitirValor(input, '', '')
     return
   }
 
-  const places = props.decimalPlaces ?? 2
   const normalized = digits.padStart(places + 1, '0')
   const integerPart = normalized.slice(0, -places).replace(/^0+(?=\d)/, '') || '0'
   const decimalPart = normalized.slice(-places)
-  emit('update:modelValue', places > 0 ? `${integerPart}.${decimalPart}` : integerPart)
+  const valor = places > 0 ? `${integerPart}.${decimalPart}` : integerPart
+  emitirValor(input, valor, Number(valor).toLocaleString('pt-BR', {
+    minimumFractionDigits: places,
+    maximumFractionDigits: places,
+  }))
 }
 
 defineExpose({
@@ -75,7 +86,7 @@ defineExpose({
 
 <template>
   <label class="block">
-    <span v-if="label" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{{ label }}</span>
+    <FieldLabel :text="label" :required="required" />
     <div class="relative">
       <input
         ref="inputElement"
@@ -83,7 +94,7 @@ defineExpose({
         :type="resolvedType"
         :inputmode="isDecimal || isMasked ? 'numeric' : undefined"
         :placeholder="placeholder"
-        :required="required"
+        :aria-required="required || undefined"
         :step="step"
         class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-100 dark:placeholder:text-gray-500"
         :class="[{ 'border-red-400': error || invalid }, isPassword ? 'pr-10' : '']"

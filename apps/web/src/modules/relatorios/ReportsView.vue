@@ -4,8 +4,8 @@ import { Boxes, FileDown, Package, ReceiptText, Scale, TriangleAlert } from '@lu
 import PageHeader from '@/components/ui/PageHeader.vue'
 import BaseBadge from '@/components/ui/BaseBadge.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
-import BaseModal from '@/components/ui/BaseModal.vue'
 import FilterButton from '@/components/ui/FilterButton.vue'
+import FilterModal from '@/components/ui/FilterModal.vue'
 import SearchInput from '@/components/ui/SearchInput.vue'
 import PeriodPicker from '@/components/ui/PeriodPicker.vue'
 import Pagination from '@/components/ui/Pagination.vue'
@@ -16,7 +16,7 @@ import { usePagination } from '@/composables/usePagination'
 import { useFilterModal } from '@/composables/useFilterModal'
 import { useLocalTableSort } from '@/composables/useTableSort'
 import type { PeriodValue } from '@/lib/period'
-import { formatDate, formatDateOnly } from '@/lib/format'
+import { formatDate, formatDateOnly, formatQuantity } from '@/lib/format'
 import { getApiErrorMessage } from '@/services/api'
 import { useAuthStore } from '@/stores/auth'
 import {
@@ -27,6 +27,7 @@ import {
   type StockByCategoryRow,
 } from '@/services/reportsService'
 import type { StockEntry } from '@/types'
+import { reasonLabel } from '@/lib/losses'
 
 const tabs = [
   { key: 'estoque', label: 'Estoque por categoria' },
@@ -38,7 +39,7 @@ type TabKey = (typeof tabs)[number]['key']
 
 const activeTab = ref<TabKey>('estoque')
 const auth = useAuthStore()
-const { page, pageSize, total, totalPages, applyMeta } = usePagination()
+const { page, pageSize, total, totalPages, applyMeta, reload, paginationProps } = usePagination()
 const loading = ref(false)
 const generatingPdf = ref(false)
 const printing = ref(false)
@@ -56,8 +57,7 @@ const {
   applyFilters,
   clearFilters,
 } = useFilterModal(emptyPeriod, () => {
-  if (page.value !== 1) page.value = 1
-  else loadActiveTab()
+  reload(loadActiveTab)
 })
 const hasDateFilterTab = computed(() => activeTab.value !== 'estoque')
 const activeFilterCount = computed(() => Number(period.value.preset !== 'todos'))
@@ -70,13 +70,6 @@ const stockEntriesReport = ref<StockEntry[]>([])
 const printLossItems = ref<LossesReport['data']>([])
 const printStockEntries = ref<StockEntry[]>([])
 
-const reasonLabels: Record<string, string> = {
-  vencido: 'Vencido',
-  avariado: 'Avariado',
-  roubo_furto: 'Roubo/Furto',
-  erro_operacional: 'Erro operacional',
-  outro: 'Outro',
-}
 
 const search = ref('')
 
@@ -98,14 +91,14 @@ const stockSort = useLocalTableSort(filteredStockByCategory, {
   stock: (row) => row.totalStock,
 }, 'category')
 const reasonSort = useLocalTableSort(lossReasonRows, {
-  reason: (row) => reasonLabels[row.reason] ?? row.reason,
+  reason: (row) => reasonLabel(row.reason),
   occurrences: (row) => row.occurrences,
   quantity: (row) => row.quantity,
 }, 'reason')
 const lossSort = useLocalTableSort(filteredLossItems, {
   date: (row) => new Date(row.lossDate).getTime(),
   product: (row) => row.product?.name ?? '',
-  reason: (row) => reasonLabels[row.reason] ?? row.reason,
+  reason: (row) => reasonLabel(row.reason),
   quantity: (row) => Number(row.quantity),
   user: (row) => row.createdByUser?.name ?? '',
 }, 'date')
@@ -127,7 +120,7 @@ const lossSummary = computed(() => {
   const occurrences = rows.reduce((sum, row) => sum + row.occurrences, 0)
   const quantity = rows.reduce((sum, row) => sum + row.quantity, 0)
   const mainReason = [...rows].sort((a, b) => b.quantity - a.quantity)[0]
-  return { occurrences, quantity, mainReason: mainReason ? reasonLabels[mainReason.reason] ?? mainReason.reason : '—' }
+  return { occurrences, quantity, mainReason: mainReason ? reasonLabel(mainReason.reason) : '—' }
 })
 
 const entriesSummary = computed(() => {
@@ -264,13 +257,11 @@ async function generatePdf() {
 }
 
 watch(activeTab, () => {
-  if (page.value !== 1) page.value = 1
-  else loadActiveTab()
+  reload(loadActiveTab)
 })
 watch(search, () => {
   if (activeTab.value === 'estoque') return
-  if (page.value !== 1) page.value = 1
-  else loadActiveTab()
+  reload(loadActiveTab)
 })
 watch([page, pageSize], () => {
   if (activeTab.value !== 'estoque') loadActiveTab()
@@ -334,7 +325,7 @@ onMounted(loadActiveTab)
       <div v-if="activeTab === 'estoque'" class="report-summary-grid grid grid-cols-1 gap-4 mb-6 sm:grid-cols-3">
         <StatCard label="Categorias" :value="String(stockSummary.categories)" :icon="Boxes" />
         <StatCard label="Produtos cadastrados" :value="String(stockSummary.products)" :icon="Package" />
-        <StatCard label="Quantidade em estoque" :value="stockSummary.quantity.toLocaleString('pt-BR')" :icon="Scale" />
+        <StatCard label="Quantidade em estoque" :value="formatQuantity(stockSummary.quantity)" :icon="Scale" />
       </div>
 
       <div
@@ -367,7 +358,7 @@ onMounted(loadActiveTab)
       <div v-else-if="activeTab === 'perdas' && lossesReport" class="space-y-6">
         <div class="report-summary-grid grid grid-cols-1 gap-4 sm:grid-cols-3">
           <StatCard label="Registros de perda" :value="String(lossSummary.occurrences)" :icon="ReceiptText" tone="danger" />
-          <StatCard label="Quantidade perdida" :value="lossSummary.quantity.toLocaleString('pt-BR')" :icon="TriangleAlert" tone="danger" />
+          <StatCard label="Quantidade perdida" :value="formatQuantity(lossSummary.quantity)" :icon="TriangleAlert" tone="danger" />
           <StatCard label="Principal motivo" :value="lossSummary.mainReason" :icon="Scale" tone="warning" />
         </div>
 
@@ -391,7 +382,7 @@ onMounted(loadActiveTab)
               </tr>
               <tr v-for="row in reasonSort.sortedItems.value" v-else :key="row.reason">
                 <td class="px-4 py-3 text-sm text-gray-900 dark:text-gray-100">
-                  {{ reasonLabels[row.reason] ?? row.reason }}
+                  {{ reasonLabel(row.reason) }}
                 </td>
                 <td class="px-4 py-3 text-sm text-gray-500 dark:text-gray-400 text-right">
                   {{ row.occurrences }} registros
@@ -430,10 +421,10 @@ onMounted(loadActiveTab)
                   <ExpandableText :text="loss.product?.name" :max-length="45" />
                 </td>
                 <td class="px-4 py-3 whitespace-nowrap">
-                  <BaseBadge variant="danger">{{ reasonLabels[loss.reason] ?? loss.reason }}</BaseBadge>
+                  <BaseBadge variant="danger">{{ reasonLabel(loss.reason) }}</BaseBadge>
                 </td>
                 <td class="px-4 py-3 text-sm text-gray-700 dark:text-gray-300 text-right">
-                  {{ Number(loss.quantity) }}
+                  {{ formatQuantity(loss.quantity) }}
                 </td>
                 <td class="max-w-64 px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
                   <ExpandableText
@@ -445,15 +436,7 @@ onMounted(loadActiveTab)
               </tr>
             </tbody>
           </table>
-          <Pagination
-            v-if="!printing"
-            :page="page"
-            :page-size="pageSize"
-            :total="total"
-            :total-pages="totalPages"
-            @update:page="page = $event"
-            @update:page-size="pageSize = $event"
-          />
+          <Pagination v-if="!printing" v-bind="paginationProps" />
         </div>
       </div>
 
@@ -467,7 +450,7 @@ onMounted(loadActiveTab)
           />
           <StatCard
             :label="printing ? 'Quantidade recebida' : 'Quantidade nesta página'"
-            :value="entriesSummary.quantity.toLocaleString('pt-BR')"
+            :value="formatQuantity(entriesSummary.quantity)"
             :icon="Package"
           />
         </div>
@@ -510,37 +493,19 @@ onMounted(loadActiveTab)
             </tr>
           </tbody>
         </table>
-        <Pagination
-          v-if="!printing"
-          :page="page"
-          :page-size="pageSize"
-          :total="total"
-          :total-pages="totalPages"
-          @update:page="page = $event"
-          @update:page-size="pageSize = $event"
-        />
+        <Pagination v-if="!printing" v-bind="paginationProps" />
         </div>
       </div>
     </template>
 
-    <BaseModal :open="filterModalOpen" title="Filtrar por período" @close="filterModalOpen = false">
-      <form class="space-y-4" @submit.prevent="applyFilters">
-        <PeriodPicker v-model="draftPeriod" />
-
-        <div class="flex justify-between items-center pt-2">
-          <button
-            type="button"
-            class="text-sm text-gray-500 hover:underline dark:text-gray-400"
-            @click="clearFilters"
-          >
-            Limpar
-          </button>
-          <div class="flex gap-2">
-            <BaseButton variant="secondary" type="button" @click="filterModalOpen = false">Cancelar</BaseButton>
-            <BaseButton type="submit">Aplicar</BaseButton>
-          </div>
-        </div>
-      </form>
-    </BaseModal>
+    <FilterModal
+      :open="filterModalOpen"
+      title="Filtrar por período"
+      @close="filterModalOpen = false"
+      @apply="applyFilters"
+      @clear="clearFilters"
+    >
+      <PeriodPicker v-model="draftPeriod" />
+    </FilterModal>
   </div>
 </template>

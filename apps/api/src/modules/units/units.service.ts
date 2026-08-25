@@ -1,12 +1,13 @@
 import { and, asc, count, eq, ilike, isNull, or } from 'drizzle-orm'
 import { orderByColumn } from '../../shared/db/sorting.js'
 import { db } from '../../db/client.js'
-import { units } from '../../db/schema/index.js'
+import { products, units } from '../../db/schema/index.js'
 import { AppError } from '../../shared/errors/AppError.js'
 import { assertUniqueField } from '../../shared/db/assertUniqueField.js'
 import { buildPaginatedResult } from '../../shared/db/paginate.js'
 import { softDeleteById, softDeleteManyWithActivity } from '../../shared/db/softDelete.js'
 import { recordActivitySafe } from '../../shared/db/recordActivity.js'
+import { assertNotUsedByProducts } from '../../shared/db/assertNotUsedByProducts.js'
 import type { CreateUnitInput, ListUnitsQuery, UpdateUnitInput } from './units.schema.js'
 
 function assertUniqueName(companyId: string, name: string, excludeId?: string) {
@@ -44,6 +45,7 @@ export async function listUnits(companyId: string, query: ListUnitsQuery) {
   if (query.search) {
     conditions.push(or(ilike(units.name, `%${query.search}%`), ilike(units.abbreviation, `%${query.search}%`))!)
   }
+  if (query.active !== undefined) conditions.push(eq(units.active, query.active))
   const where = and(...conditions)
   const orderBy = orderByColumn(query.sortBy ? units[query.sortBy] : units.name, query.sortOrder)
 
@@ -116,8 +118,13 @@ export async function updateUnit(companyId: string, userId: string, id: string, 
   return unit
 }
 
+function assertUnitsNotInUse(companyId: string, ids: string[], reference: string) {
+  return assertNotUsedByProducts({ companyId, ids, column: products.unitId, reference, action: 'a unidade' })
+}
+
 export async function deleteUnit(companyId: string, userId: string, id: string) {
   const registro = await getUnit(companyId, id)
+  await assertUnitsNotInUse(companyId, [id], 'usam esta unidade')
   await softDeleteById(units, companyId, userId, id)
   await recordActivitySafe({
     companyId,
@@ -130,5 +137,6 @@ export async function deleteUnit(companyId: string, userId: string, id: string) 
 }
 
 export async function deleteUnits(companyId: string, userId: string, ids: string[]) {
+  await assertUnitsNotInUse(companyId, ids, 'usam as unidades selecionadas')
   return softDeleteManyWithActivity({ table: units, companyId, userId, ids, entity: 'unidade' })
 }

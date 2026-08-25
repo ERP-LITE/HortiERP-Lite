@@ -12,12 +12,14 @@ import BaseModal from '@/components/ui/BaseModal.vue'
 import BaseToggle from '@/components/ui/BaseToggle.vue'
 import Pagination from '@/components/ui/Pagination.vue'
 import FilterButton from '@/components/ui/FilterButton.vue'
+import FilterModal from '@/components/ui/FilterModal.vue'
 import PrintButton from '@/components/ui/PrintButton.vue'
 import ExportCsvButton from '@/components/ui/ExportCsvButton.vue'
 import SearchInput from '@/components/ui/SearchInput.vue'
 import SortableTableHeader from '@/components/ui/SortableTableHeader.vue'
 import { getApiErrorMessage, resolveFormError } from '@/services/api'
 import { toastSuccess } from '@/lib/alerts'
+import { formatQuantity } from '@/lib/format'
 import { adjustStock, listAllCurrentStock, listCurrentStock } from '@/services/stockService'
 import { csvNumber } from '@/lib/csv'
 import { listAllCategories } from '@/services/categoriesService'
@@ -31,8 +33,8 @@ import type { Category, Product, ProductWithRelations } from '@/types'
 const auth = useAuthStore()
 const canManage = computed(() => auth.user?.role === 'admin' || auth.user?.role === 'gerente')
 
-const { page, pageSize, total, totalPages, applyMeta, watchSearch } = usePagination()
-const { sortBy, sortOrder, toggleSort } = useTableSort(() => { page.value = 1; return loadStock() }, 'name')
+const { page, pageSize, total, totalPages, applyMeta, reload, watchSearch, paginationProps } = usePagination()
+const { sortBy, sortOrder, toggleSort } = useTableSort(() => reload(loadStock), 'name')
 
 const products = ref<ProductWithRelations[]>([])
 const categories = ref<Category[]>([])
@@ -42,10 +44,7 @@ const errorMessage = ref('')
 const search = ref('')
 const { filters, draftFilters, filterModalOpen, openFilterModal, applyFilters, clearFilters } = useFilterModal(
   () => ({ categoryId: 'todas', lowStockOnly: false }),
-  () => {
-    page.value = 1
-    loadStock()
-  },
+  () => reload(loadStock),
 )
 const activeFilterCount = computed(
   () => Number(filters.value.categoryId !== 'todas') + Number(filters.value.lowStockOnly),
@@ -230,7 +229,7 @@ async function exportCsv() {
     rows: all.map((item) => [
       item.name,
       item.category?.name ?? '',
-      item.unit?.abbreviation ?? '',
+      item.unit?.name ?? '',
       csvNumber(item.currentStock, 3),
       csvNumber(item.minStock, 3),
       csvNumber(item.costPrice),
@@ -277,7 +276,7 @@ onMounted(() => {
 
     <p v-if="errorMessage" class="text-sm text-red-600 dark:text-red-400 mb-4">{{ errorMessage }}</p>
 
-    <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700">
+    <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-x-auto">
       <div class="divide-y divide-gray-100 dark:divide-gray-700 sm:hidden">
         <div v-if="loading" class="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">Carregando...</div>
         <div v-else-if="products.length === 0" class="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">
@@ -307,13 +306,13 @@ onMounted(() => {
             <div>
               <dt class="text-xs text-gray-500 dark:text-gray-400">Estoque atual</dt>
               <dd class="mt-0.5 text-sm font-semibold text-gray-900 dark:text-gray-100">
-                {{ Number(product.currentStock) }} {{ product.unit?.abbreviation }}
+                {{ formatQuantity(product.currentStock) }} {{ product.unit?.abbreviation }}
               </dd>
             </div>
             <div>
               <dt class="text-xs text-gray-500 dark:text-gray-400">Estoque mínimo</dt>
               <dd class="mt-0.5 text-sm text-gray-700 dark:text-gray-300">
-                {{ Number(product.minStock) }} {{ product.unit?.abbreviation }}
+                {{ formatQuantity(product.minStock) }} {{ product.unit?.abbreviation }}
               </dd>
             </div>
           </dl>
@@ -326,20 +325,25 @@ onMounted(() => {
             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
               Categoria
             </th>
-            <SortableTableHeader field="currentStock" :active-field="sortBy" :order="sortOrder" @sort="toggleSort">Estoque atual</SortableTableHeader>
-            <SortableTableHeader field="minStock" :active-field="sortBy" :order="sortOrder" @sort="toggleSort">Estoque mínimo</SortableTableHeader>
-            <th class="px-4 py-3" />
-            <th v-if="canManage" class="print:hidden px-4 py-3" />
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+              Unidade
+            </th>
+            <SortableTableHeader field="currentStock" align="right" :active-field="sortBy" :order="sortOrder" @sort="toggleSort">Estoque atual</SortableTableHeader>
+            <SortableTableHeader field="minStock" align="right" :active-field="sortBy" :order="sortOrder" @sort="toggleSort">Estoque mínimo</SortableTableHeader>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+              Alerta
+            </th>
+            <th v-if="canManage" data-actions class="print:hidden px-4 py-3 text-right text-xs font-medium uppercase text-gray-500 dark:text-gray-400">Ações</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
           <tr v-if="loading">
-            <td :colspan="canManage ? 6 : 5" class="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">
+            <td :colspan="canManage ? 7 : 6" class="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">
               Carregando...
             </td>
           </tr>
           <tr v-else-if="products.length === 0">
-            <td :colspan="canManage ? 6 : 5" class="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">
+            <td :colspan="canManage ? 7 : 6" class="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">
               Nenhum produto cadastrado.
             </td>
           </tr>
@@ -357,11 +361,14 @@ onMounted(() => {
             <td class="max-w-64 px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
               <ExpandableText :text="product.category?.name" :max-length="40" />
             </td>
-            <td class="px-4 py-3 text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap">
-              {{ Number(product.currentStock) }} {{ product.unit?.abbreviation }}
+            <td class="max-w-40 px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
+              <ExpandableText :text="product.unit?.name" :max-length="20" />
             </td>
-            <td class="px-4 py-3 text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">
-              {{ Number(product.minStock) }} {{ product.unit?.abbreviation }}
+            <td class="px-4 py-3 text-right text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap">
+              {{ formatQuantity(product.currentStock) }}
+            </td>
+            <td class="px-4 py-3 text-right text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">
+              {{ formatQuantity(product.minStock) }}
             </td>
             <td class="px-4 py-3 whitespace-nowrap">
               <BaseBadge v-if="Number(product.currentStock) <= Number(product.minStock)" variant="warning">
@@ -380,36 +387,23 @@ onMounted(() => {
           </tr>
         </tbody>
       </table>
-      <Pagination
-        :page="page"
-        :page-size="pageSize"
-        :total="total"
-        :total-pages="totalPages"
-        @update:page="page = $event"
-        @update:page-size="pageSize = $event"
-      />
+      <Pagination v-bind="paginationProps" />
     </div>
 
-    <BaseModal :open="filterModalOpen" title="Filtrar estoque" @close="filterModalOpen = false">
-      <form class="space-y-4" @submit.prevent="applyFilters">
-        <BaseSelect v-model="draftFilters.categoryId" label="Categoria" :options="categoryFilterOptions" />
-        <BaseToggle v-model="draftFilters.lowStockOnly" label="Somente estoque baixo" />
-
-        <div class="flex justify-between items-center pt-2">
-          <button type="button" class="text-sm text-gray-500 hover:underline dark:text-gray-400" @click="clearFilters">
-            Limpar
-          </button>
-          <div class="flex gap-2">
-            <BaseButton variant="secondary" type="button" @click="filterModalOpen = false">Cancelar</BaseButton>
-            <BaseButton type="submit">Aplicar</BaseButton>
-          </div>
-        </div>
-      </form>
-    </BaseModal>
+    <FilterModal
+      :open="filterModalOpen"
+      title="Filtrar estoque"
+      @close="filterModalOpen = false"
+      @apply="applyFilters"
+      @clear="clearFilters"
+    >
+      <BaseSelect v-model="draftFilters.categoryId" label="Categoria" :options="categoryFilterOptions" />
+      <BaseToggle v-model="draftFilters.lowStockOnly" label="Somente estoque baixo" />
+    </FilterModal>
 
     <BaseModal
       :open="adjustModalOpen"
-      :title="`Ajustar estoque — ${adjustingProduct?.name ?? ''}`"
+      :title="`Ajustar estoque: ${adjustingProduct?.name ?? ''}`"
       @close="adjustModalOpen = false"
     >
       <form class="space-y-4" @submit.prevent="handleAdjustSubmit">
@@ -418,9 +412,8 @@ onMounted(() => {
         >
           <AlertTriangle :size="16" class="mt-0.5 shrink-0" />
           <p>
-            Use isso só pra corrigir divergências de contagem física (inventário). Entradas de mercadoria e perdas
-            devem continuar sendo lançadas pelas telas próprias — o ajuste manual fica registrado no histórico de
-            movimentações com o motivo informado, mas não passa pelas validações de fornecedor ou motivo de perda.
+            Use só para corrigir divergência de contagem física. Entrada de mercadoria e perda têm telas próprias.
+            O ajuste fica registrado no histórico de movimentações com o motivo informado.
           </p>
         </div>
 
@@ -436,12 +429,14 @@ onMounted(() => {
           :decimal-places="3"
           label="Nova quantidade em estoque"
           :error="adjustFieldErrors.quantity"
+          required
         />
         <BaseInput
           v-model="adjustForm.notes"
           label="Motivo do ajuste"
           placeholder="Ex.: contagem física apontou divergência"
           :error="adjustFieldErrors.notes"
+          required
         />
 
         <p v-if="adjustErrorMessage" class="text-sm text-red-600 dark:text-red-400">{{ adjustErrorMessage }}</p>
@@ -460,9 +455,8 @@ onMounted(() => {
         >
           <AlertTriangle :size="16" class="mt-0.5 shrink-0" />
           <p>
-            Use isso só pra corrigir divergências de contagem física (inventário), como depois de uma contagem
-            completa. Entradas de mercadoria e perdas devem continuar sendo lançadas pelas telas próprias — cada
-            ajuste fica registrado no histórico de movimentações com o motivo informado.
+            Use só para corrigir divergência de contagem física, como depois de um inventário completo. Entrada de
+            mercadoria e perda têm telas próprias. Cada ajuste fica registrado no histórico com o motivo informado.
           </p>
         </div>
 
@@ -471,6 +465,7 @@ onMounted(() => {
           label="Motivo do ajuste"
           placeholder="Ex.: contagem física do inventário mensal"
           :error="bulkAdjustNotesError"
+          required
         />
 
         <div>
@@ -497,6 +492,7 @@ onMounted(() => {
                 label="Produto"
                 :options="bulkAdjustProductOptions"
                 :error="bulkAdjustItemErrors[index]?.productId"
+                required
                 @update:model-value="(value) => selectBulkAdjustProduct(index, value)"
               />
               <BaseInput
@@ -504,6 +500,7 @@ onMounted(() => {
                 :decimal-places="3"
                 label="Nova quantidade"
                 :error="bulkAdjustItemErrors[index]?.quantity"
+                required
               />
               <div class="flex flex-col">
                 <span class="block text-sm font-medium mb-1 invisible">Remover</span>

@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { emailSchema } from '../../shared/schemas/email.schema.js'
+import { ufSchema } from '../../shared/schemas/uf.schema.js'
 import { paginationQuerySchema } from '../../shared/schemas/pagination.schema.js'
 
 export const listCompaniesQuerySchema = paginationQuerySchema.extend({
@@ -31,7 +32,6 @@ const optionalText = (max = 160) => z.string().trim().max(max).optional().transf
 const cnpjSchema = z.string().transform((value) => value.replace(/\D/g, '')).refine(isValidCnpj, 'CNPJ inválido')
 const phoneSchema = z.string().transform((value) => value.replace(/\D/g, '')).refine((value) => value.length >= 10 && value.length <= 11, 'Telefone inválido')
 const postalCodeSchema = z.string().transform((value) => value.replace(/\D/g, '')).refine((value) => value.length === 8, 'CEP inválido')
-const stateSchema = z.string().trim().toUpperCase().length(2, 'Informe a UF com 2 letras')
 
 const companyFields = {
   name: requiredText('Nome fantasia é obrigatório'),
@@ -47,7 +47,7 @@ const companyFields = {
   complement: optionalText(120),
   district: requiredText('Bairro é obrigatório'),
   city: requiredText('Cidade é obrigatória'),
-  state: stateSchema,
+  state: ufSchema,
 }
 
 export const createCompanySchema = z.object({

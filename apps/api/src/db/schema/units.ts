@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm'
-import { pgTable, text, uniqueIndex, uuid } from 'drizzle-orm/pg-core'
+import { boolean, pgTable, text, uniqueIndex, uuid } from 'drizzle-orm/pg-core'
 import { auditBy, timestamps } from './columns.js'
 import { companies } from './companies.js'
 
@@ -10,6 +10,7 @@ export const units = pgTable('units', {
     .references(() => companies.id),
   name: text('name').notNull(),
   abbreviation: text('abbreviation').notNull(),
+  active: boolean('active').notNull().default(true),
   ...timestamps,
   ...auditBy,
 }, (table) => ({

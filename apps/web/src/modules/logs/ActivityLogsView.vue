@@ -7,6 +7,7 @@ import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseSelect from '@/components/ui/BaseSelect.vue'
 import BaseModal from '@/components/ui/BaseModal.vue'
 import ExpandableText from '@/components/ui/ExpandableText.vue'
+import DetailField from '@/components/ui/DetailField.vue'
 import FilterButton from '@/components/ui/FilterButton.vue'
 import PrintButton from '@/components/ui/PrintButton.vue'
 import ExportCsvButton from '@/components/ui/ExportCsvButton.vue'
@@ -17,6 +18,7 @@ import SortableTableHeader from '@/components/ui/SortableTableHeader.vue'
 import { getApiErrorMessage } from '@/services/api'
 import { useIsMobile } from '@/composables/useIsMobile'
 import { formatDateTime } from '@/lib/format'
+import { activityDetailsText, describeActivityDetails } from '@/lib/activityDetails'
 import type { PeriodValue } from '@/lib/period'
 import { listActivityLogs, listAllActivityLogs } from '@/services/logsService'
 import { usePagination } from '@/composables/usePagination'
@@ -24,11 +26,8 @@ import { useFilterModal } from '@/composables/useFilterModal'
 import { useTableSort } from '@/composables/useTableSort'
 import type { ActivityAction, ActivityEntity, ActivityLog } from '@/types'
 
-const { page, pageSize, total, totalPages, applyMeta, watchSearch } = usePagination()
-const { sortBy, sortOrder, toggleSort } = useTableSort(() => {
-  page.value = 1
-  return loadLogs()
-}, 'createdAt')
+const { page, pageSize, total, totalPages, applyMeta, reload, watchSearch, paginationProps } = usePagination()
+const { sortBy, sortOrder, toggleSort } = useTableSort(() => reload(loadLogs), 'createdAt')
 
 const logs = ref<ActivityLog[]>([])
 const loading = ref(true)
@@ -83,10 +82,7 @@ const actionVariant: Record<ActivityAction, 'success' | 'warning' | 'danger' | '
 
 const { filters, draftFilters, filterModalOpen, openFilterModal, applyFilters, clearFilters } = useFilterModal(
   () => ({ action: 'todos', entity: 'todos', period: { preset: 'todos', from: '', to: '' } as PeriodValue }),
-  () => {
-    page.value = 1
-    loadLogs()
-  },
+  () => reload(loadLogs),
 )
 const activeFilterCount = computed(
   () =>
@@ -96,6 +92,7 @@ const activeFilterCount = computed(
 )
 
 const selectedLog = ref<ActivityLog | null>(null)
+const detailItems = computed(() => describeActivityDetails(selectedLog.value?.details))
 
 const isMobile = useIsMobile()
 
@@ -138,7 +135,7 @@ async function exportCsv() {
       actionLabels[log.action],
       entityLabels[log.entity],
       log.entityLabel,
-      log.details ? JSON.stringify(log.details) : '',
+      activityDetailsText(log.details),
     ]),
   }
 }
@@ -180,7 +177,7 @@ onMounted(loadLogs)
               <th class="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500 dark:text-gray-400">
                 Registro
               </th>
-              <th class="print:hidden px-4 py-3" />
+              <th data-actions class="print:hidden px-4 py-3 text-right text-xs font-medium uppercase text-gray-500 dark:text-gray-400">Ações</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
@@ -226,19 +223,13 @@ onMounted(loadLogs)
         </table>
       </div>
 
-      <Pagination
-        v-model:page="page"
-        v-model:page-size="pageSize"
-        :total="total"
-        :total-pages="totalPages"
-        @change="loadLogs"
-      />
+      <Pagination v-bind="paginationProps" />
     </div>
 
     <BaseModal :open="filterModalOpen" title="Filtrar atividades" @close="filterModalOpen = false">
       <form class="space-y-4" @submit.prevent="applyFilters">
-        <BaseSelect v-model="draftFilters.action" label="Ação" :options="actionOptions" :searchable="false" />
-        <BaseSelect v-model="draftFilters.entity" label="Tipo de registro" :options="entityOptions" :searchable="false" />
+        <BaseSelect v-model="draftFilters.action" label="Ação" :options="actionOptions" />
+        <BaseSelect v-model="draftFilters.entity" label="Tipo de registro" :options="entityOptions" />
         <PeriodPicker v-model="draftFilters.period" />
         <div class="flex justify-between gap-2 pt-2">
           <BaseButton type="button" variant="ghost" @click="clearFilters">Limpar</BaseButton>
@@ -251,30 +242,21 @@ onMounted(loadLogs)
     </BaseModal>
 
     <BaseModal :open="Boolean(selectedLog)" title="Detalhes da atividade" @close="selectedLog = null">
-      <dl v-if="selectedLog" class="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
-        <div>
-          <dt class="text-gray-500 dark:text-gray-400">Data</dt>
-          <dd class="dark:text-gray-100">{{ formatDateTime(selectedLog.createdAt) }}</dd>
-        </div>
-        <div>
-          <dt class="text-gray-500 dark:text-gray-400">Usuário</dt>
-          <dd class="dark:text-gray-100">{{ selectedLog.actorName ?? 'Usuário não identificado' }}</dd>
-        </div>
-        <div>
-          <dt class="text-gray-500 dark:text-gray-400">E-mail</dt>
-          <dd class="break-all dark:text-gray-100">{{ selectedLog.actorEmail ?? '—' }}</dd>
-        </div>
-        <div>
-          <dt class="text-gray-500 dark:text-gray-400">Ação</dt>
-          <dd class="dark:text-gray-100">{{ describe(selectedLog) }}</dd>
-        </div>
-        <div class="sm:col-span-2">
-          <dt class="text-gray-500 dark:text-gray-400">Registro</dt>
-          <dd class="dark:text-gray-100">{{ selectedLog.entityLabel }}</dd>
-        </div>
-        <div v-if="selectedLog.details" class="sm:col-span-2">
-          <dt class="text-gray-500 dark:text-gray-400">Informações adicionais</dt>
-          <dd class="break-all font-mono text-xs dark:text-gray-100">{{ JSON.stringify(selectedLog.details) }}</dd>
+      <dl v-if="selectedLog" class="grid grid-cols-1 gap-x-6 gap-y-5 sm:grid-cols-2">
+        <DetailField label="Data">{{ formatDateTime(selectedLog.createdAt) }}</DetailField>
+        <DetailField label="Usuário">{{ selectedLog.actorName ?? 'Usuário não identificado' }}</DetailField>
+        <DetailField label="E-mail">{{ selectedLog.actorEmail ?? '—' }}</DetailField>
+        <DetailField label="Ação">{{ describe(selectedLog) }}</DetailField>
+        <DetailField label="Registro" wide>{{ selectedLog.entityLabel }}</DetailField>
+        <div v-if="detailItems.length" class="border-t border-gray-100 pt-4 sm:col-span-2 dark:border-gray-700">
+          <p class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+            Informações adicionais
+          </p>
+          <dl class="mt-2 grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2">
+            <DetailField v-for="item in detailItems" :key="item.label" :label="item.label">
+              {{ item.value }}
+            </DetailField>
+          </dl>
         </div>
       </dl>
     </BaseModal>

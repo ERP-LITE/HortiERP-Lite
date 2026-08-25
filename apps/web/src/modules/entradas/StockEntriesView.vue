@@ -4,9 +4,9 @@ import { RouterLink } from 'vue-router'
 import { Eye, FileText, Plus } from '@lucide/vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
-import BaseModal from '@/components/ui/BaseModal.vue'
 import Pagination from '@/components/ui/Pagination.vue'
 import FilterButton from '@/components/ui/FilterButton.vue'
+import FilterModal from '@/components/ui/FilterModal.vue'
 import PrintButton from '@/components/ui/PrintButton.vue'
 import ExportCsvButton from '@/components/ui/ExportCsvButton.vue'
 import SearchInput from '@/components/ui/SearchInput.vue'
@@ -24,8 +24,8 @@ import { useFilterModal } from '@/composables/useFilterModal'
 import { useTableSort } from '@/composables/useTableSort'
 import type { StockEntrySummary } from '@/types'
 
-const { page, pageSize, total, totalPages, applyMeta, watchSearch } = usePagination()
-const { sortBy, sortOrder, toggleSort } = useTableSort(() => { page.value = 1; return loadEntries() }, 'entryDate', 'desc')
+const { page, pageSize, total, totalPages, applyMeta, reload, watchSearch, paginationProps } = usePagination()
+const { sortBy, sortOrder, toggleSort } = useTableSort(() => reload(loadEntries), 'entryDate', 'desc')
 
 const entries = ref<StockEntrySummary[]>([])
 const loading = ref(true)
@@ -37,10 +37,7 @@ function emptyFilters() {
 }
 const { filters, draftFilters, filterModalOpen, openFilterModal, applyFilters, clearFilters } = useFilterModal(
   emptyFilters,
-  () => {
-    page.value = 1
-    loadEntries()
-  },
+  () => reload(loadEntries),
 )
 const activeFilterCount = computed(() => Number(filters.value.period.preset !== 'todos'))
 
@@ -136,7 +133,7 @@ onMounted(loadEntries)
               Recebido por
             </th>
             <SortableTableHeader field="invoiceStatus" :active-field="sortBy" :order="sortOrder" @sort="toggleSort">Nota fiscal</SortableTableHeader>
-            <th class="print:hidden px-4 py-3" />
+            <th data-actions class="print:hidden px-4 py-3 text-right text-xs font-medium uppercase text-gray-500 dark:text-gray-400">Ações</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
@@ -179,30 +176,17 @@ onMounted(loadEntries)
           </tr>
         </tbody>
       </table>
-      <Pagination
-        :page="page"
-        :page-size="pageSize"
-        :total="total"
-        :total-pages="totalPages"
-        @update:page="page = $event"
-        @update:page-size="pageSize = $event"
-      />
+      <Pagination v-bind="paginationProps" />
     </div>
 
-    <BaseModal :open="filterModalOpen" title="Filtrar entradas" @close="filterModalOpen = false">
-      <form class="space-y-4" @submit.prevent="applyFilters">
-        <PeriodPicker v-model="draftFilters.period" />
-
-        <div class="flex justify-between items-center pt-2">
-          <button type="button" class="text-sm text-gray-500 hover:underline dark:text-gray-400" @click="clearFilters">
-            Limpar
-          </button>
-          <div class="flex gap-2">
-            <BaseButton variant="secondary" type="button" @click="filterModalOpen = false">Cancelar</BaseButton>
-            <BaseButton type="submit">Aplicar</BaseButton>
-          </div>
-        </div>
-      </form>
-    </BaseModal>
+    <FilterModal
+      :open="filterModalOpen"
+      title="Filtrar entradas"
+      @close="filterModalOpen = false"
+      @apply="applyFilters"
+      @clear="clearFilters"
+    >
+      <PeriodPicker v-model="draftFilters.period" />
+    </FilterModal>
   </div>
 </template>
