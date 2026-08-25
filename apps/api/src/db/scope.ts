@@ -1,6 +1,6 @@
 import { drizzle } from 'drizzle-orm/node-postgres'
 import type { PoolClient } from 'pg'
-import { db, escopoAtual, pool, type Escopo } from './client.js'
+import { escopoAtual, pool, type Escopo } from './client.js'
 import * as schema from './schema/index.js'
 
 function escopoDe(client: PoolClient): Escopo {
@@ -16,17 +16,33 @@ async function definir(client: PoolClient, empresa: string | null, plataforma = 
   ])
 }
 
-export async function abrirEscopoDaRequisicao() {
+export async function reservarEscopo(empresa: string | null, plataforma = false) {
   const client = await pool.connect()
-  await definir(client, null)
+  try {
+    await definir(client, empresa, plataforma)
+  } catch (erro) {
+    client.release()
+    throw erro
+  }
   return escopoDe(client)
 }
 
-export async function fecharEscopoDaRequisicao(escopo: Escopo) {
+export async function devolverEscopo(escopo: Escopo) {
   try {
     await escopo.client.query('RESET ALL')
+  } catch {
+    // Conexão já perdida: não há o que resetar, e segurá-la seria pior.
   } finally {
     escopo.client.release()
+  }
+}
+
+async function comEscopo<T>(empresa: string | null, plataforma: boolean, acao: () => Promise<T>): Promise<T> {
+  const escopo = await reservarEscopo(empresa, plataforma)
+  try {
+    return await escopoAtual.run(escopo, acao)
+  } finally {
+    await devolverEscopo(escopo)
   }
 }
 
@@ -39,41 +55,24 @@ export async function usarEmpresa(companyId: string) {
 // Cada uso é uma travessia declarada. Se aparecer num serviço comum de uma empresa, é bug.
 export async function comEscopoDePlataforma<T>(acao: () => Promise<T>): Promise<T> {
   const existente = escopoAtual.getStore()
+  if (!existente) return comEscopo(null, true, acao)
 
-  if (existente) {
-    // Restaura o valor anterior e não 'off': aninhar duas chamadas desligaria a de fora ao sair da de
-    // dentro. E `is_local = false` porque fora de transação marca local morre no fim do statement.
-    const { rows } = await existente.client.query<{ anterior: string | null }>(
-      "SELECT current_setting('app.plataforma', true) AS anterior",
-    )
-    const anterior = rows[0]?.anterior ?? ''
-    await existente.client.query("SELECT set_config('app.plataforma', 'on', false)")
-    try {
-      return await acao()
-    } finally {
-      await existente.client.query("SELECT set_config('app.plataforma', $1, false)", [anterior])
-    }
-  }
-
-  const client = await pool.connect()
+  // Restaura o valor anterior e não 'off': aninhar duas chamadas desligaria a de fora ao sair da de
+  // dentro. E `is_local = false` porque fora de transação marca local morre no fim do statement.
+  const { rows } = await existente.client.query<{ anterior: string | null }>(
+    "SELECT current_setting('app.plataforma', true) AS anterior",
+  )
+  const anterior = rows[0]?.anterior ?? ''
+  await existente.client.query("SELECT set_config('app.plataforma', 'on', false)")
   try {
-    await definir(client, null, true)
-    return await escopoAtual.run(escopoDe(client), acao)
+    return await acao()
   } finally {
-    await client.query('RESET ALL').catch(() => {})
-    client.release()
+    await existente.client.query("SELECT set_config('app.plataforma', $1, false)", [anterior])
   }
 }
 
-export async function comEscopoDaEmpresa<T>(companyId: string, acao: () => Promise<T>): Promise<T> {
-  const client = await pool.connect()
-  try {
-    await definir(client, companyId)
-    return await escopoAtual.run(escopoDe(client), acao)
-  } finally {
-    await client.query('RESET ALL').catch(() => {})
-    client.release()
-  }
+export function comEscopoDaEmpresa<T>(companyId: string, acao: () => Promise<T>): Promise<T> {
+  return comEscopo(companyId, false, acao)
 }
 
 // Vale pelo resto da requisição. Não precisa desfazer: a conexão leva `RESET ALL` ao voltar ao pool.
@@ -82,19 +81,3 @@ export async function permitirTravessiaDePlataforma() {
   if (!escopo) throw new Error('permitirTravessiaDePlataforma chamado fora de um escopo de requisição.')
   await escopo.client.query("SELECT set_config('app.plataforma', 'on', false)")
 }
-
-export async function reservarEscopoDePlataforma() {
-  const client = await pool.connect()
-  await definir(client, null, true)
-  return escopoDe(client)
-}
-
-export async function liberarEscopoDePlataforma(escopo: Escopo) {
-  try {
-    await escopo.client.query('RESET ALL')
-  } finally {
-    escopo.client.release()
-  }
-}
-
-export { db }

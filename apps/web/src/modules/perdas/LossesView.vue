@@ -20,7 +20,7 @@ import SortableTableHeader from '@/components/ui/SortableTableHeader.vue'
 import { oldestEventDateIso, todayIso, type PeriodValue } from '@/lib/period'
 import { formatDate } from '@/lib/format'
 import { getApiErrorMessage, resolveFormError } from '@/services/api'
-import { toastSuccess } from '@/lib/alerts'
+import { toastError, toastSuccess } from '@/lib/alerts'
 import { listAllProducts } from '@/services/productsService'
 import { cancelLoss, createLoss, listAllLosses, listLosses, updateLoss } from '@/services/lossesService'
 import { csvNumber } from '@/lib/csv'
@@ -196,7 +196,7 @@ async function handleSubmit() {
     const fallback = editingId.value ? 'Não foi possível corrigir a perda' : 'Não foi possível registrar a perda'
     const result = resolveFormError(error, fallback)
     fieldErrors.value = result.fieldErrors
-    errorMessage.value = result.message
+    if (result.message) toastError(result.message)
   } finally {
     saving.value = false
   }
@@ -226,7 +226,7 @@ async function handleCancel() {
   } catch (error) {
     const result = resolveFormError(error, 'Não foi possível cancelar a perda')
     cancelErrors.value = result.fieldErrors
-    errorMessage.value = result.message
+    if (result.message) toastError(result.message)
   } finally {
     cancelling.value = false
   }

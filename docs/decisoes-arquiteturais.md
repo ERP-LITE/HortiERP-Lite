@@ -514,6 +514,30 @@ Dois erros precisaram de tratamento na origem, e não no `errorHandler`:
 
 O anexo grande demais é um caso à parte e vale registrar, porque a documentação do `@fastify/multipart` engana: com `throwFileSizeLimit` ligado (o padrão), o erro `FST_REQ_FILE_TOO_LARGE` só é levantado por `toBuffer()` ou pelo iterador de partes. Quem consome `file.file` por conta própria — é o que `invoice-storage.ts` faz, gravando direto em disco com `pipeline` para não carregar 10 MB na memória — recebe um stream que **termina normalmente**, apenas com `truncated` marcado. Sem a checagem explícita de `file.file.truncated`, o upload responderia `201` com o arquivo cortado. A frase com o limite em MB mora em `fileTooLargeMessage`, junto do mapa de traduções, e é usada tanto por essa checagem quanto pelo código do framework — para os dois caminhos nunca divergirem.
 
+### Erro de formulário aparece como alerta, não no rodapé da página
+
+Cada tela tinha um `<p>` de erro acima da tabela, e o erro de um formulário em modal caía nele: a
+mensagem renderizava **atrás do modal aberto**, invisível para quem acabou de clicar em salvar. Foi
+assim que `Quantidade solicitada (51) maior que o estoque disponível (50)` não chegou ao usuário.
+
+A divisão hoje é pela origem do erro:
+
+- **erro de campo** (`fieldErrors`) continua no próprio campo, em vermelho;
+- **erro geral de submit** vai para `toastError`, que o SweetAlert2 desenha em `z-index: 1060`, acima
+  do modal (`z-40`);
+- **erro ao carregar a página** — a lista que não veio, o filtro que falhou — continua no `<p>`, que é
+  onde ele deve estar: não há modal na frente, e a mensagem precisa ficar na tela.
+
+O critério prático no código: `resolveFormError` é submit, `getApiErrorMessage` num carregamento é
+página.
+
+### Quantidade em mensagem de erro precisa ser formatada
+
+`numeric(_, 3)` chega da consulta como string: um saldo de 50 vira `"50.000"`, que em português se lê
+como cinquenta mil — a mensagem dizia que 51 era maior que "50.000". `formatQuantity`
+(`shared/utils/quantity.ts`) resolve com `toLocaleString('pt-BR')`, e é por onde toda quantidade em
+mensagem de erro deve passar.
+
 ## Logs técnicos e auditoria por empresa
 
 Um hook global `onResponse` registra em `system_logs` as requisições da API, sem persistir corpo, senha, cookie ou token. Respostas 2xx/3xx são `info`, 4xx são `warning` e 5xx são `error`; o tratamento centralizado de erros anexa código e mensagem ao contexto antes da persistência.
@@ -525,7 +549,7 @@ Um hook global `onResponse` registra em `system_logs` as requisições da API, s
 
 As ações registradas em `activity_logs` são `criou`, `alterou`, `excluiu`, `importou`, `ajustou` e `cancelou`. A coluna é `text` livre no banco, mas o conjunto é fechado em três lugares que precisam andar juntos: o tipo `ActivityAction` (backend), o `activityActionSchema` do filtro e os mapas de rótulo e cor da tela de auditoria (`ActivityLogsView.vue`) — o `vue-tsc` acusa se algum ficar para trás, porque os mapas são `Record<ActivityAction, …>`.
 
-`system_logs` e `activity_logs` **não têm política de retenção automática**. Em instalação de longa duração são as tabelas que mais crescem e dominam o tamanho do backup; a limpeza é hoje uma decisão manual do operador. Ver [deploy-producao.md](./deploy-producao.md).
+`system_logs` e `activity_logs` são as tabelas que mais crescem e dominam o tamanho do backup. A limpeza é automática, semanal, com prazos vindos de duas leis que empurram em sentidos opostos — ver "Retenção de dados pessoais" em [deploy-producao.md](./deploy-producao.md).
 
 ## Correção de lançamentos operacionais
 

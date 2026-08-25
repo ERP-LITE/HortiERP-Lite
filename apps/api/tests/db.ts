@@ -1,16 +1,16 @@
 import type { Database, Escopo } from '../src/db/client.js'
-import { liberarEscopoDePlataforma, reservarEscopoDePlataforma } from '../src/db/scope.js'
+import { devolverEscopo, reservarEscopo } from '../src/db/scope.js'
 
 let escopo: Escopo | undefined
 
 export async function abrirDbDeTeste() {
-  escopo = await reservarEscopoDePlataforma()
+  escopo = await reservarEscopo(null, true)
 }
 
 export async function fecharDbDeTeste() {
   const atual = escopo
   escopo = undefined
-  if (atual) await liberarEscopoDePlataforma(atual)
+  if (atual) await devolverEscopo(atual)
 }
 
 // Conexão em escopo de plataforma para os testes montarem fixture e conferirem resultado. As
