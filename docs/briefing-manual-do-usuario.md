@@ -10,6 +10,10 @@
 > anterior estavam **erradas** e foram corrigidas: o alerta de estoque baixo (seção 7.3) e a geração
 > do PDF (seção 7.11). Se o comportamento do sistema mudar, corrija aqui também — é este arquivo que
 > gera o manual.
+>
+> **Revisão de 25/08/2026:** entrou o lugar onde as mensagens de erro aparecem (seção 7.1) e o prazo
+> de guarda do histórico (seção 7.13). O **manual gerado antes desta data está incompleto**: falta o
+> aviso de privacidade e o botão "Baixar meus dados", que já constam das seções 6.1 e 7.1.
 
 ---
 
@@ -200,6 +204,11 @@ cliente**, não copie.
   quiser". Não é exportação de relatório da loja — é o dado da própria pessoa.
 - A conta da empresa e o **primeiro administrador** (nome, e-mail e senha) são criados por mim, o
   fornecedor, que entrega as credenciais direto ao cliente. Não existe autocadastro.
+- **Onde as mensagens aparecem:** erro em campo preenchido errado sai em vermelho embaixo do próprio
+  campo. Erro de uma ação — estoque insuficiente, nome repetido, permissão negada — aparece como
+  **aviso no canto superior direito da tela**, por cima da janela aberta, com um X para fechar. Ele
+  desaparece sozinho depois de alguns segundos. Isso vale a pena dizer no manual porque o aviso surge
+  fora do formulário, e quem não souber olhar para o canto pode achar que o clique não fez nada.
 - **Encerramento automático:** 30 minutos sem usar e a sessão cai. No último minuto aparece um aviso
   com contagem regressiva. Para continuar conectado é preciso **clicar no botão do aviso** — só mexer
   o mouse não resolve, e isso é de propósito: assim ninguém deixa o sistema aberto e destravado num
@@ -457,6 +466,10 @@ Duas travas que parecem defeito e não são, e por isso entram no manual:
 
 Só o administrador. Mostra quem criou, alterou, excluiu, importou, ajustou ou cancelou o quê, e
 quando, dentro da própria empresa. Só leitura. É a tela para responder "quem mexeu nisso?".
+
+O histórico é guardado por **5 anos** e depois disso o sistema o limpa sozinho. Diga isso no manual sem
+alarme: é prazo de sobra para qualquer conferência, e guardar para sempre seria o problema, não a
+solução. Depois desse prazo, o nome de um usuário já excluído também deixa de aparecer no histórico.
 
 ---
 
