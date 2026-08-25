@@ -62,6 +62,8 @@ O resumo devolvido inclui `withInitialStock` e `initialStockWithoutCost`. O segu
 entra no estoque valendo zero, e o painel mostraria a loja cheia com "valor em estoque: R$ 0,00". Não impede a
 importação, mas o usuário precisa ver isso antes de confirmar.
 
+A importação aceita dois modos. Por padrão, planilha com qualquer linha inválida não grava nada. Com `skipInvalid: true`, a API importa as linhas válidas e devolve as recusadas em `errors`, o que atende a planilha grande em que parte das linhas está errada: a tela oferece isso como **Importar as N válidas** e mantém a janela aberta depois, com a lista do que ficou de fora. Nesse modo, categoria e unidade novas só são criadas se alguma linha **aceita** as usa, senão uma linha recusada deixaria para trás um cadastro sem nenhum produto. A lista de erros é baixada no formato da própria planilha modelo, com uma coluna de motivo no fim, para ser corrigida e reenviada sozinha: reenviar o arquivo inteiro traria o que já entrou como nome duplicado.
+
 ## Entrada de mercadoria
 
 Tela `/entradas` → `/entradas/nova`. Rota `POST /stock-entries`, service `stock-entries.service.ts::createStockEntry`. Qualquer usuário autenticado pode registrar (sem restrição de papel — ver decisões arquiteturais).

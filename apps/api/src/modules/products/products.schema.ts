@@ -44,6 +44,7 @@ export const IMPORT_MAX_ROWS = 2000
 
 export const importProductsSchema = z.object({
   dryRun: z.boolean().default(false),
+  skipInvalid: z.boolean().default(false),
   createMissingRefs: z.boolean().default(false),
   rows: z
     .array(

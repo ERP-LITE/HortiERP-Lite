@@ -225,6 +225,62 @@ Formulários com validação própria usam `novalidate`: mensagens nativas do na
 padronizado da aplicação. Campos inválidos recebem borda vermelha e uma mensagem em vermelho logo abaixo do
 componente, inclusive selects, competência e calendário.
 
+### Modal alto: um trecho elástico, nunca dois
+
+O modal de importação passou a estourar a altura da tela: o painel ganhava barra de rolagem e os
+botões ficavam abaixo da borda. O `BaseModal` tem agora o modo `fit`, usado só por esse modal: de
+`sm` para cima o painel deixa de rolar (`flex flex-col` com `overflow-hidden`), o cabeçalho e o rodapé
+ficam fixos e o conteúdo se encaixa na altura disponível. No celular o painel continua rolando como
+sempre, porque encaixar deixaria as listas com duas linhas.
+
+A primeira tentativa dessa mudança **quebrou a tela**, e a lição vale para qualquer modal: dois blocos
+irmãos com `flex-1` (base zero) num contêiner sem espaço suficiente não dividem o que sobra. Um deles
+colapsa para perto de zero, e como o filho tem altura mínima própria, ele **vaza para fora do bloco** e
+desenha por cima do conteúdo seguinte. Na tela, a lista do que ia ser importado apareceu por cima do
+título "O que precisa ser corrigido".
+
+O arranjo correto é **um único item elástico** entre irmãos `shrink-0`. E para haver só um, as duas
+listas viraram **abas**: "Prontas (N)" e "Com problema (M)", com uma lista na tela por vez, ocupando
+toda a altura livre (`sm:min-h-0 sm:flex-1`) e rolando por dentro. Isso resolve de uma vez o colapso e
+o caso de 50 linhas prontas com 50 erradas, em que as duas listas juntas produziam rolagem dentro de
+rolagem: o trecho rolava para alcançar a segunda lista, e a lista rolava por dentro. A explicação do
+botão fica fora da parte que rola, porque ela é o que justifica o "Importar as N válidas".
+
+Duas coisas saíram de cena para o espaço sobrar na tela de 768px de altura: os três cartões de
+contador viraram uma linha de texto (as abas já mostram "prontas" e "com problema", então os cartões
+repetiam o mesmo número em letra grande) e o link da planilha modelo, que só faz sentido antes de
+escolher o arquivo. Com isso a lista aberta ganhou cerca de 90px, o que em 1366x768 é a diferença
+entre duas e cinco linhas visíveis.
+
+Medido com Chrome headless em 1280x800, 1366x768 e 1920x1080, com 50 linhas prontas e 50 com
+problema: painel sem rolagem, rodapé sempre visível, nenhuma sobreposição, e a lista aberta crescendo
+de 250px para 546px conforme a tela, sempre com uma única barra de rolagem.
+
+### Importação parcial precisa de um caminho de volta
+
+A importação de planilha era tudo ou nada, e o motivo estava escrito na tela: importar metade e
+reenviar a planilha corrigida faria o que já entrou voltar como nome duplicado. O problema é que numa
+planilha de 100 produtos com 50 prontos, a regra obrigava a mexer no arquivo inteiro antes de
+conseguir qualquer coisa.
+
+O modo padrão continua o mesmo (nada entra se houver linha inválida). O que existe agora é a escolha
+explícita: com linha com problema, o botão passa a ser **Importar as N válidas** e a API recebe
+`skipInvalid`. Duas coisas fazem esse caminho fechar em vez de virar bagunça:
+
+- **A lista de erros virou planilha de reenvio.** Ela sai com as colunas do modelo e uma coluna de
+  motivo no fim, com os valores originais das linhas recusadas. O usuário corrige aquele arquivo e
+  envia **só ele**, o que evita justamente a duplicação que motivava o tudo ou nada. Antes o download
+  tinha linha, nome e problema, e servia para ler, não para reenviar.
+- **A janela continua aberta depois da importação parcial**, mostrando o que entrou e o que ficou de
+  fora. Fechar na hora jogaria fora a única lista das 50 linhas que faltam.
+
+E uma armadilha que só aparece na importação parcial: categoria e unidade novas eram coletadas durante
+a validação de **todas** as linhas, antes de saber quais seriam aceitas. Como no modo antigo nada era
+gravado quando havia erro, isso nunca fez diferença. Com importação parcial, uma linha recusada que
+citasse uma categoria inédita criaria essa categoria sem nenhum produto dentro. Hoje as duas listas
+são filtradas pelas linhas aceitas, o que também deixa os contadores da prévia dizendo a verdade
+sobre o que aquele botão vai criar.
+
 ### "Com nota" não podia significar duas coisas
 
 A coluna **Nota fiscal** da listagem de entradas mostrava só dois estados, e o verde saía com

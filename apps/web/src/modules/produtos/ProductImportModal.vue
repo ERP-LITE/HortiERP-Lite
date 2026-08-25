@@ -22,10 +22,24 @@ const createMissingRefs = ref(true)
 const parseError = ref('')
 const loading = ref(false)
 const importing = ref(false)
+const importedPartially = ref(false)
+const listaAberta = ref<'prontas' | 'problemas'>('prontas')
 
-const canImport = computed(
-  () => result.value !== null && result.value.summary.invalid === 0 && result.value.summary.valid > 0,
+const canImport = computed(() => (result.value?.summary.valid ?? 0) > 0 && !importedPartially.value)
+const hasErrors = computed(() => (result.value?.summary.invalid ?? 0) > 0)
+const showTabs = computed(
+  () => !importedPartially.value && (result.value?.preview.length ?? 0) > 0 && (result.value?.errors.length ?? 0) > 0,
 )
+const mostrarProntas = computed(
+  () => !importedPartially.value && (result.value?.preview.length ?? 0) > 0 && (!showTabs.value || listaAberta.value === 'prontas'),
+)
+const mostrarProblemas = computed(
+  () => (result.value?.errors.length ?? 0) > 0 && (!showTabs.value || listaAberta.value === 'problemas'),
+)
+const importLabel = computed(() => {
+  const valid = result.value?.summary.valid ?? 0
+  return hasErrors.value ? `Importar as ${valid} válida(s)` : `Importar ${valid} produto(s)`
+})
 
 watch(
   () => props.open,
@@ -34,6 +48,11 @@ watch(
   },
 )
 
+// A lista que pede ação é a que abre: com linha errada, quem confere quer ver o que precisa corrigir
+watch(result, (atual) => {
+  listaAberta.value = (atual?.summary.invalid ?? 0) > 0 ? 'problemas' : 'prontas'
+})
+
 function reset() {
   fileName.value = ''
   rows.value = []
@@ -41,6 +60,8 @@ function reset() {
   parseError.value = ''
   loading.value = false
   importing.value = false
+  importedPartially.value = false
+  listaAberta.value = 'prontas'
 }
 
 function downloadTemplate() {
@@ -88,7 +109,7 @@ async function handleFile(event: Event) {
 }
 
 async function runPreview() {
-  if (rows.value.length === 0) return
+  if (rows.value.length === 0 || importedPartially.value) return
   loading.value = true
   try {
     result.value = await importProducts({
@@ -105,14 +126,21 @@ async function runPreview() {
 
 async function handleImport() {
   importing.value = true
+  const deixandoDeFora = hasErrors.value
   try {
-    const response = await importProducts({ rows: rows.value, createMissingRefs: createMissingRefs.value })
-    result.value = response
+    const response = await importProducts({
+      rows: rows.value,
+      createMissingRefs: createMissingRefs.value,
+      skipInvalid: deixandoDeFora,
+    })
     if (response.summary.imported > 0) {
       toastSuccess(`${response.summary.imported} produto(s) importado(s) com sucesso`)
       emit('imported')
-      emit('close')
+      // Com linha de fora, o modal continua aberto: fechar jogaria fora a lista do que falta corrigir
+      if (deixandoDeFora) importedPartially.value = true
+      else emit('close')
     }
+    result.value = response
   } catch (error) {
     parseError.value = getApiErrorMessage(error, 'Não foi possível importar a planilha.')
   } finally {
@@ -120,22 +148,37 @@ async function handleImport() {
   }
 }
 
+/**
+ * A lista sai no mesmo formato da planilha modelo, com uma coluna de problema no fim: o arquivo
+ * baixado é o que a pessoa corrige e reenvia, sem precisar caçar as linhas na planilha original.
+ */
 function downloadErrors() {
   if (!result.value) return
-  downloadCsv(
-    'erros-importacao',
-    toCsv(
-      ['linha', 'nome', 'problemas'],
-      result.value.errors.map((item) => [item.line, item.name, item.errors.join(' | ')]),
-    ),
-  )
+  const rowByLine = new Map(rows.value.map((row) => [row.line, row]))
+  const linhas = result.value.errors.map((item) => {
+    const row = rowByLine.get(item.line)
+    return [
+      row?.name ?? item.name,
+      row?.categoryName ?? '',
+      row?.unitName ?? '',
+      row?.sku ?? '',
+      row?.barcode ?? '',
+      row?.costPrice ?? '',
+      row?.salePrice ?? '',
+      row?.minStock ?? '',
+      row?.currentStock ?? '',
+      row?.active ?? '',
+      item.errors.join(' | '),
+    ]
+  })
+  downloadCsv('produtos-para-corrigir', toCsv([...TEMPLATE_HEADERS, 'problema'], linhas))
 }
 </script>
 
 <template>
-  <BaseModal :open="open" title="Importar produtos de uma planilha" size="lg" @close="emit('close')">
-    <div class="space-y-5">
-      <div class="rounded-lg bg-gray-50 p-4 text-sm text-gray-600 dark:bg-gray-900 dark:text-gray-300">
+  <BaseModal :open="open" title="Importar produtos de uma planilha" size="lg" fit @close="emit('close')">
+    <div class="flex flex-col gap-4 sm:min-h-0 sm:flex-1">
+      <div v-if="!result" class="shrink-0 rounded-lg bg-gray-50 p-4 text-sm text-gray-600 dark:bg-gray-900 dark:text-gray-300">
         <p class="mb-2">
           Envie um arquivo <strong>.csv</strong> com uma linha por produto. As colunas
           <strong>nome</strong>, <strong>categoria</strong> e <strong>unidade</strong> são obrigatórias; as demais
@@ -151,7 +194,7 @@ function downloadErrors() {
         </button>
       </div>
 
-      <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div class="flex shrink-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <label
           class="inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-gray-300 px-4 py-3 text-sm font-medium text-gray-600 hover:border-primary-400 hover:text-primary-600 dark:border-gray-600 dark:text-gray-300"
         >
@@ -166,28 +209,55 @@ function downloadErrors() {
       <p v-if="loading" class="text-sm text-gray-500 dark:text-gray-400">Conferindo a planilha...</p>
 
       <template v-if="result && !loading">
-        <div class="grid grid-cols-3 gap-3 text-center">
-          <div class="rounded-lg border border-gray-200 p-3 dark:border-gray-700">
-            <p class="text-xs text-gray-500 dark:text-gray-400">Linhas lidas</p>
-            <p class="text-xl font-semibold text-gray-900 dark:text-gray-100">{{ result.summary.total }}</p>
-          </div>
-          <div class="rounded-lg border border-gray-200 p-3 dark:border-gray-700">
-            <p class="text-xs text-gray-500 dark:text-gray-400">Prontas</p>
-            <p class="text-xl font-semibold text-primary-600 dark:text-primary-400">{{ result.summary.valid }}</p>
-          </div>
-          <div class="rounded-lg border border-gray-200 p-3 dark:border-gray-700">
-            <p class="text-xs text-gray-500 dark:text-gray-400">Com problema</p>
-            <p
-              class="text-xl font-semibold"
-              :class="result.summary.invalid > 0 ? 'text-red-600 dark:text-red-400' : 'text-gray-900 dark:text-gray-100'"
-            >
-              {{ result.summary.invalid }}
-            </p>
-          </div>
+        <p class="shrink-0 text-sm text-gray-600 dark:text-gray-300">
+          <strong class="font-semibold text-gray-900 dark:text-gray-100">{{ result.summary.total }}</strong>
+          linha(s) lida(s) na planilha<template v-if="!showTabs">,
+            <strong
+              class="font-semibold"
+              :class="result.summary.invalid > 0 ? 'text-red-600 dark:text-red-400' : 'text-primary-600 dark:text-primary-400'"
+            >{{ result.summary.invalid > 0 ? result.summary.invalid : result.summary.valid }}</strong>
+            {{ result.summary.invalid > 0 ? 'com problema' : 'pronta(s) para importar' }}</template>.
+        </p>
+
+        <div
+          v-if="importedPartially"
+          class="rounded-lg border border-green-200 bg-green-50 p-4 text-sm text-green-800 dark:border-green-900 dark:bg-green-900/30 dark:text-green-200"
+        >
+          <p class="font-medium">{{ result.summary.imported }} produto(s) importado(s).</p>
+          <p class="mt-1">
+            As {{ result.summary.invalid }} linha(s) abaixo ficaram de fora e não foram criadas. Baixe a lista,
+            corrija e envie só ela numa nova importação.
+          </p>
         </div>
 
-        <div v-if="result.preview?.length && result.summary.invalid === 0" class="space-y-2">
-          <div class="flex flex-wrap items-center justify-between gap-2">
+        <div
+          v-if="showTabs"
+          class="flex shrink-0 gap-1 rounded-lg bg-gray-100 p-1 text-sm font-medium dark:bg-gray-900"
+          role="tablist"
+        >
+          <button
+            v-for="aba in [
+              { id: 'prontas', label: `Prontas (${result.summary.valid})` },
+              { id: 'problemas', label: `Com problema (${result.summary.invalid})` },
+            ]"
+            :key="aba.id"
+            type="button"
+            role="tab"
+            :aria-selected="listaAberta === aba.id"
+            class="flex-1 rounded-md px-3 py-1.5 transition-colors"
+            :class="
+              listaAberta === aba.id
+                ? 'bg-white text-gray-900 shadow-sm dark:bg-gray-700 dark:text-gray-100'
+                : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+            "
+            @click="listaAberta = aba.id as 'prontas' | 'problemas'"
+          >
+            {{ aba.label }}
+          </button>
+        </div>
+
+        <div v-if="mostrarProntas" class="flex flex-col gap-2 sm:min-h-0 sm:flex-1">
+          <div class="flex shrink-0 flex-wrap items-center justify-between gap-2">
             <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100">O que vai ser importado</h3>
             <div class="flex flex-wrap gap-1.5">
               <BaseBadge variant="success">{{ result.summary.valid }} produto(s)</BaseBadge>
@@ -209,7 +279,9 @@ function downloadErrors() {
             </div>
           </div>
 
-          <div class="app-modal-scrollbar max-h-80 overflow-auto rounded-lg border border-gray-200 sm:max-h-64 dark:border-gray-700">
+            <div
+            class="app-modal-scrollbar max-h-80 overflow-auto overscroll-contain rounded-lg border border-gray-200 sm:max-h-none sm:min-h-24 sm:flex-1 dark:border-gray-700"
+          >
             <table class="w-full min-w-[44rem] text-sm">
               <thead class="sticky top-0 bg-gray-50 dark:bg-gray-900">
                 <tr>
@@ -281,8 +353,8 @@ function downloadErrors() {
           </p>
         </div>
 
-        <div v-if="result.errors.length" class="space-y-2">
-          <div class="flex items-center justify-between">
+        <div v-if="mostrarProblemas" class="flex flex-col gap-2 sm:min-h-0 sm:flex-1">
+          <div class="flex shrink-0 items-center justify-between">
             <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100">O que precisa ser corrigido</h3>
             <button
               type="button"
@@ -292,7 +364,9 @@ function downloadErrors() {
               <Download :size="15" /> Baixar lista de erros
             </button>
           </div>
-          <div class="app-modal-scrollbar max-h-64 overflow-y-auto rounded-lg border border-gray-200 dark:border-gray-700">
+            <div
+            class="app-modal-scrollbar max-h-64 overflow-y-auto overscroll-contain rounded-lg border border-gray-200 sm:max-h-none sm:min-h-24 sm:flex-1 dark:border-gray-700"
+          >
             <table class="w-full text-sm">
               <thead class="sticky top-0 bg-gray-50 dark:bg-gray-900">
                 <tr>
@@ -310,22 +384,26 @@ function downloadErrors() {
               </tbody>
             </table>
           </div>
-          <p v-if="result.summary.omittedErrors > 0" class="text-xs text-gray-500 dark:text-gray-400">
+          <p v-if="result.summary.omittedErrors > 0" class="shrink-0 text-xs text-gray-500 dark:text-gray-400">
             e mais {{ result.summary.omittedErrors }} linha(s) com problema não listadas aqui.
           </p>
-          <p class="text-xs text-gray-500 dark:text-gray-400">
-            Nada é importado enquanto houver linha com problema. Corrija a planilha e envie de novo: assim você não
-            importa metade dos produtos e duplica o resto na segunda tentativa.
-          </p>
         </div>
+
+        <p v-if="result.errors.length && !importedPartially" class="shrink-0 text-xs text-gray-500 dark:text-gray-400">
+          Você pode importar agora só as linhas prontas: as com problema ficam de fora e nada é criado pela metade.
+          Em <strong>Baixar lista de erros</strong> vem uma planilha já no formato da importação, com o motivo de cada
+          linha: corrija ali e envie <strong>só esse arquivo</strong> depois, para não duplicar o que já entrou.
+        </p>
       </template>
     </div>
 
-    <div class="mt-6 flex justify-end gap-2">
-      <BaseButton type="button" variant="secondary" @click="emit('close')">Cancelar</BaseButton>
-      <BaseButton type="button" :disabled="!canImport || importing" @click="handleImport">
+    <div class="mt-4 flex shrink-0 flex-col gap-2 sm:flex-row sm:justify-end">
+      <BaseButton type="button" variant="secondary" @click="emit('close')">
+        {{ importedPartially ? 'Fechar' : 'Cancelar' }}
+      </BaseButton>
+      <BaseButton v-if="!importedPartially" type="button" :disabled="!canImport || importing" @click="handleImport">
         <Upload :size="16" />
-        {{ importing ? 'Importando...' : `Importar ${result?.summary.valid ?? 0} produto(s)` }}
+        {{ importing ? 'Importando...' : importLabel }}
       </BaseButton>
     </div>
   </BaseModal>

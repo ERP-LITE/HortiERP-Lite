@@ -2,9 +2,15 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, useId, watch } from 'vue'
 import { X } from '@lucide/vue'
 
-const props = withDefaults(defineProps<{ open: boolean; title: string; size?: 'sm' | 'md' | 'lg' }>(), {
-  size: 'md',
-})
+const props = withDefaults(
+  defineProps<{
+    open: boolean
+    title: string
+    size?: 'sm' | 'md' | 'lg'
+    fit?: boolean
+  }>(),
+  { size: 'md', fit: false },
+)
 const emit = defineEmits<{ close: [] }>()
 const panel = ref<HTMLElement | null>(null)
 const titleId = useId()
@@ -80,10 +86,12 @@ onBeforeUnmount(() => {
         aria-modal="true"
         :aria-labelledby="titleId"
         tabindex="-1"
-        class="app-modal-scrollbar app-modal-panel relative w-full max-h-[95vh] overflow-y-auto rounded-xl bg-white shadow-lg outline-none dark:bg-gray-800"
-        :class="sizeClass"
+        class="app-modal-scrollbar app-modal-panel relative w-full max-h-[95vh] rounded-xl bg-white shadow-lg outline-none dark:bg-gray-800"
+        :class="[sizeClass, fit ? 'overflow-y-auto sm:flex sm:flex-col sm:overflow-hidden' : 'overflow-y-auto']"
       >
-        <div class="flex items-start justify-between gap-3 px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+        <div
+          class="flex shrink-0 items-start justify-between gap-3 px-6 py-4 border-b border-gray-200 dark:border-gray-700"
+        >
           <h2 :id="titleId" class="min-w-0 break-all text-lg font-semibold text-gray-900 dark:text-gray-100">{{ title }}</h2>
           <button
             class="shrink-0 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 leading-none"
@@ -94,7 +102,7 @@ onBeforeUnmount(() => {
             <X :size="20" />
           </button>
         </div>
-        <div class="p-6">
+        <div class="p-6" :class="fit ? 'sm:flex sm:min-h-0 sm:flex-1 sm:flex-col' : ''">
           <slot />
         </div>
       </div>

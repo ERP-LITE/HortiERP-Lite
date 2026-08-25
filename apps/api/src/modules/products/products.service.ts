@@ -347,6 +347,13 @@ export async function importProducts(companyId: string, userId: string, input: I
     })
   }
 
+  // Categoria/unidade nova só entra na conta se alguma linha aceita usa. Uma linha recusada podia
+  // ser a única a citar aquela categoria, e numa importação parcial ela seria criada sem produto.
+  const usedCategoryKeys = new Set(accepted.map((item) => item.categoryKey))
+  const usedUnitKeys = new Set(accepted.map((item) => item.unitKey))
+  for (const key of [...newCategories.keys()]) if (!usedCategoryKeys.has(key)) newCategories.delete(key)
+  for (const key of [...newUnits.keys()]) if (!usedUnitKeys.has(key)) newUnits.delete(key)
+
   const comEstoque = accepted.filter((item) => item.initialStock > 0)
 
   const summary = {
@@ -383,7 +390,10 @@ export async function importProducts(companyId: string, userId: string, input: I
   }))
   const omittedPreview = Math.max(0, accepted.length - preview.length)
 
-  if (input.dryRun || summary.invalid > 0) return { summary, errors, preview, omittedPreview }
+  const blockedByErrors = summary.invalid > 0 && !input.skipInvalid
+  if (input.dryRun || blockedByErrors || summary.valid === 0) {
+    return { summary, errors, preview, omittedPreview }
+  }
 
   await db.transaction(async (tx) => {
     for (const [key, name] of newCategories) {

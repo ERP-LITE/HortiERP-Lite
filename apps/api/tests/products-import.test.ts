@@ -46,7 +46,7 @@ function importRequest(payload: unknown, cookie: string) {
 
 function countProducts(companyId: string) {
   return db
-    .select({ id: products.id })
+    .select({ id: products.id, name: products.name })
     .from(products)
     .where(and(eq(products.companyId, companyId), isNull(products.deletedAt)))
 }
@@ -220,6 +220,79 @@ describe('importação de produtos por planilha', () => {
       .from(categories)
       .where(and(eq(categories.companyId, tenant.companyId), eq(categories.name, 'Frutas'), isNull(categories.deletedAt)))
     assert.equal(createdCategories.length, 0, 'a categoria nova não pode sobrar de uma importação cancelada')
+  })
+
+  test('com skipInvalid importa as linhas válidas e deixa as com problema de fora', async () => {
+    const tenant = await createTenant('imp-parcial')
+
+    const response = await importRequest(
+      {
+        createMissingRefs: true,
+        skipInvalid: true,
+        rows: [
+          { line: 2, name: 'Manga parcial', categoryName: 'Frutas parcial', unitName: 'Quilo parcial' },
+          { line: 3, name: 'Uva parcial', categoryName: 'Frutas parcial', unitName: 'Quilo parcial', salePrice: 'nao-e-numero' },
+          { line: 4, name: 'Caqui parcial', categoryName: 'Frutas parcial', unitName: 'Quilo parcial' },
+        ],
+      },
+      authCookie(ctx.app, tenant.admin),
+    )
+
+    assert.equal(response.statusCode, 200)
+    const body = response.json<ImportResponse>()
+    assert.equal(body.summary.total, 3)
+    assert.equal(body.summary.valid, 2)
+    assert.equal(body.summary.invalid, 1)
+    assert.equal(body.summary.imported, 2)
+    assert.equal(body.errors.length, 1)
+    assert.equal(body.errors[0].line, 3)
+
+    const nomes = (await countProducts(tenant.companyId)).map((item) => item.name).sort()
+    assert.deepEqual(nomes, ['Caqui parcial', 'Manga parcial', 'Produto imp-parcial'])
+  })
+
+  test('categoria citada só por linha recusada não é criada na importação parcial', async () => {
+    const tenant = await createTenant('imp-parcial-ref')
+
+    const response = await importRequest(
+      {
+        createMissingRefs: true,
+        skipInvalid: true,
+        rows: [
+          { line: 2, name: 'Melão ok', categoryName: 'Frutas ok', unitName: 'Quilo ok' },
+          { line: 3, name: '', categoryName: 'Categoria órfã', unitName: 'Unidade órfã' },
+        ],
+      },
+      authCookie(ctx.app, tenant.admin),
+    )
+
+    const body = response.json<ImportResponse>()
+    assert.equal(body.summary.imported, 1)
+    assert.deepEqual(body.summary.newCategories, ['Frutas ok'])
+
+    const orfa = await db
+      .select({ id: categories.id })
+      .from(categories)
+      .where(and(eq(categories.companyId, tenant.companyId), eq(categories.name, 'Categoria órfã'), isNull(categories.deletedAt)))
+    assert.equal(orfa.length, 0, 'categoria de linha recusada não pode ser criada')
+  })
+
+  test('sem skipInvalid a planilha com erro continua sendo recusada inteira', async () => {
+    const tenant = await createTenant('imp-atomico-padrao')
+
+    const response = await importRequest(
+      {
+        createMissingRefs: true,
+        rows: [
+          { line: 2, name: 'Goiaba', categoryName: 'Frutas padrão', unitName: 'Quilo padrão' },
+          { line: 3, name: 'Goiaba branca', categoryName: 'Frutas padrão', unitName: 'Quilo padrão', minStock: 'x' },
+        ],
+      },
+      authCookie(ctx.app, tenant.admin),
+    )
+
+    assert.equal(response.json<ImportResponse>().summary.imported, 0)
+    assert.equal((await countProducts(tenant.companyId)).length, 1)
   })
 
   test('acusa nome repetido dentro do próprio arquivo e nome que já existe no sistema', async () => {

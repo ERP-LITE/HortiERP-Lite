@@ -106,6 +106,7 @@ export async function importProducts(payload: {
   rows: ImportProductRow[]
   dryRun?: boolean
   createMissingRefs?: boolean
+  skipInvalid?: boolean
 }) {
   const { data } = await api.post<ImportProductsResult>('/products/import', payload)
   return data

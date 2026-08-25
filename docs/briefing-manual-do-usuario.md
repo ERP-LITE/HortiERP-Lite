@@ -291,9 +291,15 @@ carregamento do cadastro. Limite de **2000 linhas** por vez.
 - Números aceitam **os dois formatos**: `1.234,56` (brasileiro) e `1234.56` (americano).
 - A coluna de ativo aceita `sim`, `s`, `1`, `ativo`, `verdadeiro` e os equivalentes de não. Em branco
   vira ativo.
-- **É tudo ou nada.** Se uma linha estiver errada, nada é importado. Vale explicar o motivo: se o
-  sistema importasse só as linhas boas, na segunda tentativa as já importadas voltariam como
-  duplicadas, e ninguém entende mais o que entrou.
+- **Linha com problema não impede o resto.** Quando parte da planilha está errada, o botão passa a
+  ser **Importar as N válidas**: entra o que está pronto e as linhas com problema ficam de fora, sem
+  nada criado pela metade. O que não pode é reenviar a planilha inteira depois de corrigir, porque o
+  que já entrou voltaria como duplicado. Por isso o botão **Baixar lista de erros** entrega uma
+  planilha **no mesmo formato da importação**, já com a coluna do motivo: é esse arquivo que a pessoa
+  corrige e envia na segunda vez. Esse é o caminho a ensinar no manual, com o exemplo de uma planilha
+  de 100 produtos em que 50 estão prontos.
+- Depois de uma importação parcial, a janela **continua aberta** mostrando o que entrou e a lista do
+  que ficou de fora, justamente para dar tempo de baixar a lista.
 - Antes de confirmar, o sistema mostra uma **prévia** com o que vai acontecer: os contadores (linhas
   lidas, prontas, com problema), etiquetas com o que é novo (categoria, unidade, produto sem custo) e
   uma **lista linha por linha do que vai entrar**, com produto, categoria, unidade, custo e estoque
