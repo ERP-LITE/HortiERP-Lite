@@ -1,6 +1,6 @@
 import { after, before, beforeEach } from 'node:test'
-import { sql } from 'drizzle-orm'
 import type { FastifyInstance } from 'fastify'
+import { Pool } from 'pg'
 import { buildApp } from '../src/app.js'
 import { db, pool } from '../src/db/client.js'
 import { categories, companies, products, units, users } from '../src/db/schema/index.js'
@@ -22,6 +22,14 @@ export interface TenantFixture {
   categoryId: string
   unitId: string
   productId: string
+}
+
+// TRUNCATE é permissão que a aplicação não tem e não deve ter: ela nunca esvazia tabela. A limpeza
+// entre testes é ato de manutenção, então roda pelo papel dono, igual ao migrate.
+const ownerPool = new Pool({ connectionString: process.env.DATABASE_URL })
+
+export async function truncateAsOwner(table: string) {
+  await ownerPool.query(`TRUNCATE TABLE ${table}`)
 }
 
 export function assertTestDatabase() {
@@ -102,12 +110,13 @@ export function setupTestApp(options: { systemLogs?: boolean } = {}) {
   })
 
   beforeEach(async () => {
-    await db.execute(sql`TRUNCATE TABLE ${companies} CASCADE`)
+    await truncateAsOwner('companies CASCADE')
   })
 
   after(async () => {
     await ctx.app.close()
     await pool.end()
+    await ownerPool.end()
   })
 
   return ctx

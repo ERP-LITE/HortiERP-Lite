@@ -232,9 +232,10 @@ antiga é uma decisão de hoje, não um evento do passado.
 
 ## Isolamento entre empresas não tem rede de proteção no banco
 
-Não há **RLS** (segurança em nível de linha) no PostgreSQL: nenhuma `POLICY`, nenhum
+Não há **RLS** (segurança em nível de linha) nas tabelas do sistema: nenhuma `POLICY`, nenhum
 `ENABLE ROW LEVEL SECURITY`. O isolamento é inteiramente da aplicação, pelo `eq(tabela.companyId, …)`
-descrito no começo deste documento. Consequência a encarar de frente: **uma consulta futura que
+descrito no começo deste documento. O pré-requisito para as políticas já está no lugar — ver
+"Dois papéis de banco" abaixo — mas as políticas em si ainda não existem. Consequência a encarar de frente: **uma consulta futura que
 esqueça o filtro vaza dados entre clientes e nada no banco impede**. O que segura hoje é o padrão
 repetido em todo service, a revisão de código e os testes de isolamento (`access-control.test.ts`).
 
@@ -270,14 +271,65 @@ anexos órfãos (manutenção transversal por definição). Outras travessias le
 localizando a empresa Plataforma pelo `super_admin`, a gestão de usuários da plataforma, a validação de
 sessão — passam sozinhas porque mencionam `companyId` por outro motivo, e por isso não aparecem lá.
 
-### Por que RLS não é ligar uma chave
+### Dois papéis de banco: por que RLS não é ligar uma chave
 
-Antes de considerar ligar RLS, entenda por que ela não funcionaria hoje: `POSTGRES_USER` é criado pela
-imagem oficial do PostgreSQL como **superusuário**, e superusuário **ignora RLS inteiramente** —
-`FORCE ROW LEVEL SECURITY` também não alcança superusuário. Ligar políticas com a conexão atual
-produziria um relatório de conformidade bonito e zero consultas barradas. O pré-requisito é criar um
-papel de aplicação sem `SUPERUSER` e sem `BYPASSRLS`, apontar a `DATABASE_URL` para ele e conferir
-que migrations, seeds e backup continuam funcionando com privilégio reduzido — nessa ordem.
+`POSTGRES_USER` é criado pela imagem oficial do PostgreSQL como **superusuário**, e superusuário
+**ignora RLS inteiramente** — `FORCE ROW LEVEL SECURITY` também não alcança superusuário. Ligar
+políticas com uma conexão de superusuário produziria um relatório de conformidade bonito e zero
+consultas barradas, sem nenhum sinal de erro.
+
+Por isso a separação de papéis veio **antes** de qualquer política, em entrega própria:
+
+| | papel | quem usa | por quê |
+|---|---|---|---|
+| `DATABASE_URL` | dono (`POSTGRES_USER`, superusuário) | `migrate`, `backup` | DDL, `CREATE ROLE` e `pg_dump` |
+| `APP_DATABASE_URL` | `hortierp_app` | `api`, `retention` | só `SELECT/INSERT/UPDATE/DELETE` |
+
+O papel de aplicação é criado e mantido por `ensureAppRole` (`src/db/appRole.ts`), chamado ao final do
+`migrate` — **depois** das migrations, para que os `GRANT` alcancem as tabelas que acabaram de nascer.
+Três decisões dentro dele:
+
+- **Reaplica os atributos e a senha a cada deploy.** O ambiente é a fonte da verdade, e
+  `NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE NOREPLICATION` no `ALTER ROLE` desfaz uma concessão
+  manual que alguém tenha feito no meio do caminho para "resolver" um erro de permissão.
+- **`ALTER DEFAULT PRIVILEGES`**, e não só `GRANT ON ALL TABLES`. Sem isso a tabela criada pela próxima
+  migration nasceria inacessível para a API, e o erro apareceria em produção.
+- **Sai sem fazer nada se o papel for igual ao dono.** Num ambiente onde `APP_DATABASE_URL` caiu no
+  fallback para `DATABASE_URL`, o script tiraria o superusuário do próprio dono do banco. É aviso e
+  não erro para o `db:migrate` local seguir funcionando sem a variável; em produção o `env.ts` já
+  recusa subir nessa situação, então esse caminho nunca é alcançado lá.
+
+Em produção o `env.ts` **recusa subir** sem `APP_DATABASE_URL`, e recusa também quando ela usa o mesmo
+usuário de `DATABASE_URL` — o caso em que tudo parece configurado e a API segue como superusuário.
+
+#### O backup não pode migrar para o papel restrito
+
+`pg_dump` rodando com papel sujeito a RLS traz **só as linhas que as políticas deixam ver, e termina
+com código zero**: backup verde, dados faltando. O serviço `backup` se conecta por `PGUSER`/`PGPASSWORD`
+próprios, sem herdar o ambiente da API, e isso parece duplicação — não é. Está comentado no
+`docker-compose.production.yml` para não ser "arrumado".
+
+#### TRUNCATE ficou fora dos privilégios
+
+A limpeza entre testes usava `TRUNCATE`, que exige privilégio próprio. Em vez de concedê-lo, a limpeza
+passou a rodar pelo papel dono (`truncateAsOwner`, em `tests/helpers.ts`): a aplicação nunca esvazia
+tabela, então esse privilégio não tem por que existir em produção.
+
+#### Como isso é provado
+
+A suíte de integração inteira conecta pelo papel restrito — são os 138 testes existentes que provam
+que os privilégios bastam para toda a superfície da aplicação. Além deles, `tests/rls.test.ts` cria
+uma tabela descartável e verifica o que a etapa em si precisava demonstrar:
+
+- o papel não tem `rolsuper`, `rolbypassrls` nem `rolcreaterole`;
+- ele alcança tabela criada depois dele, sem `GRANT` manual (prova o `ALTER DEFAULT PRIVILEGES`);
+- com uma política `USING (false)`, ele para de ver a linha **e o dono continua vendo** — a
+  demonstração direta de por que a API precisava sair do papel dono;
+- ele não cria tabela e não trunca.
+
+**O que falta:** as políticas por empresa. Elas dependem de a empresa da sessão chegar ao banco (um
+`SET LOCAL` por transação a partir do token), e ficaram para uma entrega seguinte, com este deploy no
+ar antes — a troca de papel é a parte que pode quebrar acesso em produção.
 
 ## Planilha exportada não pode virar fórmula
 

@@ -183,6 +183,53 @@ retroativas já gravadas continuam lá, e voltam a valer quando a versão atual 
 estiver no ar, o histórico e o painel voltam a filtrar por `created_at`, então uma movimentação retroativa aparece no dia
 em que foi digitada.
 
+## Papel de banco da aplicação
+
+A API **não** se conecta mais com o usuário dono do banco. São dois papéis:
+
+| variável | papel | quem usa |
+|---|---|---|
+| `DATABASE_URL` | dono (`POSTGRES_USER`, superusuário) | `migrate` |
+| `APP_DATABASE_URL` | `hortierp_app`, sem superusuário | `api`, `retention` |
+
+O motivo é o RLS: superusuário ignora política de segurança em nível de linha em silêncio, então
+enquanto a API falasse pelo dono nenhuma política protegeria nada. Ver `docs/decisoes-arquiteturais.md`.
+
+O papel é criado e mantido pelo próprio `migrate`, a cada deploy — não há passo manual de `psql`. O que
+**precisa existir antes do deploy** é a senha dele no `.env.production`:
+
+```bash
+cd ~/ERP-LITE
+cp -p .env.production .env.production.bak
+printf 'APP_DB_USER=hortierp_app\nAPP_DB_PASSWORD=%s\n' "$(openssl rand -hex 32)" >> .env.production
+grep -c '^APP_DB_' .env.production   # tem que devolver 2
+```
+
+Hex de propósito: senha com `@`, `:` ou `/` quebraria a URL de conexão.
+
+Sem essa variável o `docker compose` **recusa subir** com `Defina APP_DB_PASSWORD`, antes de tocar em
+qualquer container. A falha é ruidosa e acontece antes de qualquer mudança — é o comportamento desejado.
+
+Depois do deploy, confirme que a API está mesmo no papel restrito:
+
+```bash
+docker compose --env-file .env.production -f docker-compose.production.yml \
+  logs --tail=20 migrate | grep 'Papel de aplicação'
+
+docker compose --env-file .env.production -f docker-compose.production.yml exec -T postgres \
+  psql -U "$(grep '^POSTGRES_USER=' .env.production | cut -d= -f2)" \
+       -d "$(grep '^POSTGRES_DB=' .env.production | cut -d= -f2)" \
+  -c "SELECT rolname, rolsuper, rolbypassrls FROM pg_roles WHERE rolname = 'hortierp_app';"
+```
+
+A linha do log deve dizer `sem superusuário, sem bypass de RLS, permissões em dia`, e a consulta deve
+devolver `rolsuper = f` e `rolbypassrls = f`. Se der `t` em qualquer um dos dois, o papel foi alterado
+à mão no servidor e o próximo deploy vai desfazer isso.
+
+**O backup continua no papel dono, e isso é deliberado.** `pg_dump` rodando com papel sujeito a RLS
+traz só as linhas que as políticas deixam ver e termina com código zero — backup verde, dados
+faltando. Não unifique `PGUSER` do serviço `backup` com `APP_DB_USER`.
+
 ## Dois cuidados que o deploy não perdoa
 
 ### `npm run db:seed` nunca em produção

@@ -28,6 +28,7 @@ services:
       - apps/api/.env
     environment:
       DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      APP_DATABASE_URL: postgres://${APP_DB_USER:-hortierp_app}:${APP_DB_PASSWORD:-hortierp_app}@postgres:5432/${POSTGRES_DB}
       INVOICE_STORAGE_PATH: /app/storage/invoices
       CHOKIDAR_USEPOLLING: "true"
       CHOKIDAR_INTERVAL: "500"
