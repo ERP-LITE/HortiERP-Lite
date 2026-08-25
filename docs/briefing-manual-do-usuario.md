@@ -16,7 +16,8 @@
 > a confirmação de senha no cadastro de usuário (seção 7.12), a conferência linha por linha da
 > importação (seção 7.4), a trava de exclusão e a inativação de categoria e unidade (seção 7.2), o
 > filtro por unidade na tela de produtos (seção 7.3), a coluna de unidade na tela de estoque
-> (seção 7.8) e o campo de lista com busca, junto do nome **Situação** padronizado (seção 7.1).
+> (seção 7.8), o campo de lista com busca junto do nome **Situação** padronizado (seção 7.1) e as
+> três situações da nota fiscal na listagem de entradas (seção 7.5).
 > O **manual gerado antes desta data está incompleto**: falta o aviso de privacidade e o botão
 > "Baixar meus dados", que já constam das seções 6.1 e 7.1.
 
@@ -322,7 +323,15 @@ Uma entrada tem:
   mercadoria ter chegado noutro. A **chave de acesso** tem de ter **exatamente 44 dígitos** — chave
   incompleta é recusada, e vale dizer isso para o cliente não achar que é defeito.
 - **Itens:** produto, quantidade e, se quiser, o custo unitário daquele recebimento.
-- **Anexos:** até **3 arquivos** por entrada, em XML, PDF, JPG, PNG ou WEBP, até 10 MB cada.
+- **Anexos:** até **3 arquivos** por entrada, em XML, PDF, JPG, PNG ou WEBP, até 10 MB cada. Arquivo
+  acima do limite é recusado na hora, com o nome do arquivo e o tamanho dele na mensagem, e **a
+  entrada não é salva enquanto o arquivo recusado estiver selecionado**. Isso é de propósito: antes
+  dava para salvar a entrada e o anexo ficava para trás sem ninguém perceber. Quem precisa lançar
+  logo pode tirar o arquivo da seleção, salvar, e anexar depois pela tela de detalhes.
+- **Situação da nota na listagem:** a coluna **Nota fiscal** tem três respostas. **Anexada** (o
+  arquivo está guardado), **Sem arquivo** (os dados da nota foram digitados, mas o arquivo não subiu)
+  e **Sem nota**. Vale explicar as três, porque "Sem arquivo" é exatamente a lista do que o pessoal
+  precisa terminar de anexar.
 
 Ao salvar, o estoque de cada produto **sobe na hora**. Se algum produto da lista tiver problema, nada
 é gravado — nem a entrada, nem o estoque.

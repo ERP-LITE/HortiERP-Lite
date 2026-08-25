@@ -225,6 +225,46 @@ Formulários com validação própria usam `novalidate`: mensagens nativas do na
 padronizado da aplicação. Campos inválidos recebem borda vermelha e uma mensagem em vermelho logo abaixo do
 componente, inclusive selects, competência e calendário.
 
+### "Com nota" não podia significar duas coisas
+
+A coluna **Nota fiscal** da listagem de entradas mostrava só dois estados, e o verde saía com
+`invoiceNumber || invoiceAccessKey || anexos`. Quem digitou o número da nota e não conseguiu anexar o
+arquivo via "Com nota" na tela, sem ter nota nenhuma guardada. Agora são três estados: **Anexada**
+(verde, existe arquivo), **Sem arquivo** (âmbar, os dados da nota estão lá e o arquivo não) e **Sem
+nota** (cinza, nada). O âmbar é a fila de trabalho de quem confere nota fiscal.
+
+A ordenação da coluna acompanha: o `invoiceStatus` virou um `case` que devolve 2, 1 ou 0, então
+ordenar crescente agrupa primeiro o que ainda falta resolver.
+
+**Erro de seleção de arquivo não pode morar no objeto que o `validate()` limpa.** O formulário de
+entrada guardava o aviso do anexo em `invoiceErrors.attachments`, e a primeira linha do `validate()`
+é `invoiceErrors.value = {}`. Resultado: escolher um arquivo acima de 10 MB mostrava o aviso, e
+clicar em salvar **apagava o aviso e gravava a entrada sem o anexo**, porque a checagem de erros
+passava a encontrar o objeto vazio. Hoje o aviso é um `computed` sobre a seleção atual
+(`invoiceSelectionError`, em `lib/invoiceAttachments.ts`), então ele não pode ser apagado por quem
+valida, e o `validate()` o inclui no retorno. A regra geral: **estado derivado da seleção vira
+`computed`, não campo gravado num objeto de erros que alguém zera depois**.
+
+O limite de 3 arquivos e de 10 MB estava escrito nas duas telas que enviam anexo, com o número solto
+no meio da condição. Agora está em `lib/invoiceAttachments.ts`, junto de um comentário dizendo que o
+valor espelha `INVOICE_MAX_FILE_SIZE` da API. A mensagem também mudou de "Cada arquivo pode ter até
+10 MB" para o nome do arquivo e os dois tamanhos, porque com três arquivos selecionados a mensagem
+antiga não dizia qual deles era o problema.
+
+### Coluna de outra tabela em `sql` de ordenação sai com o alias errado
+
+Ordenar as entradas pela situação da nota fiscal devolvia **500**, e nenhum teste cobria esse
+`sortBy`. A causa: `db.query.stockEntries.findMany` monta a consulta com a tabela raiz apelidada
+(`"stockEntries"`), e uma referência de coluna de **outra** tabela dentro de um `sql` template sai
+com esse mesmo apelido. O `${stockEntryAttachments.stockEntryId}` da subconsulta virava
+`"stockEntries"."stock_entry_id"`, coluna que não existe, e o Postgres recusava a consulta inteira.
+
+Numa relational query, dentro de `sql` só entram colunas da tabela raiz pelo schema. A subconsulta
+correlacionada é escrita à mão, com apelido próprio, e repete o `company_id` para não depender do
+escopo de fora. Vale lembrar que o erro só aparece quando alguém clica naquele cabeçalho: consulta
+montada com o mesmo padrão em `select` normal (sem `with`) funciona, o que faz esse tipo de defeito
+passar em revisão.
+
 ### Peças compartilhadas das listagens
 
 Toda listagem é montada com as mesmas peças, e a regra é: se a coisa aparece igual em duas telas, ela

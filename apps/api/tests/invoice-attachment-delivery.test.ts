@@ -143,3 +143,52 @@ describe('entrega de anexo de nota fiscal', () => {
     }
   })
 })
+
+/**
+ * A coluna "Nota fiscal" da listagem distingue três situações, e a ordenação precisa
+ * acompanhar: sem nota, dados preenchidos sem arquivo, e arquivo anexado. Antes o
+ * `invoiceStatus` era booleano, então "só os dados" e "anexada" caíam no mesmo grupo.
+ */
+describe('ordenação pela situação da nota fiscal', () => {
+  it('separa sem nota, só os dados e com arquivo anexado', async () => {
+    const tenant = await createTenant('ordem-nota')
+    const cookie = authCookie(ctx.app, tenant.operator)
+
+    const semNota = await createStockEntry(tenant.companyId, tenant.operator.id, {
+      supplierName: 'Sem nota',
+      items: [{ productId: tenant.productId, quantity: 1 }],
+    })
+    const soDados = await createStockEntry(tenant.companyId, tenant.operator.id, {
+      supplierName: 'Só os dados',
+      invoiceNumber: '123456',
+      items: [{ productId: tenant.productId, quantity: 1 }],
+    })
+    const comArquivo = await createStockEntry(tenant.companyId, tenant.operator.id, {
+      supplierName: 'Com arquivo',
+      items: [{ productId: tenant.productId, quantity: 1 }],
+    })
+    const upload = await ctx.app.inject({
+      method: 'POST',
+      url: `/api/stock-entries/${comArquivo.id}/attachments`,
+      headers: { cookie, 'content-type': `multipart/form-data; boundary=${BOUNDARY}` },
+      payload: multipartBody('danfe.pdf', 'application/pdf', PDF_BYTES),
+    })
+    assert.equal(upload.statusCode, 201, upload.body)
+
+    const response = await ctx.app.inject({
+      method: 'GET',
+      url: '/api/stock-entries?sortBy=invoiceStatus&sortOrder=asc',
+      headers: { cookie },
+    })
+
+    assert.equal(response.statusCode, 200, response.body)
+    const data = response.json<{ data: { id: string; attachments: unknown[]; invoiceNumber: string | null }[] }>().data
+    assert.deepEqual(
+      data.map((entry) => entry.id),
+      [semNota.id, soDados.id, comArquivo.id],
+    )
+    assert.equal(data[1].attachments.length, 0)
+    assert.equal(data[1].invoiceNumber, '123456')
+    assert.equal(data[2].attachments.length, 1)
+  })
+})

@@ -14,6 +14,7 @@ import { listAllProducts } from '@/services/productsService'
 import { createStockEntry, uploadStockEntryAttachment } from '@/services/stockEntriesService'
 import type { Product } from '@/types'
 import { formatFileSize } from '@/lib/format'
+import { invoiceSelectionError } from '@/lib/invoiceAttachments'
 
 interface ItemRow {
   productId: string
@@ -37,6 +38,7 @@ const invoiceAccessKey = ref('')
 const invoiceIssuedAt = ref('')
 const invoiceTotal = ref('')
 const attachments = ref<File[]>([])
+const attachmentsError = computed(() => invoiceSelectionError(attachments.value))
 const invoiceErrors = ref<Record<string, string>>({})
 const items = ref<ItemRow[]>([{ productId: '', quantity: '', unitCost: '' }])
 const itemErrors = ref<{ productId?: string; quantity?: string }[]>([])
@@ -83,16 +85,13 @@ function validate(): boolean {
 
   return itemErrors.value.every((rowErrors) => Object.keys(rowErrors).length === 0) &&
     Object.keys(invoiceErrors.value).length === 0 &&
+    !attachmentsError.value &&
     !entryDateError.value
 }
 
 function handleFiles(event: Event) {
   const input = event.target as HTMLInputElement
-  const selected = Array.from(input.files ?? [])
-  invoiceErrors.value.attachments = ''
-  if (selected.length > 3) invoiceErrors.value.attachments = 'Selecione no máximo 3 arquivos'
-  else if (selected.some((file) => file.size > 10 * 1024 * 1024)) invoiceErrors.value.attachments = 'Cada arquivo pode ter até 10 MB'
-  else attachments.value = selected
+  attachments.value = Array.from(input.files ?? [])
   input.value = ''
 }
 
@@ -187,7 +186,7 @@ onMounted(loadProducts)
           <span>{{ attachments.length ? `${attachments.length} arquivo(s) selecionado(s)` : 'Selecionar anexos da nota' }}</span>
           <input class="sr-only" type="file" multiple accept=".xml,.pdf,.jpg,.jpeg,.png,.webp" @change="handleFiles" />
         </label>
-        <p v-if="invoiceErrors.attachments" class="text-xs text-red-600">{{ invoiceErrors.attachments }}</p>
+        <p v-if="attachmentsError" class="text-xs text-red-600 dark:text-red-400">{{ attachmentsError }}</p>
         <ul v-if="attachments.length" class="space-y-1 text-xs text-gray-500 dark:text-gray-400">
           <li v-for="file in attachments" :key="`${file.name}-${file.size}`" class="break-all">
             {{ file.name }} · {{ formatFileSize(file.size) }}

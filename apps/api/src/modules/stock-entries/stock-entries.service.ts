@@ -41,13 +41,19 @@ export async function listStockEntries(companyId: string, query: ListStockEntrie
   if (query.from) conditions.push(gte(stockEntries.entryDate, query.from))
   if (query.to) conditions.push(lte(stockEntries.entryDate, query.to))
   const where = and(...conditions)
-  const invoiceStatus = sql<boolean>`(
-    ${stockEntries.invoiceNumber} is not null
-    or ${stockEntries.invoiceAccessKey} is not null
-    or exists (
-      select 1 from ${stockEntryAttachments}
-      where ${stockEntryAttachments.stockEntryId} = ${stockEntries.id}
-    )
+  // A subconsulta é escrita à mão de propósito: dentro de uma relational query, referência de coluna
+  // de outra tabela (${stockEntryAttachments.stockEntryId}) sai com o alias da tabela raiz e o
+  // Postgres recusa a consulta. Só as colunas de stockEntries podem vir do schema aqui.
+  const invoiceStatus = sql<number>`(
+    case
+      when exists (
+        select 1 from stock_entry_attachments anexo
+        where anexo.stock_entry_id = ${stockEntries.id}
+          and anexo.company_id = ${stockEntries.companyId}
+      ) then 2
+      when ${stockEntries.invoiceNumber} is not null or ${stockEntries.invoiceAccessKey} is not null then 1
+      else 0
+    end
   )`
   const entrySortColumns = {
     entryDate: stockEntries.entryDate,

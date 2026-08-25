@@ -79,5 +79,8 @@ export function formatChartNumber(value: number) {
 }
 
 export function formatFileSize(bytes: number) {
-  return bytes >= 1024 * 1024 ? `${(bytes / 1024 / 1024).toFixed(2)} MB` : `${Math.ceil(bytes / 1024)} KB`
+  if (bytes < 1024 * 1024) return `${Math.ceil(bytes / 1024)} KB`
+  // Arredonda para cima: 10 MB e um byte não pode aparecer como "10,00 MB" numa mensagem de limite
+  const megas = Math.ceil((bytes / 1024 / 1024) * 100) / 100
+  return `${megas.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} MB`
 }

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { describe, test } from 'node:test'
-import { formatCnpj, formatPhone, formatQuantity } from '../src/lib/format.js'
+import { formatCnpj, formatFileSize, formatPhone, formatQuantity } from '../src/lib/format.js'
 
 describe('quantidade na tela sai em português', () => {
   test('a string do banco não é lida como milhar', () => {
@@ -30,5 +30,17 @@ describe('CNPJ e telefone gravados sem pontuação voltam formatados', () => {
     assert.equal(formatPhone('47997724317'), '(47) 99772-4317')
     assert.equal(formatPhone('4733334444'), '(47) 3333-4444')
     assert.equal(formatPhone(''), '')
+  })
+})
+
+describe('formatFileSize', () => {
+  test('MB com vírgula e arredondado para cima', () => {
+    assert.equal(formatFileSize(1024 * 1024 * 2.345), '2,35 MB')
+    assert.equal(formatFileSize(1024 * 1024), '1,00 MB')
+  })
+
+  test('abaixo de 1 MB fica em KB inteiro', () => {
+    assert.equal(formatFileSize(900), '1 KB')
+    assert.equal(formatFileSize(1024 * 300), '300 KB')
   })
 })

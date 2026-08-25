@@ -10,7 +10,8 @@ import DateInput from '@/components/ui/DateInput.vue'
 import ExpandableText from '@/components/ui/ExpandableText.vue'
 import FieldLabel from '@/components/ui/FieldLabel.vue'
 import SortableTableHeader from '@/components/ui/SortableTableHeader.vue'
-import { formatCurrency, formatDate, formatDateTime, formatQuantity, formatFileSize } from '@/lib/format'
+import { formatCurrency, formatDate, formatDateTime, formatFileSize, formatQuantity } from '@/lib/format'
+import { invoiceSelectionError } from '@/lib/invoiceAttachments'
 import { confirmDelete, toastError, toastSuccess } from '@/lib/alerts'
 import { downloadBlob } from '@/lib/download'
 import { getApiErrorMessage } from '@/services/api'
@@ -178,12 +179,9 @@ async function handleUpload(event: Event) {
   const files = Array.from(input.files ?? [])
   input.value = ''
   if (!files.length) return
-  if ((entry.value?.attachments.length ?? 0) + files.length > 3) {
-    errorMessage.value = 'Cada entrada aceita no máximo 3 anexos'
-    return
-  }
-  if (files.some((file) => file.size > 10 * 1024 * 1024)) {
-    errorMessage.value = 'Cada arquivo pode ter até 10 MB'
+  const selectionError = invoiceSelectionError(files, entry.value?.attachments.length ?? 0)
+  if (selectionError) {
+    errorMessage.value = selectionError
     return
   }
 

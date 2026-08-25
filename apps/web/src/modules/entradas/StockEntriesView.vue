@@ -47,8 +47,16 @@ function itemsSummary(entry: StockEntrySummary) {
     .join(', ')
 }
 
-function hasInvoice(entry: StockEntrySummary) {
-  return Boolean(entry.invoiceNumber || entry.invoiceAccessKey || entry.attachments?.length)
+function invoiceBadge(entry: StockEntrySummary) {
+  if (entry.attachments?.length) return { variant: 'success' as const, label: 'Anexada', hint: undefined }
+  if (entry.invoiceNumber || entry.invoiceAccessKey) {
+    return {
+      variant: 'warning' as const,
+      label: 'Sem arquivo',
+      hint: 'Os dados da nota estão preenchidos, mas nenhum arquivo foi anexado',
+    }
+  }
+  return { variant: 'neutral' as const, label: 'Sem nota', hint: undefined }
 }
 
 async function loadEntries() {
@@ -159,8 +167,8 @@ onMounted(loadEntries)
               <ExpandableText :text="entry.createdByUser?.name" :max-length="40" empty-text="Usuário não identificado" />
             </td>
             <td class="px-4 py-3 whitespace-nowrap">
-              <BaseBadge :variant="hasInvoice(entry) ? 'success' : 'neutral'">
-                <FileText :size="13" /> {{ hasInvoice(entry) ? 'Com nota' : 'Sem nota' }}
+              <BaseBadge :variant="invoiceBadge(entry).variant" :title="invoiceBadge(entry).hint">
+                <FileText :size="13" /> {{ invoiceBadge(entry).label }}
               </BaseBadge>
             </td>
             <td class="print:hidden px-4 py-3 text-right">
