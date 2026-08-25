@@ -1,9 +1,8 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
-import { sql } from 'drizzle-orm'
 import { db } from '../src/db/client.js'
 import { systemLogs } from '../src/db/schema/index.js'
-import { authCookie, createTenant, setupTestApp } from './helpers.js'
+import { authCookie, createTenant, setupTestApp, truncateAsOwner } from './helpers.js'
 
 // Único arquivo que sobe o app com o hook de log ligado: sem isso, nada que dependa
 // dele aparece na suíte — foi exatamente o ponto cego que deixou `/api/health`
@@ -27,7 +26,7 @@ async function waitForLoggedPath(path: string, timeoutMs = 3_000) {
 
 describe('hook de log de requisições', () => {
   it('não registra healthcheck em nenhum dos dois caminhos', async () => {
-    await db.execute(sql`TRUNCATE TABLE ${systemLogs}`)
+    await truncateAsOwner('system_logs')
     const tenant = await createTenant('log-health')
     const cookie = authCookie(ctx.app, tenant.admin)
 
@@ -49,7 +48,7 @@ describe('hook de log de requisições', () => {
   })
 
   it('não registra as próprias telas de consulta de log', async () => {
-    await db.execute(sql`TRUNCATE TABLE ${systemLogs}`)
+    await truncateAsOwner('system_logs')
     const tenant = await createTenant('log-logs')
     const cookie = authCookie(ctx.app, tenant.admin)
 

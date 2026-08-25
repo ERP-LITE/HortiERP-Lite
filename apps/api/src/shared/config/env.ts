@@ -1,11 +1,24 @@
 import 'dotenv/config'
 import { z } from 'zod'
 
+function usuarioDaUrl(url: string) {
+  try {
+    return new URL(url).username
+  } catch {
+    return null
+  }
+}
+
 const envSchema = z
   .object({
     NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
     PORT: z.coerce.number().default(3333),
     DATABASE_URL: z.string().min(1, 'DATABASE_URL é obrigatório'),
+    APP_DATABASE_URL: z
+      .string()
+      .trim()
+      .optional()
+      .transform((value) => value || undefined),
     JWT_SECRET: z.string().min(1, 'JWT_SECRET é obrigatório'),
     JWT_EXPIRES_IN: z.string().default('8h'),
     CORS_ORIGIN: z
@@ -56,6 +69,22 @@ const envSchema = z
       })
     }
 
+    if (!value.APP_DATABASE_URL) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['APP_DATABASE_URL'],
+        message:
+          'APP_DATABASE_URL é obrigatório em produção: a API não deve se conectar com o papel dono do banco',
+      })
+    } else if (usuarioDaUrl(value.APP_DATABASE_URL) === usuarioDaUrl(value.DATABASE_URL)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['APP_DATABASE_URL'],
+        message:
+          'APP_DATABASE_URL usa o mesmo usuário de DATABASE_URL; nesse caso a API segue com o papel dono e o RLS não vale nada',
+      })
+    }
+
     if (value.CORS_ORIGIN.some((origin) => !origin.startsWith('https://'))) {
       context.addIssue({
         code: z.ZodIssueCode.custom,
@@ -65,7 +94,12 @@ const envSchema = z
     }
   })
 
-const parsed = envSchema.safeParse(process.env)
+const parsedSchema = envSchema.transform((value) => ({
+  ...value,
+  APP_DATABASE_URL: value.APP_DATABASE_URL ?? value.DATABASE_URL,
+}))
+
+const parsed = parsedSchema.safeParse(process.env)
 
 if (!parsed.success) {
   console.error('Variáveis de ambiente inválidas:', parsed.error.flatten().fieldErrors)
@@ -73,3 +107,9 @@ if (!parsed.success) {
 }
 
 export const env = parsed.data
+
+if (env.NODE_ENV !== 'production' && !process.env.APP_DATABASE_URL) {
+  console.warn(
+    'APP_DATABASE_URL não definida: usando DATABASE_URL. Em produção isso é recusado — veja apps/api/.env.example.',
+  )
+}

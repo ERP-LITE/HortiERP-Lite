@@ -28,6 +28,7 @@ jobs:
 
     env:
       DATABASE_URL: postgres://hortierp_test:hortierp_test@127.0.0.1:5432/hortierp_test
+      APP_DATABASE_URL: postgres://hortierp_app:hortierp_app@127.0.0.1:5432/hortierp_test
       NODE_ENV: test
       JWT_SECRET: integration-test-secret-with-at-least-32-characters
 

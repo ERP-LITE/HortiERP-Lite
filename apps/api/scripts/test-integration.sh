@@ -3,6 +3,9 @@ set -eu
 
 repository_dir=$(CDPATH= cd -- "$(dirname -- "$0")/../../.." && pwd)
 test_database_url='postgres://hortierp_test:hortierp_test@127.0.0.1:5434/hortierp_test'
+# Papel de aplicação: criado pelo passo de migration e usado por todos os testes, para que a suíte
+# prove que as permissões do papel restrito bastam.
+app_database_url='postgres://hortierp_app:senha-de-teste@127.0.0.1:5434/hortierp_test'
 invoice_test_storage='/tmp/hortierp-test-invoices'
 
 cleanup() {
@@ -16,12 +19,14 @@ docker compose -p hortierp-tests -f "$repository_dir/docker-compose.test.yml" up
 
 cd "$repository_dir/apps/api"
 DATABASE_URL="$test_database_url" \
+APP_DATABASE_URL="$app_database_url" \
 NODE_ENV=test \
 JWT_SECRET='integration-test-secret-with-at-least-32-characters' \
 INVOICE_STORAGE_PATH="$invoice_test_storage" \
 npm run db:migrate
 
 DATABASE_URL="$test_database_url" \
+APP_DATABASE_URL="$app_database_url" \
 NODE_ENV=test \
 JWT_SECRET='integration-test-secret-with-at-least-32-characters' \
 INVOICE_STORAGE_PATH="$invoice_test_storage" \
