@@ -10,6 +10,7 @@ import { sql } from 'drizzle-orm'
 import { env } from './shared/config/env.js'
 import { HEALTH_PATHS } from './shared/config/health.js'
 import { db } from './db/client.js'
+import { registerRequestScope } from './db/requestScope.js'
 import { errorHandler } from './shared/middlewares/errorHandler.js'
 import { AppError } from './shared/errors/AppError.js'
 import { formatRetryDelay } from './shared/errors/frameworkMessages.js'
@@ -81,6 +82,9 @@ export function buildApp(options: { systemLogs?: boolean } = {}) {
     throw AppError.notFound('Endereço não encontrado')
   })
   if (options.systemLogs !== false) registerSystemLogsHook(app)
+  // Depois do log de propósito: hooks `onResponse` correm na ordem de registro, e o log escreve no
+  // banco antes de a conexão ser devolvida.
+  registerRequestScope(app)
 
   for (const healthPath of HEALTH_PATHS) {
     app.get(healthPath, async (_request, reply) => {

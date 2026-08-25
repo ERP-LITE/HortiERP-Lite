@@ -2,9 +2,10 @@
  * Procura consulta a tabela multiempresa que não menciona `companyId` na função onde roda.
  *
  * Por que existe: o isolamento entre empresas é escrito à mão em toda consulta
- * (`eq(tabela.companyId, companyId)`) e o banco não tem RLS — se uma consulta nova esquecer o
- * filtro, o PostgreSQL devolve os dados de todos os clientes sem reclamar. Ver
- * docs/decisoes-arquiteturais.md#isolamento-entre-empresas-não-tem-rede-de-proteção-no-banco.
+ * (`eq(tabela.companyId, companyId)`). Desde as políticas de RLS o banco também barra o que passa do
+ * escopo, mas o erro que ele produz é uma consulta vazia — sintoma que se confunde com "não tem
+ * dado". Este verificador continua valendo porque aponta o esquecimento no CI, com nome de arquivo e
+ * função, antes de virar bug de tela. Ver docs/decisoes-arquiteturais.md.
  *
  * O que ele NÃO é: prova de isolamento. Ele pega o esquecimento honesto — a função que nunca
  * pensou em empresa — e não pega o filtro com a variável errada. Vale pelo custo, não pela força.

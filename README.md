@@ -115,8 +115,9 @@ contra fórmula nas planilhas exportadas) e duas verificações estáticas:
 - `npm run csp:hash` — confere se o hash de `script-src` na CSP ainda corresponde ao script inline de
   `apps/web/index.html`.
 - `npm run check:tenant-scope` — lê o código da API com o AST do TypeScript e acusa consulta a tabela multiempresa numa
-  função que não menciona `companyId`. Como o banco ainda não tem políticas de RLS, o isolamento entre empresas depende
-  desse filtro estar escrito em toda consulta; a verificação existe para o esquecimento aparecer no CI e não em produção. As poucas
+  função que não menciona `companyId`. O banco também barra o que passa do escopo, pelas políticas de RLS, mas o erro que
+  ele produz é consulta vazia — sintoma que se confunde com "não tem dado". A verificação existe para o esquecimento
+  aparecer no CI com arquivo e função; a verificação existe para o esquecimento aparecer no CI e não em produção. As poucas
   consultas transversais de propósito — login por e-mail, manutenção operacional e retenção de dados por data — estão
   declaradas com justificativa no próprio verificador. Ver
   [decisões arquiteturais](./docs/decisoes-arquiteturais.md#o-verificador-que-substitui-a-rede-de-proteção-por-enquanto).

@@ -18,6 +18,7 @@ import {
   units,
   users,
 } from '../../db/schema/index.js'
+import { comEscopoDePlataforma } from '../../db/scope.js'
 import { env } from '../../shared/config/env.js'
 
 async function countBy(table: PgTable, column: PgColumn, value: string) {
@@ -32,7 +33,13 @@ export interface CompanyFootprint {
   volumes: Record<string, number>
 }
 
+// Travessia declarada: apagar uma empresa é ato de fora dela — sob escopo de empresa nem daria para
+// encontrá-la.
 export async function collectCompanyFootprint(companyId: string): Promise<CompanyFootprint | null> {
+  return comEscopoDePlataforma(() => coletar(companyId))
+}
+
+async function coletar(companyId: string): Promise<CompanyFootprint | null> {
   const [company] = await db
     .select({ id: companies.id, name: companies.name, document: companies.document })
     .from(companies)
@@ -72,6 +79,10 @@ export async function collectCompanyFootprint(companyId: string): Promise<Compan
 }
 
 export async function eraseCompanyData(footprint: CompanyFootprint) {
+  return comEscopoDePlataforma(() => apagar(footprint))
+}
+
+async function apagar(footprint: CompanyFootprint) {
   const { company, entryIds, storedNames } = footprint
 
   await db.transaction(async (tx) => {

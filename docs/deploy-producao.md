@@ -200,10 +200,15 @@ O papel é criado e mantido pelo próprio `migrate`, a cada deploy — não há 
 
 ```bash
 cd ~/ERP-LITE
-cp -p .env.production .env.production.bak
+# Backup FORA da pasta do repositório: ver "Backup do .env.production não pode ficar no repositório".
+cp -p .env.production ~/env-production.bak
 printf 'APP_DB_USER=hortierp_app\nAPP_DB_PASSWORD=%s\n' "$(openssl rand -hex 32)" >> .env.production
 grep -c '^APP_DB_' .env.production   # tem que devolver 2
 ```
+
+Rode o `printf` **uma vez só**. Rodando duas vezes o arquivo fica com dois pares `APP_DB_*` e duas senhas
+diferentes; não quebra nada (o `docker compose` usa a última), mas confunde depois. Para limpar:
+`sed -i '/^APP_DB_USER=/d;/^APP_DB_PASSWORD=/d' .env.production` e refazer o `printf`.
 
 Hex de propósito: senha com `@`, `:` ou `/` quebraria a URL de conexão.
 
@@ -226,6 +231,30 @@ A linha do log deve dizer `sem superusuário, sem bypass de RLS, permissões em 
 devolver `rolsuper = f` e `rolbypassrls = f`. Se der `t` em qualquer um dos dois, o papel foi alterado
 à mão no servidor e o próximo deploy vai desfazer isso.
 
+### Políticas de RLS e o tamanho do pool
+
+A migration `0006_rls_por_empresa.sql` liga RLS em 13 tabelas. Ela **não** exige variável nova
+obrigatória, mas muda uma característica de produção: cada requisição passa a reservar uma conexão do
+banco do início ao fim, porque é na conexão que mora a empresa da sessão. O pool passa a dimensionar
+requisições simultâneas, e não consultas.
+
+O padrão é `DATABASE_POOL_MAX=20`. Medido com 80 requisições simultâneas de listagem, o p95 ficou em
+97 ms — folgado contra o limite de 750 ms do teste de carga. Se um dia faltar conexão, o sintoma é
+espera na entrada da requisição (não erro de banco), e o ajuste é subir essa variável no
+`.env.production`. Antes de subir muito, confira o `max_connections` do PostgreSQL (padrão: 100).
+
+Depois do deploy, confirme que as políticas existem:
+
+```bash
+docker compose --env-file .env.production -f docker-compose.production.yml exec -T postgres \
+  psql -U "$(grep '^POSTGRES_USER=' .env.production | cut -d= -f2)" \
+       -d "$(grep '^POSTGRES_DB=' .env.production | cut -d= -f2)" \
+  -c "SELECT count(*) AS tabelas_com_politica FROM pg_policies WHERE schemaname='public';"
+```
+
+Deve devolver **13**. Se devolver 0, a migration não rodou e o isolamento voltou a depender só da
+aplicação — o sistema funciona, mas sem a segunda camada.
+
 **O backup continua no papel dono, e isso é deliberado.** `pg_dump` rodando com papel sujeito a RLS
 traz só as linhas que as políticas deixam ver e termina com código zero — backup verde, dados
 faltando. Não unifique `PGUSER` do serviço `backup` com `APP_DB_USER`.
@@ -242,6 +271,15 @@ Hoje o próprio script recusa: `assertNotProduction` aborta com código 1 quando
 sem tocar no banco. Para criar o primeiro acesso de uma instalação real o comando é
 `npm run db:seed:platform`, que exige `PLATFORM_ADMIN_EMAIL` e `PLATFORM_ADMIN_PASSWORD` e não tem
 senha embutida.
+
+### Backup do `.env.production` não pode ficar no repositório
+
+O `rsync` do deploy roda com `--delete` e exclui `.env.production` pelo **nome exato**. Um
+`.env.production.bak` ao lado dele não casa com o filtro, então **o próximo deploy apaga o backup**.
+
+Para segredo em texto puro isso é até desejável, mas não sirva de backup para rollback: se você precisar
+voltar uma variável, o arquivo não vai estar lá. Copie sempre para fora da pasta do repositório
+(`~/env-production.bak`) e apague depois de confirmar.
 
 ### O `.env.production` fica fora do Git
 
@@ -373,6 +411,31 @@ ter um procedimento específico e testado de restauração do banco.
 O volume `invoice_files` e todas as migrations aplicadas devem permanecer durante um rollback. Antes de cada nova
 migration, documente se a versão anterior da aplicação continua compatível com o schema novo; se não continuar, o
 rollback exige restauração coordenada do backup e não apenas a troca da imagem.
+
+### A `0006` não é compatível com a versão anterior da aplicação
+
+A migration das políticas de RLS é a **primeira** que quebra o rollback só por troca de imagem. A versão
+anterior da API não define a empresa da sessão na conexão, e a política exige essa variável para
+devolver linha. Trocar a imagem sem desfazer as políticas faz o sistema subir saudável e **mostrar tudo
+vazio** — nenhum erro, nenhum dado.
+
+Se precisar voltar a imagem, desligue as políticas junto:
+
+```bash
+docker compose --env-file .env.production -f docker-compose.production.yml exec -T postgres \
+  psql -U "$(grep '^POSTGRES_USER=' .env.production | cut -d= -f2)" \
+       -d "$(grep '^POSTGRES_DB=' .env.production | cut -d= -f2)" -c "
+DO \$\$
+DECLARE t text;
+BEGIN
+  FOR t IN SELECT tablename FROM pg_policies WHERE schemaname='public' LOOP
+    EXECUTE format('ALTER TABLE %I DISABLE ROW LEVEL SECURITY', t);
+  END LOOP;
+END \$\$;"
+```
+
+Isso **desliga** o RLS sem apagar as políticas: elas voltam a valer com um
+`ALTER TABLE … ENABLE ROW LEVEL SECURITY` quando a versão nova voltar ao ar. Os dados não são tocados.
 
 ### Compatibilidade das migrations
 

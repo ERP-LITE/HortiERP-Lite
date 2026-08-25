@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { describe, test } from 'node:test'
 import { eq } from 'drizzle-orm'
-import { db } from '../src/db/client.js'
+import { db } from './db.js'
 import { stockMovements } from '../src/db/schema/index.js'
 import { MAX_BACKDATE_DAYS } from '../src/shared/schemas/eventDate.schema.js'
 import { addDaysToIsoDate, businessDate, todayIsoDate } from '../src/shared/utils/date.js'

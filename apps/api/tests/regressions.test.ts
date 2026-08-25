@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import { and, eq } from 'drizzle-orm'
-import { db } from '../src/db/client.js'
+import { db } from './db.js'
 import { companies, users } from '../src/db/schema/index.js'
 import { authCookie, createTenant, setupTestApp } from './helpers.js'
 

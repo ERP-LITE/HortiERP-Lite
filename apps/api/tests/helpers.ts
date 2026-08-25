@@ -2,7 +2,8 @@ import { after, before, beforeEach } from 'node:test'
 import type { FastifyInstance } from 'fastify'
 import { Pool } from 'pg'
 import { buildApp } from '../src/app.js'
-import { db, pool } from '../src/db/client.js'
+import { pool } from '../src/db/client.js'
+import { abrirDbDeTeste, db, fecharDbDeTeste } from './db.js'
 import { categories, companies, products, units, users } from '../src/db/schema/index.js'
 
 export type Role = 'admin' | 'gerente' | 'operador' | 'super_admin'
@@ -103,6 +104,7 @@ export function setupTestApp(options: { systemLogs?: boolean } = {}) {
 
   before(async () => {
     assertTestDatabase()
+    await abrirDbDeTeste()
     // O hook de log fica desligado por padrão (ruído em toda requisição de teste);
     // quem testa o próprio hook liga explicitamente.
     ctx.app = buildApp({ systemLogs: options.systemLogs ?? false })
@@ -115,6 +117,7 @@ export function setupTestApp(options: { systemLogs?: boolean } = {}) {
 
   after(async () => {
     await ctx.app.close()
+    await fecharDbDeTeste()
     await pool.end()
     await ownerPool.end()
   })

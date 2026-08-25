@@ -116,17 +116,16 @@ O fornecedor tem um perfil de plataforma que pode **acessar a empresa do cliente
 
 ### 3.3 Isolamento entre empresas-cliente
 
-Cada consulta filtra pela empresa da sessão. O banco ainda **não** tem políticas de RLS (a trava no
-próprio banco de dados), então o isolamento depende de o filtro estar escrito em toda consulta. Para que um
+O isolamento tem duas camadas. Cada consulta filtra pela empresa da sessão, e o próprio banco recusa o
+que passa do escopo, por políticas de RLS (segurança em nível de linha) em 13 tabelas. Para que um
 esquecimento não chegue a produção, existe uma verificação automática que lê o código e acusa
 consulta a tabela multiempresa em função que não menciona a empresa: hoje **118 consultas
 verificadas, nenhuma desprotegida**, e as poucas travessias propositais estão declaradas com
 justificativa. Ela roda no CI e reprova o deploy.
 
-Isso é mitigação, não equivalente ao RLS — ver pendência na seção 9. O pré-requisito das políticas está
-implementado: a aplicação fala com o banco por um papel sem superusuário, e o papel dono ficou restrito
-às migrations e ao backup. Sem essa separação, política escrita não barraria consulta nenhuma, porque
-superusuário ignora RLS.
+A segunda camada exigiu que a aplicação falasse com o banco por um papel **sem superusuário** —
+superusuário ignora RLS em silêncio, e sem essa troca a política não barraria consulta nenhuma. O papel
+dono ficou restrito às migrations e ao backup.
 
 ---
 
@@ -170,7 +169,7 @@ Verificadas no código, não declaradas por otimismo:
 | Corpo de requisição fora do log | ✅ senha nunca vai para log |
 | Acesso do fornecedor registrado | ✅ |
 | Autenticação em dois fatores | ❌ não existe |
-| RLS no banco | ⚠️ papel sem superusuário aplicado; políticas pendentes (ver seção 9) |
+| RLS no banco | ✅ política por empresa em 13 tabelas, sobre papel sem superusuário |
 
 ---
 
@@ -244,8 +243,7 @@ Em ordem de importância. As três primeiras são jurídicas e não se resolvem 
 | 2 | **Aviso de privacidade** — a tela existe (rota pública `/privacidade`, link no rodapé de todas as telas e na de login) e o texto foi redigido a partir deste registro. **Falta a revisão jurídica do texto** | advogado |
 | 3 | **Procedimento de resposta a incidente** (seção 8) | fornecedor, com revisão jurídica |
 | 4 | **Cláusulas contratuais com a Backblaze** para a transferência internacional | advogado |
-| 5 | **Políticas de RLS no banco** — a trava de isolamento no próprio banco. O pré-requisito (papel de aplicação sem superusuário) está implementado; faltam as políticas por empresa | fornecedor |
-| 6 | Autenticação em dois fatores | fornecedor |
+| 5 | Autenticação em dois fatores | fornecedor |
 
 Vale perguntar ao advogado sobre o **regime simplificado para agentes de tratamento de pequeno
 porte**, regulamentado pela ANPD: se aplicável, dispensa formalidades como a nomeação obrigatória de

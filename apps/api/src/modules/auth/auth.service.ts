@@ -3,6 +3,7 @@ import { and, eq, isNull, type InferSelectModel } from 'drizzle-orm'
 import { db } from '../../db/client.js'
 import { companies, users } from '../../db/schema/index.js'
 import { AppError } from '../../shared/errors/AppError.js'
+import { comEscopoDePlataforma } from '../../db/scope.js'
 
 type Company = InferSelectModel<typeof companies>
 
@@ -18,6 +19,11 @@ function assertAccountUsable(user: UserWithCompany | undefined, message: string)
 }
 
 export async function authenticateUser(email: string, password: string) {
+  // Travessia declarada: o e-mail é único global e nesta consulta ainda não existe sessão nem empresa.
+  return comEscopoDePlataforma(() => localizarParaLogin(email, password))
+}
+
+async function localizarParaLogin(email: string, password: string) {
   const found = await db.query.users.findFirst({
     where: and(eq(users.email, email), isNull(users.deletedAt)),
     with: { company: true },

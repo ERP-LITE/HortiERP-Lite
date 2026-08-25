@@ -1,6 +1,7 @@
 import bcrypt from 'bcryptjs'
 import { eq } from 'drizzle-orm'
 import { db, pool } from './client.js'
+import { comEscopoDePlataforma } from './scope.js'
 import {
   categories,
   companies,
@@ -393,10 +394,14 @@ async function run() {
   console.log('  Gerente:  gerente@hortierp.com / gerente123')
   console.log('  Operador: operador@hortierp.com / operador123')
 
-  await pool.end()
 }
 
-run().catch((error) => {
-  console.error('Falha ao rodar seed:', error)
-  process.exit(1)
-})
+// Escopo de plataforma: o seed cria as empresas, então não existe empresa de sessão ainda.
+comEscopoDePlataforma(run)
+  .catch((error) => {
+    console.error('Falha ao rodar seed:', error)
+    process.exitCode = 1
+  })
+  .finally(async () => {
+    await pool.end().catch(() => {})
+  })

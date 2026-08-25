@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
-import { createStockEntry } from '../src/modules/stock-entries/stock-entries.service.js'
+import { createStockEntry } from './servicos.js'
 import { authCookie, createTenant, setupTestApp } from './helpers.js'
 
 const ctx = setupTestApp()
