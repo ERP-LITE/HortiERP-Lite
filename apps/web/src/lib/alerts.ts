@@ -38,6 +38,8 @@ export function toastSuccess(message: string) {
   })
 }
 
+// Mais tempo e botão de fechar, diferente do toast de sucesso: aqui a mensagem costuma ter duas
+// informações para comparar ("solicitado X, disponível Y") e some antes de ser lida.
 export function toastError(message: string) {
   Swal.fire({
     toast: true,
@@ -45,7 +47,8 @@ export function toastError(message: string) {
     icon: 'error',
     title: message,
     showConfirmButton: false,
-    timer: 3500,
+    showCloseButton: true,
+    timer: 8000,
     timerProgressBar: true,
     ...themeOptions(),
   })

@@ -3,10 +3,10 @@ import { describe, it } from 'node:test'
 import { eq } from 'drizzle-orm'
 import { db as dbDaAplicacao } from '../src/db/client.js'
 import { comEscopoDaEmpresa } from '../src/db/scope.js'
-import { products, stockEntries, stockEntryItems } from '../src/db/schema/index.js'
+import { companies, products, stockEntries, stockEntryItems } from '../src/db/schema/index.js'
 import { db } from './db.js'
-import { authCookie, createTenant, setupTestApp } from './helpers.js'
-import { createStockEntry } from './servicos.js'
+import { authCookie, createTenant, createUser, setupTestApp } from './helpers.js'
+import { createLoss, createStockEntry } from './servicos.js'
 
 const ctx = setupTestApp()
 
@@ -92,6 +92,32 @@ describe('políticas de RLS por empresa', () => {
       dbDaAplicacao.select({ id: stockEntries.id }).from(stockEntries),
     )
     assert.equal(entradas.length, 0)
+  })
+
+  it('mostra o nome de quem registrou, mesmo sendo operador da plataforma', async () => {
+    // Registro criado pelo suporte durante impersonação: o autor mora na empresa da Plataforma, e a
+    // tela da empresa-cliente precisa continuar mostrando "Registrado por".
+    const empresa = await createTenant('rls-autor', '10')
+    const [plataforma] = await db.insert(companies).values({ name: 'Plataforma' }).returning({ id: companies.id })
+    const suporte = await createUser(plataforma.id, 'super_admin', 'rls-autor')
+
+    await createLoss(empresa.companyId, suporte.id, {
+      productId: empresa.productId,
+      quantity: '1',
+      reason: 'vencido',
+    })
+
+    const resposta = await ctx.app.inject({
+      method: 'GET',
+      url: '/api/losses?page=1&pageSize=10',
+      headers: { cookie: authCookie(ctx.app, empresa.admin) },
+    })
+
+    assert.equal(resposta.statusCode, 200)
+    const [perda] = resposta.json().data as Array<{ createdByUser: { name: string } | null }>
+    assert.ok(perda, 'a perda deveria aparecer na lista da empresa')
+    assert.ok(perda.createdByUser, 'o autor do registro desapareceu')
+    assert.equal(perda.createdByUser.name, suporte.name)
   })
 
   it('duas requisições simultâneas de empresas diferentes não trocam de escopo', async () => {

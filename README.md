@@ -35,7 +35,7 @@ ERP-LITE/
    cp apps/api/.env.example apps/api/.env
    cp apps/web/.env.example apps/web/.env
    ```
-   O `.env` da raiz define usuário/senha/porta do Postgres para o Docker Compose (fonte única — troque só ali). Se você mudar esses valores, atualize também `DATABASE_URL` em `apps/api/.env` para bater com eles.
+   O `.env` da raiz define usuário/senha/porta do Postgres para o Docker Compose (fonte única — troque só ali). Se você mudar esses valores, atualize também `DATABASE_URL` e `APP_DATABASE_URL` em `apps/api/.env` para bater com eles — a segunda é o papel sem superusuário por onde a API fala com o banco, criado pelo `npm run db:migrate`.
 2. Suba os containers:
    ```bash
    docker compose up --build -d

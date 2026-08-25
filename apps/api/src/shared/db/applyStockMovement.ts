@@ -2,6 +2,7 @@ import { and, eq, gte, isNull, sql } from 'drizzle-orm'
 import { db } from '../../db/client.js'
 import { products, stockMovements } from '../../db/schema/index.js'
 import { AppError } from '../errors/AppError.js'
+import { formatQuantity } from '../utils/quantity.js'
 
 type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0]
 
@@ -64,7 +65,7 @@ export async function applyStockMovement(tx: Transaction, input: ApplyStockMovem
     if (!product) throw AppError.notFound(`Produto não encontrado: ${productId}`)
 
     throw new AppError(
-      `Quantidade solicitada (${-delta}) maior que o estoque disponível (${product.currentStock})`,
+      `Quantidade solicitada (${formatQuantity(-delta)}) maior que o estoque disponível (${formatQuantity(product.currentStock)})`,
       422,
       'INSUFFICIENT_STOCK',
     )

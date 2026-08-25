@@ -233,7 +233,7 @@ devolver `rolsuper = f` e `rolbypassrls = f`. Se der `t` em qualquer um dos dois
 
 ### Políticas de RLS e o tamanho do pool
 
-A migration `0006_rls_por_empresa.sql` liga RLS em 13 tabelas. Ela **não** exige variável nova
+A migration `0006_rls_por_empresa.sql` liga RLS em 13 tabelas, e a `0007` acrescenta uma exceção de leitura para o autor de registro feito pelo suporte. Elas **não** exigem variável nova
 obrigatória, mas muda uma característica de produção: cada requisição passa a reservar uma conexão do
 banco do início ao fim, porque é na conexão que mora a empresa da sessão. O pool passa a dimensionar
 requisições simultâneas, e não consultas.
@@ -249,11 +249,12 @@ Depois do deploy, confirme que as políticas existem:
 docker compose --env-file .env.production -f docker-compose.production.yml exec -T postgres \
   psql -U "$(grep '^POSTGRES_USER=' .env.production | cut -d= -f2)" \
        -d "$(grep '^POSTGRES_DB=' .env.production | cut -d= -f2)" \
-  -c "SELECT count(*) AS tabelas_com_politica FROM pg_policies WHERE schemaname='public';"
+  -c "SELECT count(DISTINCT tablename) AS tabelas, count(*) AS politicas FROM pg_policies WHERE schemaname='public';"
 ```
 
-Deve devolver **13**. Se devolver 0, a migration não rodou e o isolamento voltou a depender só da
-aplicação — o sistema funciona, mas sem a segunda camada.
+Deve devolver **13 tabelas e 14 políticas** — a política extra é a da `0007`, que deixa o nome do
+operador da plataforma visível em "Registrado por". Se vier 0, as migrations não rodaram e o
+isolamento voltou a depender só da aplicação: o sistema funciona, mas sem a segunda camada.
 
 **O backup continua no papel dono, e isso é deliberado.** `pg_dump` rodando com papel sujeito a RLS
 traz só as linhas que as políticas deixam ver e termina com código zero — backup verde, dados

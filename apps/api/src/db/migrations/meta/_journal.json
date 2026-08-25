@@ -50,6 +50,13 @@
       "when": 1787660460129,
       "tag": "0006_rls_por_empresa",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1787664665157,
+      "tag": "0007_autor_da_plataforma_visivel",
+      "breakpoints": true
     }
   ]
 }

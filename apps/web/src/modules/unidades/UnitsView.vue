@@ -95,7 +95,7 @@ async function handleSubmit() {
   } catch (error) {
     const result = resolveFormError(error, 'Não foi possível salvar a unidade')
     fieldErrors.value = result.fieldErrors
-    errorMessage.value = result.message
+    if (result.message) toastError(result.message)
   } finally {
     saving.value = false
   }
