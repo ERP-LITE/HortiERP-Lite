@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, ref, watch, type CSSProperties } from 'vue'
 import { Check, ChevronDown, Search } from '@lucide/vue'
+import FieldLabel from './FieldLabel.vue'
 
-const props = withDefaults(defineProps<{
+const props = defineProps<{
   modelValue: string
   label?: string
   required?: boolean
@@ -10,12 +11,11 @@ const props = withDefaults(defineProps<{
   invalid?: boolean
   options: { value: string; label: string }[]
   placeholder?: string
-  searchable?: boolean
-}>(), {
-  searchable: true,
-})
+}>()
 
 const emit = defineEmits<{ 'update:modelValue': [value: string] }>()
+
+const MIN_DROPDOWN_WIDTH = 224
 
 const container = ref<HTMLElement | null>(null)
 const trigger = ref<HTMLButtonElement | null>(null)
@@ -46,10 +46,11 @@ function updateDropdownPosition() {
   const availableBelow = window.innerHeight - rect.bottom - gap - viewportMargin
   const availableAbove = rect.top - gap - viewportMargin
   const openAbove = availableBelow < 250 && availableAbove > availableBelow
+  const width = Math.min(Math.max(rect.width, MIN_DROPDOWN_WIDTH), window.innerWidth - viewportMargin * 2)
 
   dropdownStyle.value = {
-    left: `${Math.max(viewportMargin, Math.min(rect.left, window.innerWidth - rect.width - viewportMargin))}px`,
-    width: `${Math.min(rect.width, window.innerWidth - viewportMargin * 2)}px`,
+    left: `${Math.max(viewportMargin, Math.min(rect.left, window.innerWidth - width - viewportMargin))}px`,
+    width: `${width}px`,
     ...(openAbove
       ? { bottom: `${window.innerHeight - rect.top + gap}px` }
       : { top: `${rect.bottom + gap}px` }),
@@ -104,9 +105,6 @@ watch(open, (isOpen) => {
     window.removeEventListener('scroll', updateDropdownPosition, true)
   }
 })
-watch(() => props.searchable, (searchable) => {
-  if (!searchable) closeDropdown()
-})
 onBeforeUnmount(() => {
   document.removeEventListener('click', handleOutsideClick)
   window.removeEventListener('resize', updateDropdownPosition)
@@ -116,55 +114,26 @@ onBeforeUnmount(() => {
 
 <template>
   <div ref="container" class="relative block" :class="{ 'z-30': open }">
-    <span v-if="label" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{{ label }}</span>
-    <div v-if="!searchable" class="relative">
-      <select
-        :value="modelValue"
-        :required="required"
-        class="w-full appearance-none rounded-lg border border-gray-300 pl-3.5 pr-10 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 bg-white dark:bg-gray-800 dark:border-gray-600 dark:text-gray-100"
-        :class="{ 'border-red-400': error || invalid }"
-        @change="$emit('update:modelValue', ($event.target as HTMLSelectElement).value)"
+    <FieldLabel :text="label" :required="required" />
+    <button
+      ref="trigger"
+      type="button"
+      class="app-field-trigger flex w-full items-center rounded-lg border border-gray-300 bg-white py-2.5 pl-3.5 pr-3 text-left text-sm text-gray-900 shadow-sm transition-colors hover:border-gray-400 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:hover:border-gray-500"
+      :class="{ 'border-red-400': error || invalid }"
+      :aria-expanded="open"
+      :aria-required="required || undefined"
+      aria-haspopup="listbox"
+      @click="toggleDropdown"
+      @keydown.esc.prevent="closeDropdown"
+    >
+      <span
+        class="min-w-0 flex-1 truncate"
+        :class="{ 'text-gray-400 dark:text-gray-500': !selectedOption }"
       >
-        <option value="" disabled>{{ placeholder ?? 'Selecione...' }}</option>
-        <option v-for="option in options" :key="option.value" :value="option.value">
-          {{ option.label }}
-        </option>
-      </select>
-      <ChevronDown
-        :size="16"
-        class="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500"
-      />
-    </div>
-
-    <template v-else>
-      <button
-        ref="trigger"
-        type="button"
-        class="app-field-trigger flex w-full items-center rounded-lg border border-gray-300 bg-white py-2.5 pl-3.5 pr-3 text-left text-sm text-gray-900 shadow-sm transition-colors hover:border-gray-400 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:hover:border-gray-500"
-        :class="{ 'border-red-400': error || invalid }"
-        :aria-expanded="open"
-        aria-haspopup="listbox"
-        @click="toggleDropdown"
-        @keydown.esc.prevent="closeDropdown"
-      >
-        <span
-          class="min-w-0 flex-1 truncate"
-          :class="{ 'text-gray-400 dark:text-gray-500': !selectedOption }"
-        >
-          {{ selectedOption?.label ?? placeholder ?? 'Selecione...' }}
-        </span>
-        <ChevronDown :size="16" class="ml-2 shrink-0 text-gray-400 transition-transform" :class="{ 'rotate-180': open }" />
-      </button>
-      <input
-        v-if="required"
-        :value="modelValue"
-        required
-        tabindex="-1"
-        aria-hidden="true"
-        class="pointer-events-none absolute h-px w-px opacity-0"
-      />
-
-    </template>
+        {{ selectedOption?.label ?? placeholder ?? 'Selecione...' }}
+      </span>
+      <ChevronDown :size="16" class="ml-2 shrink-0 text-gray-400 transition-transform" :class="{ 'rotate-180': open }" />
+    </button>
     <span v-if="error" class="mt-1 block text-xs text-red-600 dark:text-red-400">{{ error }}</span>
   </div>
 

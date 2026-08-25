@@ -4,6 +4,7 @@ import { booleanQueryParam, paginationQuerySchema } from '../../shared/schemas/p
 export const listProductsQuerySchema = paginationQuerySchema.extend({
   search: z.string().trim().min(1).optional(),
   categoryId: z.string().uuid().optional(),
+  unitId: z.string().uuid().optional(),
   active: booleanQueryParam,
   sortBy: z.enum(['name', 'sku', 'costPrice', 'currentStock', 'active']).optional(),
 })

@@ -16,8 +16,28 @@ type ImportResponse = {
     omittedErrors: number
     newCategories: string[]
     newUnits: string[]
+    inactive: number
+    initialStockValue: number
   }
   errors: { line: number; name: string; errors: string[] }[]
+  preview: {
+    line: number
+    name: string
+    categoryName: string
+    unitName: string
+    sku: string | null
+    barcode: string | null
+    costPrice: number | null
+    salePrice: number | null
+    minStock: number
+    initialStock: number
+    active: boolean
+    newCategory: boolean
+    newUnit: boolean
+    inactiveCategory: boolean
+    inactiveUnit: boolean
+  }[]
+  omittedPreview: number
 }
 
 function importRequest(payload: unknown, cookie: string) {
@@ -67,6 +87,67 @@ describe('importação de produtos por planilha', () => {
     assert.match(byLine.get(5)!.join(' '), /Custo inválido/)
 
     // Só o produto criado pela fixture continua lá
+    assert.equal((await countProducts(tenant.companyId)).length, 1)
+  })
+
+  test('a conferência antes de importar lista linha por linha o que vai entrar', async () => {
+    const tenant = await createTenant('imp-preview')
+
+    const response = await importRequest(
+      {
+        dryRun: true,
+        createMissingRefs: true,
+        rows: [
+          {
+            line: 2,
+            name: 'Tomate Italiano',
+            categoryName: 'Legumes',
+            unitName: 'Quilograma',
+            sku: 'TOM001',
+            costPrice: '7,49',
+            salePrice: '11,90',
+            minStock: '10',
+            currentStock: '38,5',
+          },
+          {
+            line: 3,
+            name: 'Alface Crespa',
+            categoryName: 'Verduras',
+            unitName: 'Unidade',
+            currentStock: '12',
+            active: 'não',
+          },
+        ],
+      },
+      authCookie(ctx.app, tenant.admin),
+    )
+
+    assert.equal(response.statusCode, 200)
+    const body = response.json<ImportResponse>()
+    assert.equal(body.summary.imported, 0)
+    assert.equal(body.omittedPreview, 0)
+    assert.deepEqual(body.preview[0], {
+      line: 2,
+      name: 'Tomate Italiano',
+      categoryName: 'Legumes',
+      unitName: 'Quilograma',
+      sku: 'TOM001',
+      barcode: null,
+      costPrice: 7.49,
+      salePrice: 11.9,
+      minStock: 10,
+      initialStock: 38.5,
+      active: true,
+      newCategory: true,
+      newUnit: true,
+      inactiveCategory: false,
+      inactiveUnit: false,
+    })
+    assert.equal(body.preview[1].costPrice, null)
+    assert.equal(body.preview[1].initialStock, 12)
+    assert.equal(body.preview[1].active, false)
+    assert.equal(body.summary.inactive, 1)
+    assert.equal(body.summary.initialStockValue, 288.37)
     assert.equal((await countProducts(tenant.companyId)).length, 1)
   })
 

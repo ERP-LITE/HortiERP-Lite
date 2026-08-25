@@ -3,6 +3,7 @@ import { computed, ref } from 'vue'
 import { STATUS_CRITICAL, STATUS_GOOD, STATUS_NEUTRAL, useChartInk } from './palette'
 import ChartTooltip from './ChartTooltip.vue'
 import type { DashboardProductQuantity, DashboardQuantityByUnit } from '@/types'
+import { formatChartNumber } from '@/lib/format'
 
 const props = defineProps<{
   data: {
@@ -86,10 +87,6 @@ function formatDayLabel(date: string) {
   return `${day}/${month}`
 }
 
-function formatNumber(value: number) {
-  return value.toLocaleString('pt-BR', { maximumFractionDigits: 1 })
-}
-
 function showTooltip(
   event: MouseEvent | FocusEvent,
   date: string,
@@ -119,9 +116,9 @@ function buildDetails(
   products: DashboardProductQuantity[],
   otherProductsCount: number,
 ) {
-  const totals = quantities.map((item) => `Total: ${formatNumber(item.quantity)} ${item.unitAbbreviation}`)
+  const totals = quantities.map((item) => `Total: ${formatChartNumber(item.quantity)} ${item.unitAbbreviation}`)
   const productLines = products.map(
-    (item) => `${item.productName}: ${formatNumber(item.quantity)} ${item.unitAbbreviation}`,
+    (item) => `${item.productName}: ${formatChartNumber(item.quantity)} ${item.unitAbbreviation}`,
   )
   if (otherProductsCount > 0) productLines.push(`+ ${otherProductsCount} outros produtos`)
   return totals.length ? [...totals, ...productLines] : ['Nenhuma quantidade registrada']
@@ -164,7 +161,7 @@ function hideTooltip() {
           :fill="ink.muted"
           style="font-size: 9px"
         >
-          {{ formatNumber(tick) }}
+          {{ formatChartNumber(tick) }}
         </text>
       </g>
 

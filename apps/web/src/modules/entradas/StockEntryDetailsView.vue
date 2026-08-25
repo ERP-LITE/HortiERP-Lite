@@ -8,8 +8,9 @@ import BaseModal from '@/components/ui/BaseModal.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
 import DateInput from '@/components/ui/DateInput.vue'
 import ExpandableText from '@/components/ui/ExpandableText.vue'
+import FieldLabel from '@/components/ui/FieldLabel.vue'
 import SortableTableHeader from '@/components/ui/SortableTableHeader.vue'
-import { formatCurrency, formatDate, formatDateTime } from '@/lib/format'
+import { formatCurrency, formatDate, formatDateTime, formatQuantity, formatFileSize } from '@/lib/format'
 import { confirmDelete, toastError, toastSuccess } from '@/lib/alerts'
 import { downloadBlob } from '@/lib/download'
 import { getApiErrorMessage } from '@/services/api'
@@ -58,10 +59,6 @@ const editForm = ref({
   invoiceTotal: '',
 })
 const entryId = computed(() => String(route.params.id))
-
-function formatFileSize(size: number) {
-  return size >= 1024 * 1024 ? `${(size / 1024 / 1024).toFixed(2)} MB` : `${Math.ceil(size / 1024)} KB`
-}
 
 function isPreviewable(attachment: StockEntryAttachment) {
   return attachment.mimeType === 'application/pdf' || attachment.mimeType.startsWith('image/')
@@ -247,7 +244,7 @@ onBeforeUnmount(clearPreview)
               <div>
                 <dt class="text-xs text-gray-500 dark:text-gray-400">Quantidade</dt>
                 <dd class="mt-0.5 text-sm font-semibold text-gray-900 dark:text-gray-100">
-                  {{ Number(item.quantity) }} {{ item.product.unit.abbreviation }}
+                  {{ formatQuantity(item.quantity) }} {{ item.product.unit.abbreviation }}
                 </dd>
               </div>
               <div>
@@ -260,7 +257,7 @@ onBeforeUnmount(clearPreview)
         <div class="overflow-x-auto">
           <table class="hidden min-w-full divide-y divide-gray-200 dark:divide-gray-700 sm:table">
             <thead class="bg-gray-50 dark:bg-gray-900/60"><tr><SortableTableHeader field="product" :active-field="itemSort.sortBy.value" :order="itemSort.sortOrder.value" @sort="itemSort.toggleSort">Produto</SortableTableHeader><SortableTableHeader field="quantity" :active-field="itemSort.sortBy.value" :order="itemSort.sortOrder.value" align="right" @sort="itemSort.toggleSort">Quantidade</SortableTableHeader><SortableTableHeader field="unitCost" :active-field="itemSort.sortBy.value" :order="itemSort.sortOrder.value" align="right" @sort="itemSort.toggleSort">Custo unitário</SortableTableHeader></tr></thead>
-            <tbody class="divide-y divide-gray-100 dark:divide-gray-700"><tr v-for="item in itemSort.sortedItems.value" :key="item.id"><td class="max-w-80 px-4 py-3 text-sm font-medium dark:text-gray-100"><ExpandableText :text="item.product.name" /></td><td class="px-4 py-3 text-right text-sm whitespace-nowrap dark:text-gray-300">{{ Number(item.quantity) }} {{ item.product.unit.abbreviation }}</td><td class="px-4 py-3 text-right text-sm dark:text-gray-300">{{ formatCurrency(item.unitCost, '—') }}</td></tr></tbody>
+            <tbody class="divide-y divide-gray-100 dark:divide-gray-700"><tr v-for="item in itemSort.sortedItems.value" :key="item.id"><td class="max-w-80 px-4 py-3 text-sm font-medium dark:text-gray-100"><ExpandableText :text="item.product.name" /></td><td class="px-4 py-3 text-right text-sm whitespace-nowrap dark:text-gray-300">{{ formatQuantity(item.quantity) }} {{ item.product.unit.abbreviation }}</td><td class="px-4 py-3 text-right text-sm dark:text-gray-300">{{ formatCurrency(item.unitCost, '—') }}</td></tr></tbody>
           </table>
         </div>
       </section>
@@ -349,12 +346,12 @@ onBeforeUnmount(clearPreview)
             <BaseInput v-model="editForm.invoiceAccessKey" label="Chave de acesso (44 dígitos)" />
           </div>
           <label class="block sm:col-span-2">
-            <span class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Observações</span>
+            <FieldLabel text="Observações" />
             <textarea
               v-model="editForm.notes"
               rows="4"
               maxlength="2000"
-              class="w-full resize-y rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
+              class="w-full resize-y rounded-lg border border-gray-300 bg-white px-3.5 py-2.5 text-sm text-gray-900 shadow-sm transition-colors hover:border-gray-400 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:hover:border-gray-500"
             />
           </label>
         </div>

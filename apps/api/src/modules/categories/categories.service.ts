@@ -1,12 +1,13 @@
 import { and, asc, count, eq, ilike, isNull, or } from 'drizzle-orm'
 import { orderByColumn } from '../../shared/db/sorting.js'
 import { db } from '../../db/client.js'
-import { categories } from '../../db/schema/index.js'
+import { categories, products } from '../../db/schema/index.js'
 import { AppError } from '../../shared/errors/AppError.js'
 import { assertUniqueField } from '../../shared/db/assertUniqueField.js'
 import { buildPaginatedResult } from '../../shared/db/paginate.js'
 import { softDeleteById, softDeleteManyWithActivity } from '../../shared/db/softDelete.js'
 import { recordActivitySafe } from '../../shared/db/recordActivity.js'
+import { assertNotUsedByProducts } from '../../shared/db/assertNotUsedByProducts.js'
 import type { CreateCategoryInput, ListCategoriesQuery, UpdateCategoryInput } from './categories.schema.js'
 
 function assertUniqueName(companyId: string, name: string, excludeId?: string) {
@@ -29,6 +30,7 @@ export async function listCategories(companyId: string, query: ListCategoriesQue
   if (query.search) {
     conditions.push(or(ilike(categories.name, `%${query.search}%`), ilike(categories.description, `%${query.search}%`))!)
   }
+  if (query.active !== undefined) conditions.push(eq(categories.active, query.active))
   const where = and(...conditions)
   const orderBy = orderByColumn(query.sortBy ? categories[query.sortBy] : categories.name, query.sortOrder)
 
@@ -99,8 +101,13 @@ export async function updateCategory(companyId: string, userId: string, id: stri
   return category
 }
 
+function assertCategoriesNotInUse(companyId: string, ids: string[], reference: string) {
+  return assertNotUsedByProducts({ companyId, ids, column: products.categoryId, reference, action: 'a categoria' })
+}
+
 export async function deleteCategory(companyId: string, userId: string, id: string) {
   const registro = await getCategory(companyId, id)
+  await assertCategoriesNotInUse(companyId, [id], 'usam esta categoria')
   await softDeleteById(categories, companyId, userId, id)
   await recordActivitySafe({
     companyId,
@@ -113,5 +120,6 @@ export async function deleteCategory(companyId: string, userId: string, id: stri
 }
 
 export async function deleteCategories(companyId: string, userId: string, ids: string[]) {
+  await assertCategoriesNotInUse(companyId, ids, 'usam as categorias selecionadas')
   return softDeleteManyWithActivity({ table: categories, companyId, userId, ids, entity: 'categoria' })
 }

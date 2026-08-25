@@ -4,7 +4,7 @@ const interactiveSelector = 'button, a, input, select, textarea, label'
 
 function decorate(table: HTMLTableElement) {
   const labels = Array.from(table.querySelectorAll<HTMLTableCellElement>('thead th')).map((cell) =>
-    cell.textContent?.trim() ?? '',
+    cell.dataset.actions === undefined ? cell.textContent?.trim() ?? '' : '',
   )
 
   table.querySelectorAll<HTMLTableRowElement>('tbody tr').forEach((row) => {

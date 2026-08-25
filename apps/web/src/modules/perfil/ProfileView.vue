@@ -9,16 +9,9 @@ import { getApiErrorMessage } from '@/services/api'
 import { toastError, toastSuccess } from '@/lib/alerts'
 import { Download } from '@lucide/vue'
 import { downloadBlob } from '@/lib/download'
-import type { UserRole } from '@/types'
+import { roleLabel } from '@/lib/roles'
 
 const auth = useAuthStore()
-
-const roleLabels: Record<UserRole, string> = {
-  admin: 'Administrador',
-  gerente: 'Gerente',
-  operador: 'Operador',
-  super_admin: 'Super Admin',
-}
 
 const currentPassword = ref('')
 const newPassword = ref('')
@@ -28,6 +21,11 @@ const errorMessage = ref('')
 
 async function handleSubmit() {
   errorMessage.value = ''
+
+  if (!currentPassword.value || !newPassword.value) {
+    errorMessage.value = 'Informe a senha atual e a nova senha'
+    return
+  }
 
   if (newPassword.value !== confirmPassword.value) {
     errorMessage.value = 'A confirmação de senha não confere com a nova senha'
@@ -86,7 +84,7 @@ async function handleDownloadPersonalData() {
           <div>
             <dt class="text-gray-500 dark:text-gray-400">Perfil</dt>
             <dd class="text-gray-900 dark:text-gray-100 font-medium">
-              {{ roleLabels[auth.user?.role as UserRole] ?? auth.user?.role }}
+              {{ roleLabel(auth.user?.role) }}
             </dd>
           </div>
         </dl>

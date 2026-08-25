@@ -3,8 +3,8 @@ import { ArrowLeft, Sprout } from '@lucide/vue'
 import ThemeToggle from '@/components/ui/ThemeToggle.vue'
 import AppFooter from '@/components/AppFooter.vue'
 
-const atualizadoEm = '24 de agosto de 2026'
-const conteudoRevisado = 'sha256-InHfrWA/0EkNHKlXYA31+vWssGfkpSoKKsEwVTROz/g='
+const atualizadoEm = '25 de agosto de 2026'
+const conteudoRevisado = 'sha256-W9VWvMCHkQYxxtXHvh/Xaam9aUXX93tPfQ+oyNxS4XM='
 const suporte = '(47) 99154-0607'
 </script>
 
@@ -53,7 +53,7 @@ const suporte = '(47) 99154-0607'
           </p>
           <p class="mt-2">
             O HortiERP Lite é o fornecedor do sistema. Cuidamos do funcionamento, da segurança e das
-            cópias de segurança, seguindo o que a sua empresa determina — não usamos os dados para
+            cópias de segurança, seguindo o que a sua empresa determina. Não usamos os dados para
             nenhuma outra finalidade.
           </p>
         </section>
@@ -64,7 +64,7 @@ const suporte = '(47) 99154-0607'
             <li><strong class="font-semibold">Seu nome e e-mail</strong>, para identificar quem entra no sistema.</li>
             <li>
               <strong class="font-semibold">Sua senha</strong>, guardada de forma embaralhada. Nem nós conseguimos
-              descobrir qual é — só substituí-la por uma nova.
+              descobrir qual é: só podemos substituí-la por uma nova.
             </li>
             <li><strong class="font-semibold">Seu perfil de acesso</strong> (administrador, gerente ou operador).</li>
             <li>
@@ -84,7 +84,7 @@ const suporte = '(47) 99154-0607'
           <h2 class="mb-2 text-base font-semibold text-gray-900 dark:text-gray-100">Por quanto tempo fica guardado</h2>
           <ul class="ml-5 list-disc space-y-1.5">
             <li>
-              <strong class="font-semibold">Registro de conexão: 6 meses.</strong> Esse prazo não é escolha nossa — é
+              <strong class="font-semibold">Registro de conexão: 6 meses.</strong> Esse prazo não é escolha nossa: é
               o que o Marco Civil da Internet exige de quem oferece um sistema pela internet. Depois
               disso, é apagado automaticamente.
             </li>
@@ -95,7 +95,7 @@ const suporte = '(47) 99154-0607'
             <li>
               <strong class="font-semibold">Seu cadastro:</strong> enquanto você tiver acesso. Se a sua conta for
               excluída, o nome permanece por 5 anos para o histórico continuar fazendo sentido, e
-              depois é apagado — o registro deixa de apontar para você.
+              depois é apagado, e o registro deixa de apontar para você.
             </li>
           </ul>
           <p class="mt-2">A limpeza é automática, feita pelo próprio sistema toda semana.</p>
@@ -123,7 +123,7 @@ const suporte = '(47) 99154-0607'
           <h2 class="mb-2 text-base font-semibold text-gray-900 dark:text-gray-100">Onde os dados ficam</h2>
           <p>
             Em um servidor <strong class="font-semibold">no Brasil, em São Paulo</strong>. As cópias de segurança são
-            embaralhadas antes de sair do servidor e guardadas em outro provedor, no exterior — quem
+            embaralhadas antes de sair do servidor e guardadas em outro provedor, no exterior. Quem
             armazena não tem como ler o conteúdo, porque a chave não fica com eles.
           </p>
         </section>
@@ -163,7 +163,7 @@ const suporte = '(47) 99154-0607'
             <li>Não há anúncio nem rastreamento de navegação dentro do sistema.</li>
             <li>Não guardamos dado de saúde, biometria, religião, opinião política ou nada parecido.</li>
             <li>Não existe nenhuma decisão automática do sistema a seu respeito: ele conta estoque, não avalia pessoas.</li>
-            <li>O sistema não envia e-mail — nem de aviso, nem de recuperação de senha.</li>
+            <li>O sistema não envia e-mail, nem de aviso, nem de recuperação de senha.</li>
           </ul>
         </section>
 
@@ -184,7 +184,7 @@ const suporte = '(47) 99154-0607'
           </p>
           <p class="mt-2">
             Se o assunto for corrigir ou apagar informação sua, comece pelo administrador da sua
-            empresa — é ela a responsável pelos dados.
+            empresa, que é a responsável pelos dados.
           </p>
         </section>
       </div>

@@ -3,6 +3,7 @@ import { computed, ref } from 'vue'
 import { useCategoricalPalette, useChartInk } from './palette'
 import ChartTooltip from './ChartTooltip.vue'
 import type { DashboardProductQuantity, DashboardQuantityByUnit } from '@/types'
+import { formatChartNumber } from '@/lib/format'
 
 const props = defineProps<{
   data: {
@@ -52,10 +53,6 @@ const segments = computed(() => {
   })
 })
 
-function formatNumber(value: number) {
-  return value.toLocaleString('pt-BR', { maximumFractionDigits: 1 })
-}
-
 function showTooltip(event: MouseEvent | FocusEvent, segment: (typeof segments.value)[number]) {
   const bounds = chartContainer.value?.getBoundingClientRect()
   if (!bounds) return
@@ -78,8 +75,8 @@ function buildDetails(
   products: DashboardProductQuantity[],
   otherProductsCount: number,
 ) {
-  const lines = totals.map((item) => `Total: ${formatNumber(item.quantity)} ${item.unitAbbreviation}`)
-  lines.push(...products.map((item) => `${item.productName}: ${formatNumber(item.quantity)} ${item.unitAbbreviation}`))
+  const lines = totals.map((item) => `Total: ${formatChartNumber(item.quantity)} ${item.unitAbbreviation}`)
+  lines.push(...products.map((item) => `${item.productName}: ${formatChartNumber(item.quantity)} ${item.unitAbbreviation}`))
   if (otherProductsCount > 0) lines.push(`+ ${otherProductsCount} outros produtos`)
   return lines
 }
@@ -132,7 +129,7 @@ function hideTooltip() {
         class="fill-gray-900 dark:fill-gray-100"
         style="font-size: 22px; font-weight: 700"
       >
-        {{ formatNumber(total) }}
+        {{ formatChartNumber(total) }}
       </text>
     </svg>
 

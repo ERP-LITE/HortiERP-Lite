@@ -11,6 +11,7 @@ import BaseBadge from '@/components/ui/BaseBadge.vue'
 import BaseToggle from '@/components/ui/BaseToggle.vue'
 import Pagination from '@/components/ui/Pagination.vue'
 import FilterButton from '@/components/ui/FilterButton.vue'
+import FilterModal from '@/components/ui/FilterModal.vue'
 import PrintButton from '@/components/ui/PrintButton.vue'
 import ExportCsvButton from '@/components/ui/ExportCsvButton.vue'
 import SearchInput from '@/components/ui/SearchInput.vue'
@@ -18,7 +19,8 @@ import PeriodPicker from '@/components/ui/PeriodPicker.vue'
 import ExpandableText from '@/components/ui/ExpandableText.vue'
 import SortableTableHeader from '@/components/ui/SortableTableHeader.vue'
 import { oldestEventDateIso, todayIso, type PeriodValue } from '@/lib/period'
-import { formatDate } from '@/lib/format'
+import { formatDate, formatQuantity } from '@/lib/format'
+import { reasonLabels, reasonOptions } from '@/lib/losses'
 import { getApiErrorMessage, resolveFormError } from '@/services/api'
 import { toastError, toastSuccess } from '@/lib/alerts'
 import { listAllProducts } from '@/services/productsService'
@@ -34,19 +36,10 @@ const auth = useAuthStore()
 const canManage = computed(() => auth.user?.role === 'admin' || auth.user?.role === 'gerente')
 const canCorrect = (loss: Loss) => canManage.value && !loss.cancelledAt
 
-const reasonOptions: { value: LossReason; label: string }[] = [
-  { value: 'vencido', label: 'Vencido' },
-  { value: 'avariado', label: 'Avariado' },
-  { value: 'roubo_furto', label: 'Roubo/Furto' },
-  { value: 'erro_operacional', label: 'Erro operacional' },
-  { value: 'outro', label: 'Outro' },
-]
 const reasonFilterOptions = [{ value: 'todos', label: 'Todos os motivos' }, ...reasonOptions]
 
-const reasonLabels = Object.fromEntries(reasonOptions.map((r) => [r.value, r.label])) as Record<LossReason, string>
-
-const { page, pageSize, total, totalPages, applyMeta, watchSearch } = usePagination()
-const { sortBy, sortOrder, toggleSort } = useTableSort(() => { page.value = 1; return loadLosses() }, 'lossDate', 'desc')
+const { page, pageSize, total, totalPages, applyMeta, reload, watchSearch, paginationProps } = usePagination()
+const { sortBy, sortOrder, toggleSort } = useTableSort(() => reload(loadLosses), 'lossDate', 'desc')
 
 const losses = ref<Loss[]>([])
 const products = ref<Product[]>([])
@@ -64,10 +57,7 @@ function emptyFilters() {
 }
 const { filters, draftFilters, filterModalOpen, openFilterModal, applyFilters, clearFilters } = useFilterModal(
   emptyFilters,
-  () => {
-    page.value = 1
-    loadLosses()
-  },
+  () => reload(loadLosses),
 )
 const activeFilterCount = computed(
   () =>
@@ -308,7 +298,7 @@ onMounted(loadAll)
             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
               Registrado por
             </th>
-            <th class="print:hidden px-4 py-3" />
+            <th data-actions class="print:hidden px-4 py-3 text-right text-xs font-medium uppercase text-gray-500 dark:text-gray-400">Ações</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
@@ -339,7 +329,7 @@ onMounted(loadAll)
               class="px-4 py-3 text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap"
               :class="loss.cancelledAt ? 'line-through' : ''"
             >
-              {{ Number(loss.quantity) }}
+              {{ formatQuantity(loss.quantity) }}
             </td>
             <td class="px-4 py-3 whitespace-nowrap">
               <BaseBadge v-if="loss.cancelledAt" variant="neutral">Cancelada</BaseBadge>
@@ -379,14 +369,7 @@ onMounted(loadAll)
           </tr>
         </tbody>
       </table>
-      <Pagination
-        :page="page"
-        :page-size="pageSize"
-        :total="total"
-        :total-pages="totalPages"
-        @update:page="page = $event"
-        @update:page-size="pageSize = $event"
-      />
+      <Pagination v-bind="paginationProps" />
     </div>
 
     <BaseModal
@@ -400,7 +383,7 @@ onMounted(loadAll)
             {{ editingLoss?.product?.name }}
           </p>
           <p class="text-sm text-gray-500 dark:text-gray-400">
-            {{ Number(editingLoss?.quantity ?? 0) }} · {{ formatDate(editingLoss?.lossDate ?? '') }}
+            {{ formatQuantity(editingLoss?.quantity) }} · {{ formatDate(editingLoss?.lossDate ?? '') }}
           </p>
           <p class="text-xs text-gray-500 dark:text-gray-400">
             Produto, quantidade e data não podem ser alterados. Se algum deles está errado, cancele a perda e registre
@@ -413,13 +396,14 @@ onMounted(loadAll)
             label="Produto"
             :options="productOptions"
             :error="fieldErrors.productId"
-            searchable
+            required
           />
           <BaseInput
             v-model="form.quantity"
             :decimal-places="3"
             label="Quantidade"
             :error="fieldErrors.quantity"
+            required
           />
           <DateInput
             v-model="form.lossDate"
@@ -427,9 +411,10 @@ onMounted(loadAll)
             :min="oldestEventDateIso()"
             :max="todayIso()"
             :error="fieldErrors.lossDate"
+            required
           />
         </template>
-        <BaseSelect v-model="form.reason" label="Motivo" :options="reasonOptions" :error="fieldErrors.reason" />
+        <BaseSelect v-model="form.reason" label="Motivo" :options="reasonOptions" :error="fieldErrors.reason" required />
         <BaseInput v-model="form.notes" label="Observações (opcional)" :error="fieldErrors.notes" />
 
         <div class="flex justify-end gap-2 pt-2">
@@ -448,7 +433,7 @@ onMounted(loadAll)
             {{ cancelTarget?.product?.name }}
           </p>
           <p class="text-sm text-gray-500 dark:text-gray-400">
-            {{ Number(cancelTarget?.quantity ?? 0) }} · {{ reasonLabels[cancelTarget?.reason ?? 'outro'] }}
+            {{ formatQuantity(cancelTarget?.quantity) }} · {{ reasonLabels[cancelTarget?.reason ?? 'outro'] }}
           </p>
         </div>
         <p class="text-sm text-gray-600 dark:text-gray-400">
@@ -459,6 +444,7 @@ onMounted(loadAll)
           v-model="cancelForm.cancelReason"
           label="Motivo do cancelamento"
           :error="cancelErrors.cancelReason"
+          required
         />
 
         <div class="flex justify-end gap-2 pt-2">
@@ -470,23 +456,17 @@ onMounted(loadAll)
       </form>
     </BaseModal>
 
-    <BaseModal :open="filterModalOpen" title="Filtrar perdas" @close="filterModalOpen = false">
-      <form class="space-y-4" @submit.prevent="applyFilters">
-        <BaseSelect v-model="draftFilters.productId" label="Produto" :options="productFilterOptions" searchable />
-        <BaseSelect v-model="draftFilters.reason" label="Motivo" :options="reasonFilterOptions" />
-        <PeriodPicker v-model="draftFilters.period" />
-        <BaseToggle v-model="draftFilters.includeCancelled" label="Mostrar perdas canceladas" />
-
-        <div class="flex justify-between items-center pt-2">
-          <button type="button" class="text-sm text-gray-500 hover:underline dark:text-gray-400" @click="clearFilters">
-            Limpar
-          </button>
-          <div class="flex gap-2">
-            <BaseButton variant="secondary" type="button" @click="filterModalOpen = false">Cancelar</BaseButton>
-            <BaseButton type="submit">Aplicar</BaseButton>
-          </div>
-        </div>
-      </form>
-    </BaseModal>
+    <FilterModal
+      :open="filterModalOpen"
+      title="Filtrar perdas"
+      @close="filterModalOpen = false"
+      @apply="applyFilters"
+      @clear="clearFilters"
+    >
+      <BaseSelect v-model="draftFilters.productId" label="Produto" :options="productFilterOptions" />
+      <BaseSelect v-model="draftFilters.reason" label="Motivo" :options="reasonFilterOptions" />
+      <PeriodPicker v-model="draftFilters.period" />
+      <BaseToggle v-model="draftFilters.includeCancelled" label="Mostrar perdas canceladas" />
+    </FilterModal>
   </div>
 </template>

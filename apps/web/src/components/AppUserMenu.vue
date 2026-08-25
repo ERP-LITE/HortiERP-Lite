@@ -2,16 +2,11 @@
 import { onBeforeUnmount, onMounted, ref } from 'vue'
 import { ChevronDown, LogOut, User } from '@lucide/vue'
 import { useAuthStore } from '@/stores/auth'
+import { roleLabel } from '@/lib/roles'
 
 const auth = useAuthStore()
 const open = ref(false)
 const rootRef = ref<HTMLElement | null>(null)
-
-const roleLabels: Record<string, string> = {
-  admin: 'Administrador',
-  gerente: 'Gerente',
-  operador: 'Operador',
-}
 
 function initials(name?: string) {
   if (!name) return '?'
@@ -60,7 +55,7 @@ onBeforeUnmount(() => document.removeEventListener('click', handleClickOutside))
       <span class="hidden sm:block text-left leading-tight">
         <span class="block text-sm font-medium text-gray-900 dark:text-gray-100">{{ auth.user?.name }}</span>
         <span class="block text-xs text-gray-500 dark:text-gray-400">
-          {{ roleLabels[auth.user?.role ?? ''] ?? auth.user?.role }}
+          {{ roleLabel(auth.user?.role) }}
         </span>
       </span>
       <ChevronDown :size="16" class="text-gray-400 dark:text-gray-500" />
@@ -76,7 +71,7 @@ onBeforeUnmount(() => document.removeEventListener('click', handleClickOutside))
         <span
           class="inline-block mt-1.5 text-[11px] font-medium px-2 py-0.5 rounded-full bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-400"
         >
-          {{ roleLabels[auth.user?.role ?? ''] ?? auth.user?.role }}
+          {{ roleLabel(auth.user?.role) }}
         </span>
       </div>
       <RouterLink

@@ -4,7 +4,9 @@ Todos os fluxos abaixo são escopados por `companyId` (ver [decisões arquitetur
 
 ## Cadastro básico
 
-Pré-requisito dos fluxos de estoque: **categoria** e **unidade de medida** existem independentes de produto (telas `/categorias` e `/unidades`); um **produto** exige uma categoria e uma unidade já cadastradas (`categoryId`/`unitId` validados como pertencentes à mesma empresa na criação/edição — `assertCategoryAndUnitBelongToCompany`). `currentStock` do produto nasce em `0` e só é alterado pelos fluxos de entrada, perda e ajuste manual abaixo — nunca é editado diretamente pela tela de produto.
+Pré-requisito dos fluxos de estoque: **categoria** e **unidade de medida** existem independentes de produto (telas `/categorias` e `/unidades`); um **produto** exige uma categoria e uma unidade já cadastradas (`categoryId`/`unitId` validados como pertencentes à mesma empresa e ativos na criação/edição, por `assertCategoryAndUnitUsable`). `currentStock` do produto nasce em `0` e só é alterado pelos fluxos de entrada, perda e ajuste manual abaixo — nunca é editado diretamente pela tela de produto.
+
+Categoria e unidade têm situação **ativa/inativa**: inativa continua valendo para os produtos que já usam, sai das opções de produto novo e as duas telas filtram por situação. A listagem de produtos filtra por categoria, **unidade** e situação. Excluir categoria ou unidade em uso é recusado com `409`, e a mensagem oferece as duas saídas: trocar o cadastro dos produtos, ou apenas inativar.
 
 As listagens de categorias, unidades, produtos e usuários permitem selecionar os registros visíveis por checkbox e excluí-los em lote. A exclusão é lógica e auditada; está disponível para `admin` e `gerente` nos cadastros gerais e somente para `admin` em usuários. Históricos operacionais (entradas, perdas e movimentações) não oferecem exclusão.
 
@@ -28,13 +30,20 @@ que a tela usa para mostrar a prévia antes de confirmar.
 Os erros voltam por número de linha, limitados a 200 por resposta; `omittedErrors` conta quantos ficaram de fora para
 a tela não fingir que a lista está completa.
 
+**A conferência vale também quando não há erro.** A resposta traz `preview`: uma linha por produto aceito, com o valor
+já convertido, a categoria e a unidade como vão ficar, o estoque inicial e as marcas `newCategory`/`newUnit`. Sem isso
+a tela só mostrava contadores quando a planilha estava certa, e quem importa 300 produtos confirmava sem ver o que ia
+entrar. A lista vem da API, e não do arquivo lido no navegador, porque é a API que sabe o que vai fazer com cada linha:
+o número já interpretado, a categoria que ainda não existe, a unidade encontrada pela abreviação. Mesmo limite de 200
+dos erros, com `omittedPreview` no mesmo papel de `omittedErrors`.
+
 Como cada campo é interpretado:
 
 | Campo | Regra |
 |---|---|
 | `name` | obrigatório; recusado se repetir outro produto **do arquivo** ou já existente, ignorando maiúsculas |
-| `categoryName` | obrigatório; precisa existir, salvo com `createMissingRefs` |
-| `unitName` | obrigatório; aceita o **nome** ou a **abreviação** da unidade, porque quem preenche a planilha escreve "kg", não "Quilograma" |
+| `categoryName` | obrigatório; precisa existir, salvo com `createMissingRefs`; categoria inativa é reaproveitada, não duplicada |
+| `unitName` | obrigatório; aceita o **nome** ou a **abreviação** da unidade, porque quem preenche a planilha escreve "kg", não "Quilograma"; unidade inativa é reaproveitada, e a conferência marca a linha |
 | `sku` | opcional; único quando informado, na mesma comparação sem maiúsculas |
 | `costPrice`, `salePrice`, `minStock`, `currentStock` | aceitam o formato brasileiro (`1.234,56`) e o americano (`1234.56`) — o separador decimal é o último que aparecer, e o outro é tratado como separador de milhar. Planilha exportada do Excel em português usa vírgula, mas quem digita à mão mistura os dois |
 | `active` | `sim`/`s`/`true`/`verdadeiro`/`1`/`ativo` e `nao`/`não`/`n`/`false`/`falso`/`0`/`inativo`; vazio vira ativo |

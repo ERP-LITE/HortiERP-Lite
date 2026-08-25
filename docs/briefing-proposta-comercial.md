@@ -42,7 +42,13 @@ estoque na hora e guarda o valor do momento. Motivo e observação podem ser cor
 produto errados exigem cancelar a perda — a quantidade volta ao estoque sozinha, a perda sai dos
 relatórios e do painel, e fica registrado quem cancelou e por quê.
 
-**Importação.** Carga de produtos por planilha, com estoque inicial, prévia antes de confirmar e
+**Cadastros.** Produto, categoria e unidade de medida. Categoria e unidade podem ser **inativadas**
+quando a loja para de usar: saem das opções de produto novo e os produtos antigos continuam intactos. O
+sistema não deixa excluir categoria ou unidade que esteja em algum produto, para o cadastro não ficar
+apontando para o vazio.
+
+**Importação.** Carga de produtos por planilha, com estoque inicial, conferência linha por linha antes
+de confirmar (o que vai entrar, o que vai ser criado, o que está sem custo) e
 recusa total se qualquer linha tiver problema (não importa metade). Produto sem custo preenchido
 aparece valendo R$ 0,00 nos relatórios até o valor ser informado, e o sistema avisa antes de
 confirmar.
@@ -171,6 +177,9 @@ Para revisar uma proposta já escrita, é isto que precisa entrar ou ser corrigi
 limpeza automática de registros antigos; a cópia de segurança fora do servidor **com a
 transferência internacional declarada**; o isolamento em duas camadas; o apagamento definitivo no
 cancelamento.
+
+**Acrescentar também:** a inativação de categoria e unidade e a conferência linha por linha da
+importação.
 
 **Corrigir:** o trecho que diz que na perda cancelada "nada é apagado" (hoje o registro é guardado
 por 5 anos) e o que diz que o nome continua aparecendo depois de excluído (vale para produto,

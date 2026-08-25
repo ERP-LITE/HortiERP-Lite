@@ -12,12 +12,14 @@ import BaseBadge from '@/components/ui/BaseBadge.vue'
 import BaseToggle from '@/components/ui/BaseToggle.vue'
 import Pagination from '@/components/ui/Pagination.vue'
 import FilterButton from '@/components/ui/FilterButton.vue'
+import FilterModal from '@/components/ui/FilterModal.vue'
 import PrintButton from '@/components/ui/PrintButton.vue'
 import ExportCsvButton from '@/components/ui/ExportCsvButton.vue'
 import SearchInput from '@/components/ui/SearchInput.vue'
 import BulkSelectionBar from '@/components/ui/BulkSelectionBar.vue'
 import TableCheckbox from '@/components/ui/TableCheckbox.vue'
 import SortableTableHeader from '@/components/ui/SortableTableHeader.vue'
+import StatusBadge from '@/components/ui/StatusBadge.vue'
 import { getApiErrorMessage, resolveFormError } from '@/services/api'
 import { confirmDelete, toastError, toastSuccess } from '@/lib/alerts'
 import { listAllCategories } from '@/services/categoriesService'
@@ -30,12 +32,14 @@ import { useBulkSelection } from '@/composables/useBulkSelection'
 import { useFilterModal } from '@/composables/useFilterModal'
 import { useTableSort } from '@/composables/useTableSort'
 import type { Category, Product, Unit } from '@/types'
+import { formatQuantity } from '@/lib/format'
+import { statusFilterOptionsFor, statusLabel } from '@/lib/status'
 
 const auth = useAuthStore()
 const canManage = computed(() => auth.user?.role === 'admin' || auth.user?.role === 'gerente')
 
-const { page, pageSize, total, totalPages, applyMeta, watchSearch } = usePagination()
-const { sortBy, sortOrder, toggleSort } = useTableSort(() => { page.value = 1; return loadProducts() }, 'name')
+const { page, pageSize, total, totalPages, applyMeta, reload, watchSearch, paginationProps } = usePagination()
+const { sortBy, sortOrder, toggleSort } = useTableSort(() => reload(loadProducts), 'name')
 
 const products = ref<Product[]>([])
 const { selectedIds, allVisibleSelected, toggleOne, toggleAllVisible, clearSelection } = useBulkSelection(() =>
@@ -49,20 +53,16 @@ const errorMessage = ref('')
 
 const search = ref('')
 const { filters, draftFilters, filterModalOpen, openFilterModal, applyFilters, clearFilters } = useFilterModal(
-  () => ({ categoryId: 'todas', active: 'todos' }),
-  () => {
-    page.value = 1
-    loadProducts()
-  },
+  () => ({ categoryId: 'todas', unitId: 'todas', active: 'todos' }),
+  () => reload(loadProducts),
 )
 const activeFilterCount = computed(
-  () => Number(filters.value.categoryId !== 'todas') + Number(filters.value.active !== 'todos'),
+  () =>
+    Number(filters.value.categoryId !== 'todas') +
+    Number(filters.value.unitId !== 'todas') +
+    Number(filters.value.active !== 'todos'),
 )
-const statusFilterOptions = [
-  { value: 'todos', label: 'Todos' },
-  { value: 'true', label: 'Ativo' },
-  { value: 'false', label: 'Inativo' },
-]
+const statusFilterOptions = statusFilterOptionsFor()
 
 const modalOpen = ref(false)
 const importModalOpen = ref(false)
@@ -83,9 +83,27 @@ const emptyForm = {
 }
 const form = ref({ ...emptyForm })
 
-const categoryOptions = computed(() => categories.value.map((c) => ({ value: c.id, label: c.name })))
-const unitOptions = computed(() => units.value.map((u) => ({ value: u.id, label: `${u.name} (${u.abbreviation})` })))
-const categoryFilterOptions = computed(() => [{ value: 'todas', label: 'Todas as categorias' }, ...categoryOptions.value])
+const categoryOptions = computed(() =>
+  categories.value
+    .filter((c) => c.active || c.id === form.value.categoryId)
+    .map((c) => ({ value: c.id, label: c.active ? c.name : `${c.name} (inativa)` })),
+)
+const unitOptions = computed(() =>
+  units.value
+    .filter((u) => u.active || u.id === form.value.unitId)
+    .map((u) => ({
+      value: u.id,
+      label: u.active ? `${u.name} (${u.abbreviation})` : `${u.name} (${u.abbreviation}) inativa`,
+    })),
+)
+const categoryFilterOptions = computed(() => [
+  { value: 'todas', label: 'Todas as categorias' },
+  ...categories.value.map((c) => ({ value: c.id, label: c.name })),
+])
+const unitFilterOptions = computed(() => [
+  { value: 'todas', label: 'Todas as unidades' },
+  ...units.value.map((u) => ({ value: u.id, label: `${u.name} (${u.abbreviation})` })),
+])
 
 function categoryName(id: string) {
   return categories.value.find((c) => c.id === id)?.name ?? '—'
@@ -103,6 +121,7 @@ async function loadProducts() {
       pageSize: pageSize.value,
       search: search.value || undefined,
       categoryId: filters.value.categoryId !== 'todas' ? filters.value.categoryId : undefined,
+      unitId: filters.value.unitId !== 'todas' ? filters.value.unitId : undefined,
       active: filters.value.active === 'todos' ? undefined : filters.value.active === 'true',
       sortBy: sortBy.value,
       sortOrder: sortOrder.value,
@@ -150,7 +169,7 @@ async function exportCsv() {
       csvNumber(item.salePrice),
       csvNumber(item.currentStock, 3),
       csvNumber(item.minStock, 3),
-      item.active ? 'Ativo' : 'Inativo',
+      statusLabel(item.active),
     ]),
   }
 }
@@ -188,6 +207,7 @@ function validate(): boolean {
   if (!form.value.name.trim()) fieldErrors.value.name = 'Informe o nome do produto'
   if (!form.value.categoryId) fieldErrors.value.categoryId = 'Selecione a categoria'
   if (!form.value.unitId) fieldErrors.value.unitId = 'Selecione a unidade'
+  if (form.value.minStock === '') fieldErrors.value.minStock = 'Informe o estoque mínimo'
   return Object.keys(fieldErrors.value).length === 0
 }
 
@@ -316,8 +336,8 @@ onMounted(loadAll)
               Categoria
             </th>
             <SortableTableHeader field="currentStock" :active-field="sortBy" :order="sortOrder" @sort="toggleSort">Estoque</SortableTableHeader>
-            <SortableTableHeader field="active" :active-field="sortBy" :order="sortOrder" @sort="toggleSort">Status</SortableTableHeader>
-            <th class="print:hidden px-4 py-3" />
+            <SortableTableHeader field="active" :active-field="sortBy" :order="sortOrder" @sort="toggleSort">Situação</SortableTableHeader>
+            <th data-actions class="print:hidden px-4 py-3 text-right text-xs font-medium uppercase text-gray-500 dark:text-gray-400">Ações</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
@@ -352,15 +372,13 @@ onMounted(loadAll)
               <ExpandableText :text="categoryName(product.categoryId)" :max-length="40" />
             </td>
             <td class="px-4 py-3 text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap">
-              {{ Number(product.currentStock) }} {{ unitAbbreviation(product.unitId) }}
+              {{ formatQuantity(product.currentStock) }} {{ unitAbbreviation(product.unitId) }}
               <BaseBadge v-if="Number(product.currentStock) <= Number(product.minStock)" variant="warning" class="ml-1">
                 baixo
               </BaseBadge>
             </td>
             <td class="px-4 py-3 whitespace-nowrap">
-              <BaseBadge :variant="product.active ? 'success' : 'neutral'">
-                {{ product.active ? 'Ativo' : 'Inativo' }}
-              </BaseBadge>
+              <StatusBadge :active="product.active" />
             </td>
             <td v-if="canManage" class="print:hidden px-4 py-3 text-right space-x-1 whitespace-nowrap" @dblclick.stop>
               <button
@@ -382,19 +400,12 @@ onMounted(loadAll)
           </tr>
         </tbody>
       </table>
-      <Pagination
-        :page="page"
-        :page-size="pageSize"
-        :total="total"
-        :total-pages="totalPages"
-        @update:page="page = $event"
-        @update:page-size="pageSize = $event"
-      />
+      <Pagination v-bind="paginationProps" />
     </div>
 
     <BaseModal :open="modalOpen" :title="editingId ? 'Editar produto' : 'Novo produto'" @close="modalOpen = false">
       <form class="space-y-4" @submit.prevent="handleSubmit">
-        <BaseInput v-model="form.name" label="Nome" :error="fieldErrors.name" />
+        <BaseInput v-model="form.name" label="Nome" :error="fieldErrors.name" required />
 
         <div class="grid grid-cols-2 gap-4">
           <BaseSelect
@@ -402,12 +413,14 @@ onMounted(loadAll)
             label="Categoria"
             :options="categoryOptions"
             :error="fieldErrors.categoryId"
+            required
           />
           <BaseSelect
             v-model="form.unitId"
             label="Unidade"
             :options="unitOptions"
             :error="fieldErrors.unitId"
+            required
           />
         </div>
 
@@ -419,7 +432,7 @@ onMounted(loadAll)
         <div class="grid grid-cols-3 gap-4">
           <BaseInput v-model="form.costPrice" :decimal-places="2" label="Custo (R$)" />
           <BaseInput v-model="form.salePrice" :decimal-places="2" label="Venda (R$)" />
-          <BaseInput v-model="form.minStock" :decimal-places="3" label="Estoque mínimo" required />
+          <BaseInput v-model="form.minStock" :decimal-places="3" label="Estoque mínimo" :error="fieldErrors.minStock" required />
         </div>
 
         <BaseToggle v-model="form.active" label="Produto ativo" />
@@ -431,22 +444,17 @@ onMounted(loadAll)
       </form>
     </BaseModal>
 
-    <BaseModal :open="filterModalOpen" title="Filtrar produtos" @close="filterModalOpen = false">
-      <form class="space-y-4" @submit.prevent="applyFilters">
-        <BaseSelect v-model="draftFilters.categoryId" label="Categoria" :options="categoryFilterOptions" />
-        <BaseSelect v-model="draftFilters.active" label="Status" :options="statusFilterOptions" />
-
-        <div class="flex justify-between items-center pt-2">
-          <button type="button" class="text-sm text-gray-500 hover:underline dark:text-gray-400" @click="clearFilters">
-            Limpar
-          </button>
-          <div class="flex gap-2">
-            <BaseButton variant="secondary" type="button" @click="filterModalOpen = false">Cancelar</BaseButton>
-            <BaseButton type="submit">Aplicar</BaseButton>
-          </div>
-        </div>
-      </form>
-    </BaseModal>
+    <FilterModal
+      :open="filterModalOpen"
+      title="Filtrar produtos"
+      @close="filterModalOpen = false"
+      @apply="applyFilters"
+      @clear="clearFilters"
+    >
+      <BaseSelect v-model="draftFilters.categoryId" label="Categoria" :options="categoryFilterOptions" />
+      <BaseSelect v-model="draftFilters.unitId" label="Unidade" :options="unitFilterOptions" />
+      <BaseSelect v-model="draftFilters.active" label="Situação" :options="statusFilterOptions" />
+    </FilterModal>
 
     <ProductImportModal :open="importModalOpen" @close="importModalOpen = false" @imported="loadAll" />
   </div>
