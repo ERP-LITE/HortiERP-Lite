@@ -1,8 +1,9 @@
 import { z } from 'zod'
+import { LIMITES_NUMERO, LIMITES_TEXTO } from '../../shared/schemas/limits.js'
 import { booleanQueryParam, paginationQuerySchema } from '../../shared/schemas/pagination.schema.js'
 
 export const listProductsQuerySchema = paginationQuerySchema.extend({
-  search: z.string().trim().min(1).optional(),
+  search: z.string().trim().min(1).max(LIMITES_TEXTO.busca).optional(),
   categoryId: z.string().uuid().optional(),
   unitId: z.string().uuid().optional(),
   active: booleanQueryParam,
@@ -11,27 +12,29 @@ export const listProductsQuerySchema = paginationQuerySchema.extend({
 
 export type ListProductsQuery = z.infer<typeof listProductsQuerySchema>
 
-const clearableText = z
-  .string()
-  .trim()
-  .transform((value) => value || null)
-  .nullable()
-  .optional()
+const clearableText = (max: number) =>
+  z
+    .string()
+    .trim()
+    .max(max)
+    .transform((value) => value || null)
+    .nullable()
+    .optional()
 
 const clearableMoney = z.preprocess(
   (value) => (value === '' ? null : value),
-  z.coerce.number().nonnegative().nullable().optional(),
+  z.coerce.number().nonnegative().max(LIMITES_NUMERO.valorUnitario).nullable().optional(),
 )
 
 export const createProductSchema = z.object({
   categoryId: z.string().uuid('Categoria inválida'),
   unitId: z.string().uuid('Unidade de medida inválida'),
-  name: z.string().min(1, 'Nome é obrigatório'),
-  sku: clearableText,
-  barcode: clearableText,
+  name: z.string().trim().min(1, 'Nome é obrigatório').max(LIMITES_TEXTO.nome),
+  sku: clearableText(LIMITES_TEXTO.sku),
+  barcode: clearableText(LIMITES_TEXTO.codigoBarras),
   costPrice: clearableMoney,
   salePrice: clearableMoney,
-  minStock: z.coerce.number().nonnegative().default(0),
+  minStock: z.coerce.number().nonnegative().max(LIMITES_NUMERO.quantidade).default(0),
   active: z.boolean().default(true),
 })
 

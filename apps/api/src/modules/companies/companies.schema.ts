@@ -2,9 +2,11 @@ import { z } from 'zod'
 import { emailSchema } from '../../shared/schemas/email.schema.js'
 import { ufSchema } from '../../shared/schemas/uf.schema.js'
 import { paginationQuerySchema } from '../../shared/schemas/pagination.schema.js'
+import { passwordSchema } from '../../shared/schemas/password.schema.js'
+import { LIMITES_TEXTO } from '../../shared/schemas/limits.js'
 
 export const listCompaniesQuerySchema = paginationQuerySchema.extend({
-  search: z.string().trim().min(1).optional(),
+  search: z.string().trim().min(1).max(LIMITES_TEXTO.busca).optional(),
   sortBy: z.enum(['name', 'document', 'active']).optional(),
 })
 
@@ -32,8 +34,8 @@ function isValidCnpj(value: string) {
   return calculateDigit(12) === Number(value[12]) && calculateDigit(13) === Number(value[13])
 }
 
-const requiredText = (message: string, max = 160) => z.string().trim().min(1, message).max(max)
-const optionalText = (max = 160) => z.string().trim().max(max).optional().transform((value) => value || undefined)
+const requiredText = (message: string, max: number = LIMITES_TEXTO.razaoSocial) => z.string().trim().min(1, message).max(max)
+const optionalText = (max: number = LIMITES_TEXTO.razaoSocial) => z.string().trim().max(max).optional().transform((value) => value || undefined)
 const cnpjSchema = z
   .string()
   .transform((value) => value.replace(/[^0-9A-Za-z]/g, '').toUpperCase())
@@ -45,14 +47,14 @@ const companyFields = {
   name: requiredText('Nome fantasia é obrigatório'),
   legalName: requiredText('Razão social é obrigatória'),
   document: cnpjSchema,
-  stateRegistration: optionalText(30),
+  stateRegistration: optionalText(LIMITES_TEXTO.inscricaoEstadual),
   contactName: requiredText('Responsável é obrigatório'),
-  contactEmail: z.string().trim().email('E-mail de contato inválido').max(160),
+  contactEmail: z.string().trim().email('E-mail de contato inválido').max(LIMITES_TEXTO.email),
   phone: phoneSchema,
   postalCode: postalCodeSchema,
   street: requiredText('Logradouro é obrigatório'),
-  addressNumber: requiredText('Número é obrigatório', 30),
-  complement: optionalText(120),
+  addressNumber: requiredText('Número é obrigatório', LIMITES_TEXTO.numeroEndereco),
+  complement: optionalText(LIMITES_TEXTO.complemento),
   district: requiredText('Bairro é obrigatório'),
   city: requiredText('Cidade é obrigatória'),
   state: ufSchema,
@@ -60,9 +62,9 @@ const companyFields = {
 
 export const createCompanySchema = z.object({
   ...companyFields,
-  adminName: z.string().min(1, 'Nome do administrador é obrigatório'),
+  adminName: z.string().trim().min(1, 'Nome do administrador é obrigatório').max(LIMITES_TEXTO.nome),
   adminEmail: emailSchema,
-  adminPassword: z.string().min(8, 'Senha deve ter ao menos 8 caracteres'),
+  adminPassword: passwordSchema,
 })
 
 export const updateCompanySchema = z.object(companyFields).partial()

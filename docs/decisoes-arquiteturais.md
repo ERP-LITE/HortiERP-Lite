@@ -346,6 +346,19 @@ mora num componente ou num composable, não copiada nas duas.
   bloco de propriedades, isso resolveu duas telas fora do padrão: uma escutava `@change`, evento que
   o `Pagination` não emite (era código morto, quem recarregava era o observador de `page`), e outra
   não tinha handler nenhum.
+- **`SortableTableHeader`** desenha o cabeçalho ordenável. O `uppercase` estava na classe do `th`,
+  onde não tinha efeito: o texto vive dentro de um `<button>`, e o preflight do Tailwind zera o
+  `text-transform` de todo botão para normalizar Firefox e Edge. O resultado era cabeçalho ordenável
+  em caixa normal ao lado de cabeçalho fixo em maiúsculas, na mesma tabela, em todas as telas. A
+  classe passou para o botão. Herança de `text-transform` não vence um reset que mira o elemento.
+- **`ItemsSummary`** mostra a relação de itens de um lançamento como contagem (`12 itens`) e abre a
+  tabela num modal. A primeira versão abria a lista dentro da própria célula, como o
+  `ExpandableText` faz: resolvia a largura, mas esticava a linha na vertical e empurrava as
+  seguintes para baixo. No modal cabe a tabela com quantidade e unidade alinhadas, que é o formato
+  em que essa informação é lida. Dentro dele o nome do produto **quebra** em vez de truncar: são
+  duas colunas e sobra altura, e a prévia com chevron do `ExpandableText` espremia a coluna de
+  quantidade para fora da tela no celular. O papel não tem clique, então a lista completa é
+  renderizada oculta e só aparece na impressão, no lugar do botão.
 - **`StatusBadge`** e `lib/status.ts` guardam as palavras e a cor de ativo/inativo. A etiqueta, a
   opção do filtro e a coluna do CSV saem do mesmo lugar, com o gênero como parâmetro (unidade é
   "Inativa", produto é "Inativo") e um texto alternativo para o caso de Empresas, onde inativo se
@@ -374,6 +387,37 @@ Além das validações amigáveis dos services, nomes de categorias, unidades e 
 A checagem existe **duas vezes de propósito**: o service confere antes do insert para devolver um erro amigável apontando o campo, e o índice segura o caso de duas requisições simultâneas passarem as duas pela checagem. O que não pode existir duas vezes é o **texto** da mensagem: campo e mensagem de cada índice moram só em `shared/db/uniqueConstraints.ts`, indexados pelo nome real do índice no PostgreSQL — que é o que o driver devolve no campo `constraint` do erro `23505`. Os dois caminhos (checagem amigável e tradução do erro no `errorHandler`) leem o mesmo mapa, porque levam à mesma tela e divergiam sem ninguém notar quando cada um guardava a própria cópia. `uniqueViolationConstraint`, no mesmo arquivo, é quem reconhece o `23505` — inclusive quando o Drizzle embrulha o erro do driver dentro de uma transação e o código sai do nível de cima.
 
 A única captura local de duplicidade que sobrou é a de `createCompanyWithAdmin`, e só para trocar o rótulo do campo: naquele formulário o campo se chama `adminEmail`, não `email`, e a mensagem precisa aparecer embaixo do campo que existe na tela.
+
+## Limites de tamanho dos campos
+
+Nenhuma coluna de texto do banco é `varchar`: são todas `text`, sem limite. Enquanto a validação
+também não tinha limite, um operador conseguia colar um texto de megabytes numa observação de perda
+ou num nome de produto, e a listagem inteira nascia deformada. Foi o que apareceu em teste, com uma
+observação repetida centenas de vezes empurrando as colunas para fora da tela.
+
+Os números moram em `shared/schemas/limits.ts` (`LIMITES_TEXTO`, `LIMITES_NUMERO`), com espelho em
+`apps/web/src/lib/limits.ts`. **Mudou um, muda nos dois**, e o que vale é sempre o do backend: o
+`maxlength` do campo existe só para a digitação parar antes de ir ao servidor, não como validação.
+Pedir boa vontade não bastava, então `apps/web/tests/limits.test.ts` importa os dois arquivos e
+falha quando um limite muda de um lado só, quando um limite novo da API não chega ao espelho, ou
+quando um teto numérico deixa de caber na precisão da coluna.
+
+O teto numérico não é preciosismo. Quantidade e saldo são `numeric(12,3)`, dinheiro é `numeric(12,2)`:
+antes de existir `.max()`, uma quantidade com trinta dígitos passava pelo `.positive()` do Zod, chegava
+ao `insert` e o Postgres respondia `numeric field overflow`, que o `errorHandler` só sabe traduzir
+como **erro interno do servidor**. O usuário via "erro 500" onde a resposta certa era "esse valor é
+grande demais". Nos campos decimais da tela, o `BaseInput` recebe `:max` e simplesmente ignora o dígito
+que ultrapassa, do mesmo jeito que a máscara de CNPJ ignora o 15º.
+
+Senha tem um limite próprio e um motivo próprio: o **bcrypt ignora tudo depois do 72º byte**. Sem teto,
+duas senhas diferentes que compartilhassem os primeiros 72 bytes autenticariam o mesmo usuário.
+`shared/schemas/password.schema.ts` mede em bytes, não em caracteres, porque um acento ocupa dois. A
+única exceção é o campo de senha do **login**, que aceita mais: recusar ali transformaria uma senha
+antiga e correta em "dados inválidos".
+
+A importação por planilha valida os mesmos limites linha a linha, com a mensagem apontando a coluna:
+ela não passa pelos schemas de cadastro, e sem isso a planilha seria o caminho aberto para gravar o que
+o formulário recusa.
 
 ## Data do fato e data do lançamento
 
@@ -675,7 +719,11 @@ privacidade; onde ele separava uma explicação, virou ponto, dois-pontos ou par
 dois dados (empresa e competência, rota e status), o separador é o ponto médio `·`, que já era o padrão
 das listagens.
 
-Toda mensagem que chega ao cliente é em português. Isso é fácil de garantir nos erros que o próprio sistema levanta (`AppError` e Zod), e é justamente onde a regra vazava: **erros do Fastify e dos seus plugins nascem em inglês**, e o `errorHandler` repassava `error.message` sem olhar em qualquer 4xx que não fosse `AppError`. Foi assim que `Rate limit exceeded, retry in 53 seconds` apareceu na tela do usuário.
+Toda mensagem que chega ao cliente é em português, e o caminho vazava por dois lados.
+
+O primeiro é o Zod. O `errorHandler` devolve `error.flatten().fieldErrors` direto para a tela, campo a campo, então **qualquer regra escrita sem mensagem própria vira inglês**: `.max(10)` numa abreviação de unidade aparecia como `String must contain at most 10 character(s)` embaixo do campo. Escrever a mensagem em cada regra resolve só enquanto ninguém esquecer. O que resolve de fato é `shared/schemas/zodErrorMap.ts`, um `z.setErrorMap` global registrado antes de qualquer schema ser usado (o `import` com efeito colateral no topo de `app.ts`): ele traduz `too_small`, `too_big`, `invalid_type`, `invalid_enum_value` e companhia, e a mensagem específica de cada schema continua tendo prioridade quando existe. Assim uma validação nova nasce em português mesmo sem ninguém lembrar de escrever o texto.
+
+O segundo são os **erros do Fastify e dos seus plugins, que nascem em inglês**, e o `errorHandler` repassava `error.message` sem olhar em qualquer 4xx que não fosse `AppError`. Foi assim que `Rate limit exceeded, retry in 53 seconds` apareceu na tela do usuário.
 
 A tradução mora em `shared/errors/frameworkMessages.ts`, e `frameworkErrorMessage` resolve em duas camadas: primeiro pelo código do erro (`FST_REQ_FILE_TOO_LARGE`, `FST_ERR_CTP_INVALID_MEDIA_TYPE`, …), e, sem código conhecido, pela mensagem genérica do status HTTP. A função **nunca devolve `undefined`** — é o que garante que um plugin novo, com códigos que ninguém mapeou, degrade para um texto genérico em português em vez de voltar a vazar inglês.
 

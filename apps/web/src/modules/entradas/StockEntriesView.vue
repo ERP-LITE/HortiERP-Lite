@@ -12,6 +12,7 @@ import ExportCsvButton from '@/components/ui/ExportCsvButton.vue'
 import SearchInput from '@/components/ui/SearchInput.vue'
 import PeriodPicker from '@/components/ui/PeriodPicker.vue'
 import ExpandableText from '@/components/ui/ExpandableText.vue'
+import ItemsSummary from '@/components/ui/ItemsSummary.vue'
 import BaseBadge from '@/components/ui/BaseBadge.vue'
 import SortableTableHeader from '@/components/ui/SortableTableHeader.vue'
 import type { PeriodValue } from '@/lib/period'
@@ -41,10 +42,12 @@ const { filters, draftFilters, filterModalOpen, openFilterModal, applyFilters, c
 )
 const activeFilterCount = computed(() => Number(filters.value.period.preset !== 'todos'))
 
-function itemsSummary(entry: StockEntrySummary) {
-  return entry.items
-    .map((item) => `${item.product.name} (${Number(item.quantity)} ${item.product.unit.abbreviation})`)
-    .join(', ')
+function itemsList(entry: StockEntrySummary) {
+  return entry.items.map((item) => ({
+    name: item.product.name,
+    quantity: item.quantity,
+    unit: item.product.unit.abbreviation,
+  }))
 }
 
 function invoiceBadge(entry: StockEntrySummary) {
@@ -161,7 +164,10 @@ onMounted(loadEntries)
               <ExpandableText :text="entry.supplierName" :max-length="40" />
             </td>
             <td class="max-w-80 px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
-              <ExpandableText :text="itemsSummary(entry)" />
+              <ItemsSummary
+                :items="itemsList(entry)"
+                :title="`Itens de ${formatDate(entry.entryDate)}`"
+              />
             </td>
             <td class="max-w-64 px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
               <ExpandableText :text="entry.createdByUser?.name" :max-length="40" empty-text="Usuário não identificado" />

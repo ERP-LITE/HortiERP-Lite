@@ -30,6 +30,7 @@ import { useAuthStore } from '@/stores/auth'
 import { usePagination } from '@/composables/usePagination'
 import { useFilterModal } from '@/composables/useFilterModal'
 import { useTableSort } from '@/composables/useTableSort'
+import { LIMITES_NUMERO, LIMITES_TEXTO } from '@/lib/limits'
 import type { Loss, LossReason, Product } from '@/types'
 
 const auth = useAuthStore()
@@ -298,15 +299,15 @@ onMounted(loadAll)
             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
               Registrado por
             </th>
-            <th data-actions class="print:hidden px-4 py-3 text-right text-xs font-medium uppercase text-gray-500 dark:text-gray-400">Ações</th>
+            <th v-if="canManage" data-actions class="print:hidden px-4 py-3 text-right text-xs font-medium uppercase text-gray-500 dark:text-gray-400">Ações</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
           <tr v-if="loading">
-            <td colspan="7" class="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">Carregando...</td>
+            <td :colspan="canManage ? 7 : 6" class="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">Carregando...</td>
           </tr>
           <tr v-else-if="losses.length === 0">
-            <td colspan="7" class="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">
+            <td :colspan="canManage ? 7 : 6" class="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">
               Nenhuma perda registrada.
             </td>
           </tr>
@@ -365,7 +366,6 @@ onMounted(loadAll)
                 </button>
               </template>
             </td>
-            <td v-else class="print:hidden px-4 py-3" />
           </tr>
         </tbody>
       </table>
@@ -401,6 +401,7 @@ onMounted(loadAll)
           <BaseInput
             v-model="form.quantity"
             :decimal-places="3"
+            :max="LIMITES_NUMERO.quantidade"
             label="Quantidade"
             :error="fieldErrors.quantity"
             required
@@ -415,7 +416,12 @@ onMounted(loadAll)
           />
         </template>
         <BaseSelect v-model="form.reason" label="Motivo" :options="reasonOptions" :error="fieldErrors.reason" required />
-        <BaseInput v-model="form.notes" label="Observações (opcional)" :error="fieldErrors.notes" />
+        <BaseInput
+          v-model="form.notes"
+          label="Observações (opcional)"
+          :maxlength="LIMITES_TEXTO.observacoes"
+          :error="fieldErrors.notes"
+        />
 
         <div class="flex justify-end gap-2 pt-2">
           <BaseButton variant="secondary" type="button" @click="modalOpen = false">Cancelar</BaseButton>
@@ -443,6 +449,7 @@ onMounted(loadAll)
         <BaseInput
           v-model="cancelForm.cancelReason"
           label="Motivo do cancelamento"
+          :maxlength="LIMITES_TEXTO.motivo"
           :error="cancelErrors.cancelReason"
           required
         />

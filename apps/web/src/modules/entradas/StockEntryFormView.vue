@@ -14,7 +14,8 @@ import { listAllProducts } from '@/services/productsService'
 import { createStockEntry, uploadStockEntryAttachment } from '@/services/stockEntriesService'
 import type { Product } from '@/types'
 import { formatFileSize } from '@/lib/format'
-import { invoiceSelectionError } from '@/lib/invoiceAttachments'
+import { invoiceKeyError, invoiceSelectionError } from '@/lib/invoiceAttachments'
+import { LIMITES_NUMERO, LIMITES_TEXTO } from '@/lib/limits'
 
 interface ItemRow {
   productId: string
@@ -73,9 +74,8 @@ function validate(): boolean {
   else if (entryDate.value > todayIso()) entryDateError.value = 'A data não pode ser futura'
   else if (entryDate.value < oldestEventDateIso()) entryDateError.value = 'A data é antiga demais'
 
-  if (invoiceAccessKey.value && !/^\d{44}$/.test(invoiceAccessKey.value)) {
-    invoiceErrors.value.invoiceAccessKey = 'A chave da NF-e deve ter 44 dígitos'
-  }
+  const chaveInvalida = invoiceKeyError(invoiceAccessKey.value)
+  if (chaveInvalida) invoiceErrors.value.invoiceAccessKey = chaveInvalida
   itemErrors.value = items.value.map((item) => {
     const rowErrors: { productId?: string; quantity?: string } = {}
     if (!item.productId) rowErrors.productId = 'Selecione o produto'
@@ -155,8 +155,8 @@ onMounted(loadProducts)
           :error="entryDateError"
           required
         />
-        <BaseInput v-model="supplierName" label="Fornecedor (opcional)" />
-        <BaseInput v-model="notes" label="Observações (opcional)" />
+        <BaseInput v-model="supplierName" label="Fornecedor (opcional)" :maxlength="LIMITES_TEXTO.fornecedor" />
+        <BaseInput v-model="notes" label="Observações (opcional)" :maxlength="LIMITES_TEXTO.observacoesEntrada" />
       </div>
 
       <section class="space-y-4 rounded-xl border border-gray-200 p-4 dark:border-gray-700">
@@ -167,14 +167,20 @@ onMounted(loadProducts)
           </p>
         </div>
         <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <BaseInput v-model="invoiceNumber" label="Número da nota" />
-          <BaseInput v-model="invoiceSeries" label="Série" />
+          <BaseInput v-model="invoiceNumber" label="Número da nota" :maxlength="LIMITES_TEXTO.numeroNota" />
+          <BaseInput v-model="invoiceSeries" label="Série" :maxlength="LIMITES_TEXTO.serieNota" />
           <DateInput v-model="invoiceIssuedAt" label="Data de emissão" />
-          <BaseInput v-model="invoiceTotal" :decimal-places="2" label="Valor total (R$)" />
+          <BaseInput
+            v-model="invoiceTotal"
+            :decimal-places="2"
+            :max="LIMITES_NUMERO.valorNota"
+            label="Valor total (R$)"
+          />
           <div class="sm:col-span-2">
             <BaseInput
               v-model="invoiceAccessKey"
               label="Chave de acesso (44 dígitos)"
+              :maxlength="LIMITES_TEXTO.chaveNfe"
               :error="invoiceErrors.invoiceAccessKey"
             />
           </div>
@@ -223,11 +229,17 @@ onMounted(loadProducts)
             <BaseInput
               v-model="item.quantity"
               :decimal-places="3"
+              :max="LIMITES_NUMERO.quantidade"
               label="Quantidade"
               :error="itemErrors[index]?.quantity"
               required
             />
-            <BaseInput v-model="item.unitCost" :decimal-places="2" label="Custo unit. (opcional)" />
+            <BaseInput
+              v-model="item.unitCost"
+              :decimal-places="2"
+              :max="LIMITES_NUMERO.valorUnitario"
+              label="Custo unit. (opcional)"
+            />
             <div class="flex flex-col">
               <span class="block text-sm font-medium mb-1 invisible">Remover</span>
               <button

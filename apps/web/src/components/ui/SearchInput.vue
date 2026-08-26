@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onBeforeUnmount, ref, watch } from 'vue'
 import { Search } from '@lucide/vue'
+import { LIMITES_TEXTO } from '@/lib/limits'
 
 const props = defineProps<{ modelValue: string; placeholder?: string }>()
 const emit = defineEmits<{ 'update:modelValue': [value: string] }>()
@@ -29,6 +30,7 @@ onBeforeUnmount(() => clearTimeout(timer))
     <input
       v-model="local"
       type="text"
+      :maxlength="LIMITES_TEXTO.busca"
       :placeholder="placeholder ?? 'Buscar...'"
       class="h-10 w-full sm:w-64 rounded-lg border border-gray-300 pl-9 pr-3 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-100 dark:placeholder:text-gray-500"
     />

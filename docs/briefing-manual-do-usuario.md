@@ -128,6 +128,10 @@ Vale explicar no manual por que lançar entrada e perda é liberado para todos: 
 dia de quem está no depósito, travar por perfil só atrasaria o trabalho. Já **corrigir** e **ajustar
 estoque** são decisões de quem responde pelo estoque, e por isso ficam com gerente e administrador.
 
+Uma consequência que o manual pode registrar em uma frase: **as telas do operador não têm coluna
+Ações**. Onde ele não pode editar nem excluir, a coluna nem aparece, em vez de aparecer vazia. Se o
+cliente comparar a tela do estoquista com a do gerente e notar a diferença, é isso.
+
 ## 6. O menu
 
 Itens do menu lateral, na ordem em que aparecem:
@@ -328,7 +332,10 @@ Uma entrada tem:
   de emissão da nota é independente da data da entrada: a nota pode ter sido emitida num dia e a
   mercadoria ter chegado noutro. A **chave de acesso** tem de ter **exatamente 44 dígitos** — chave
   incompleta é recusada, e vale dizer isso para o cliente não achar que é defeito.
-- **Itens:** produto, quantidade e, se quiser, o custo unitário daquele recebimento.
+- **Itens:** produto, quantidade e, se quiser, o custo unitário daquele recebimento. Cabem até 200
+  itens na mesma entrada. Na listagem, a coluna **Itens** mostra quantos produtos a entrada tem
+  (`12 itens`) e o clique abre uma janelinha com a relação, produto e quantidade, para uma nota
+  grande não esticar a tabela. Impresso, sai a relação inteira.
 - **Anexos:** até **3 arquivos** por entrada, em XML, PDF, JPG, PNG ou WEBP, até 10 MB cada. Arquivo
   acima do limite é recusado na hora, com o nome do arquivo e o tamanho dele na mensagem, e **a
   entrada não é salva enquanto o arquivo recusado estiver selecionado**. Isso é de propósito: antes
@@ -503,8 +510,8 @@ vírgula — diga que abre direto no Excel, sem falar em CSV, ponto e vírgula o
 ### 7.12 Usuários
 
 Só o administrador. Cadastra nome, e-mail, perfil e senha, e pode desativar quem saiu da empresa. A
-senha precisa ter **no mínimo 8 caracteres** — informe isso, senão o administrador topa com o aviso
-sem entender. A senha é digitada duas vezes, no campo **Senha** e em **Confirmar senha**: quem digita
+senha precisa ter **no mínimo 8 caracteres** (e no máximo 72), informe isso, senão o administrador
+topa com o aviso sem entender. A senha é digitada duas vezes, no campo **Senha** e em **Confirmar senha**: quem digita
 não é quem vai usar, e o campo é mascarado, então o erro de digitação só apareceria na hora em que o
 funcionário não conseguisse entrar. Existe também um **Gerar senha aleatória**, que preenche os dois
 campos e copia a senha para a área de transferência — é o caminho recomendado, junto de "mande a senha

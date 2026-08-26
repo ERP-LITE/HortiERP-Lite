@@ -7,6 +7,7 @@ import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
 import { useAuthStore } from '@/stores/auth'
 import { resolveFormError } from '@/services/api'
+import { LIMITES_TEXTO } from '@/lib/limits'
 
 const email = ref('')
 const password = ref('')
@@ -58,7 +59,15 @@ async function handleSubmit() {
       <p v-if="sessionMessage" class="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:bg-amber-900/30 dark:text-amber-200">
         {{ sessionMessage }}
       </p>
-      <BaseInput v-model="email" type="email" label="E-mail" placeholder="seu@email.com" :error="fieldErrors.email" :invalid="invalidCredentials" />
+      <BaseInput
+        v-model="email"
+        type="email"
+        label="E-mail"
+        placeholder="seu@email.com"
+        :maxlength="LIMITES_TEXTO.email"
+        :error="fieldErrors.email"
+        :invalid="invalidCredentials"
+      />
       <BaseInput
         ref="passwordInput"
         v-model="password"

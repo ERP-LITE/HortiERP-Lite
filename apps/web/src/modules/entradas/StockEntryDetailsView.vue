@@ -11,7 +11,7 @@ import ExpandableText from '@/components/ui/ExpandableText.vue'
 import FieldLabel from '@/components/ui/FieldLabel.vue'
 import SortableTableHeader from '@/components/ui/SortableTableHeader.vue'
 import { formatCurrency, formatDate, formatDateTime, formatFileSize, formatQuantity } from '@/lib/format'
-import { invoiceSelectionError } from '@/lib/invoiceAttachments'
+import { invoiceKeyError, invoiceSelectionError } from '@/lib/invoiceAttachments'
 import { confirmDelete, toastError, toastSuccess } from '@/lib/alerts'
 import { downloadBlob } from '@/lib/download'
 import { getApiErrorMessage } from '@/services/api'
@@ -26,6 +26,7 @@ import type { StockEntry, StockEntryAttachment } from '@/types'
 import { useAuthStore } from '@/stores/auth'
 import { useLocalTableSort } from '@/composables/useTableSort'
 import { useIsMobile } from '@/composables/useIsMobile'
+import { LIMITES_NUMERO, LIMITES_TEXTO } from '@/lib/limits'
 
 const route = useRoute()
 const router = useRouter()
@@ -93,8 +94,9 @@ function openEdit() {
 }
 
 async function handleEdit() {
-  if (editForm.value.invoiceAccessKey && !/^\d{44}$/.test(editForm.value.invoiceAccessKey)) {
-    editError.value = 'A chave da NF-e deve ter 44 dígitos'
+  const chaveInvalida = invoiceKeyError(editForm.value.invoiceAccessKey)
+  if (chaveInvalida) {
+    editError.value = chaveInvalida
     return
   }
   editing.value = true
@@ -335,20 +337,25 @@ onBeforeUnmount(clearPreview)
       <form class="space-y-4" @submit.prevent="handleEdit">
         <p v-if="editError" class="break-all text-sm text-red-600 dark:text-red-400">{{ editError }}</p>
         <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <BaseInput v-model="editForm.supplierName" label="Fornecedor" />
-          <BaseInput v-model="editForm.invoiceNumber" label="Número da nota" />
-          <BaseInput v-model="editForm.invoiceSeries" label="Série" />
+          <BaseInput v-model="editForm.supplierName" label="Fornecedor" :maxlength="LIMITES_TEXTO.fornecedor" />
+          <BaseInput v-model="editForm.invoiceNumber" label="Número da nota" :maxlength="LIMITES_TEXTO.numeroNota" />
+          <BaseInput v-model="editForm.invoiceSeries" label="Série" :maxlength="LIMITES_TEXTO.serieNota" />
           <DateInput v-model="editForm.invoiceIssuedAt" label="Data de emissão" />
-          <BaseInput v-model="editForm.invoiceTotal" :decimal-places="2" label="Valor total (R$)" />
+          <BaseInput
+            v-model="editForm.invoiceTotal"
+            :decimal-places="2"
+            :max="LIMITES_NUMERO.valorNota"
+            label="Valor total (R$)"
+          />
           <div class="sm:col-span-2">
-            <BaseInput v-model="editForm.invoiceAccessKey" label="Chave de acesso (44 dígitos)" />
+            <BaseInput v-model="editForm.invoiceAccessKey" label="Chave de acesso (44 dígitos)" :maxlength="LIMITES_TEXTO.chaveNfe" />
           </div>
           <label class="block sm:col-span-2">
             <FieldLabel text="Observações" />
             <textarea
               v-model="editForm.notes"
               rows="4"
-              maxlength="2000"
+              :maxlength="LIMITES_TEXTO.observacoesEntrada"
               class="w-full resize-y rounded-lg border border-gray-300 bg-white px-3.5 py-2.5 text-sm text-gray-900 shadow-sm transition-colors hover:border-gray-400 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:hover:border-gray-500"
             />
           </label>

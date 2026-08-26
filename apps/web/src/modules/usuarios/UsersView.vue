@@ -27,6 +27,7 @@ import { useBulkSelection } from '@/composables/useBulkSelection'
 import { useFilterModal } from '@/composables/useFilterModal'
 import { useTableSort } from '@/composables/useTableSort'
 import type { User, UserRole } from '@/types'
+import { LIMITES_TEXTO } from '@/lib/limits'
 
 const roleOptions: { value: UserRole; label: string }[] = [
   { value: 'admin', label: 'Administrador' },
@@ -293,12 +294,26 @@ onMounted(loadUsers)
 
     <BaseModal :open="modalOpen" :title="editingId ? 'Editar usuário' : 'Novo usuário'" @close="modalOpen = false">
       <form class="space-y-4" @submit.prevent="handleSubmit">
-        <BaseInput v-model="form.name" label="Nome" :error="fieldErrors.name" required />
-        <BaseInput v-model="form.email" type="email" label="E-mail" :error="fieldErrors.email" required />
+        <BaseInput
+          v-model="form.name"
+          label="Nome"
+          :maxlength="LIMITES_TEXTO.nome"
+          :error="fieldErrors.name"
+          required
+        />
+        <BaseInput
+          v-model="form.email"
+          type="email"
+          label="E-mail"
+          :maxlength="LIMITES_TEXTO.email"
+          :error="fieldErrors.email"
+          required
+        />
         <div>
           <BaseInput
             v-model="form.password"
             type="password"
+            :maxlength="LIMITES_TEXTO.senha"
             :label="editingId ? 'Nova senha (opcional)' : 'Senha'"
             :error="fieldErrors.password"
             :required="!editingId"
@@ -314,6 +329,7 @@ onMounted(loadUsers)
         <BaseInput
           v-model="passwordConfirm"
           type="password"
+          :maxlength="LIMITES_TEXTO.senha"
           :label="editingId ? 'Confirmar nova senha' : 'Confirmar senha'"
           :error="fieldErrors.passwordConfirm"
           :required="!editingId"

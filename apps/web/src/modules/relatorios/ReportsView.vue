@@ -11,6 +11,7 @@ import PeriodPicker from '@/components/ui/PeriodPicker.vue'
 import Pagination from '@/components/ui/Pagination.vue'
 import StatCard from '@/components/ui/StatCard.vue'
 import ExpandableText from '@/components/ui/ExpandableText.vue'
+import ItemsSummary from '@/components/ui/ItemsSummary.vue'
 import SortableTableHeader from '@/components/ui/SortableTableHeader.vue'
 import { usePagination } from '@/composables/usePagination'
 import { useFilterModal } from '@/composables/useFilterModal'
@@ -479,8 +480,15 @@ onMounted(loadActiveTab)
                 <ExpandableText :text="entry.supplierName" :max-length="40" />
               </td>
               <td class="max-w-80 px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
-                <ExpandableText
-                  :text="entry.items.map((item) => `${item.product.name} (${Number(item.quantity)})`).join(', ')"
+                <ItemsSummary
+                  :items="
+                    entry.items.map((item) => ({
+                      name: item.product.name,
+                      quantity: item.quantity,
+                      unit: item.product.unit?.abbreviation,
+                    }))
+                  "
+                  :title="`Itens de ${formatDate(entry.entryDate)}`"
                 />
               </td>
               <td class="max-w-64 px-4 py-3 text-sm text-gray-500 dark:text-gray-400">

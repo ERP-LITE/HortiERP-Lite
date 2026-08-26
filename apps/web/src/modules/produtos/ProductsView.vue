@@ -31,6 +31,7 @@ import { usePagination } from '@/composables/usePagination'
 import { useBulkSelection } from '@/composables/useBulkSelection'
 import { useFilterModal } from '@/composables/useFilterModal'
 import { useTableSort } from '@/composables/useTableSort'
+import { LIMITES_NUMERO, LIMITES_TEXTO } from '@/lib/limits'
 import type { Category, Product, Unit } from '@/types'
 import { formatQuantity } from '@/lib/format'
 import { statusFilterOptionsFor, statusLabel } from '@/lib/status'
@@ -337,15 +338,15 @@ onMounted(loadAll)
             </th>
             <SortableTableHeader field="currentStock" :active-field="sortBy" :order="sortOrder" @sort="toggleSort">Estoque</SortableTableHeader>
             <SortableTableHeader field="active" :active-field="sortBy" :order="sortOrder" @sort="toggleSort">Situação</SortableTableHeader>
-            <th data-actions class="print:hidden px-4 py-3 text-right text-xs font-medium uppercase text-gray-500 dark:text-gray-400">Ações</th>
+            <th v-if="canManage" data-actions class="print:hidden px-4 py-3 text-right text-xs font-medium uppercase text-gray-500 dark:text-gray-400">Ações</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
           <tr v-if="loading">
-            <td :colspan="canManage ? 6 : 5" class="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">Carregando...</td>
+            <td :colspan="canManage ? 6 : 4" class="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">Carregando...</td>
           </tr>
           <tr v-else-if="products.length === 0">
-            <td :colspan="canManage ? 6 : 5" class="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">
+            <td :colspan="canManage ? 6 : 4" class="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">
               Nenhum produto cadastrado.
             </td>
           </tr>
@@ -396,7 +397,6 @@ onMounted(loadAll)
                 <Trash2 :size="16" />
               </button>
             </td>
-            <td v-else class="print:hidden px-4 py-3" />
           </tr>
         </tbody>
       </table>
@@ -405,7 +405,13 @@ onMounted(loadAll)
 
     <BaseModal :open="modalOpen" :title="editingId ? 'Editar produto' : 'Novo produto'" @close="modalOpen = false">
       <form class="space-y-4" @submit.prevent="handleSubmit">
-        <BaseInput v-model="form.name" label="Nome" :error="fieldErrors.name" required />
+        <BaseInput
+          v-model="form.name"
+          label="Nome"
+          :maxlength="LIMITES_TEXTO.nome"
+          :error="fieldErrors.name"
+          required
+        />
 
         <div class="grid grid-cols-2 gap-4">
           <BaseSelect
@@ -425,14 +431,43 @@ onMounted(loadAll)
         </div>
 
         <div class="grid grid-cols-2 gap-4">
-          <BaseInput v-model="form.sku" label="SKU (opcional)" :error="fieldErrors.sku" />
-          <BaseInput v-model="form.barcode" label="Código de barras (opcional)" />
+          <BaseInput
+            v-model="form.sku"
+            label="SKU (opcional)"
+            :maxlength="LIMITES_TEXTO.sku"
+            :error="fieldErrors.sku"
+          />
+          <BaseInput
+            v-model="form.barcode"
+            label="Código de barras (opcional)"
+            :maxlength="LIMITES_TEXTO.codigoBarras"
+            :error="fieldErrors.barcode"
+          />
         </div>
 
         <div class="grid grid-cols-3 gap-4">
-          <BaseInput v-model="form.costPrice" :decimal-places="2" label="Custo (R$)" />
-          <BaseInput v-model="form.salePrice" :decimal-places="2" label="Venda (R$)" />
-          <BaseInput v-model="form.minStock" :decimal-places="3" label="Estoque mínimo" :error="fieldErrors.minStock" required />
+          <BaseInput
+            v-model="form.costPrice"
+            :decimal-places="2"
+            :max="LIMITES_NUMERO.valorUnitario"
+            label="Custo (R$)"
+            :error="fieldErrors.costPrice"
+          />
+          <BaseInput
+            v-model="form.salePrice"
+            :decimal-places="2"
+            :max="LIMITES_NUMERO.valorUnitario"
+            label="Venda (R$)"
+            :error="fieldErrors.salePrice"
+          />
+          <BaseInput
+            v-model="form.minStock"
+            :decimal-places="3"
+            :max="LIMITES_NUMERO.quantidade"
+            label="Estoque mínimo"
+            :error="fieldErrors.minStock"
+            required
+          />
         </div>
 
         <BaseToggle v-model="form.active" label="Produto ativo" />

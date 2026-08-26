@@ -28,6 +28,7 @@ import { useAuthStore } from '@/stores/auth'
 import { usePagination } from '@/composables/usePagination'
 import { useFilterModal } from '@/composables/useFilterModal'
 import { useTableSort } from '@/composables/useTableSort'
+import { LIMITES_NUMERO, LIMITES_TEXTO } from '@/lib/limits'
 import type { Category, Product, ProductWithRelations } from '@/types'
 
 const auth = useAuthStore()
@@ -427,6 +428,7 @@ onMounted(() => {
         <BaseInput
           v-model="adjustForm.quantity"
           :decimal-places="3"
+          :max="LIMITES_NUMERO.quantidade"
           label="Nova quantidade em estoque"
           :error="adjustFieldErrors.quantity"
           required
@@ -435,6 +437,7 @@ onMounted(() => {
           v-model="adjustForm.notes"
           label="Motivo do ajuste"
           placeholder="Ex.: contagem física apontou divergência"
+          :maxlength="LIMITES_TEXTO.motivo"
           :error="adjustFieldErrors.notes"
           required
         />
@@ -464,6 +467,7 @@ onMounted(() => {
           v-model="bulkAdjustNotes"
           label="Motivo do ajuste"
           placeholder="Ex.: contagem física do inventário mensal"
+          :maxlength="LIMITES_TEXTO.motivo"
           :error="bulkAdjustNotesError"
           required
         />
@@ -498,6 +502,7 @@ onMounted(() => {
               <BaseInput
                 v-model="item.quantity"
                 :decimal-places="3"
+                :max="LIMITES_NUMERO.quantidade"
                 label="Nova quantidade"
                 :error="bulkAdjustItemErrors[index]?.quantity"
                 required

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { describe, test } from 'node:test'
-import { MAX_INVOICE_FILE_SIZE, invoiceSelectionError } from '../src/lib/invoiceAttachments'
+import { MAX_INVOICE_FILE_SIZE, invoiceKeyError, invoiceSelectionError } from '../src/lib/invoiceAttachments'
 
 function arquivo(name: string, size: number) {
   return { name, size } as File
@@ -29,5 +29,23 @@ describe('seleção de anexos da nota', () => {
     const dois = [arquivo('a.pdf', 1024), arquivo('b.pdf', 1024)]
     assert.equal(invoiceSelectionError(dois, 0), '')
     assert.match(invoiceSelectionError(dois, 2), /no máximo 3 anexos/)
+  })
+})
+
+describe('chave de acesso da NF-e', () => {
+  test('campo vazio não é erro: a nota fiscal é opcional', () => {
+    assert.equal(invoiceKeyError(''), '')
+  })
+
+  test('44 dígitos passam', () => {
+    assert.equal(invoiceKeyError('1'.repeat(44)), '')
+  })
+
+  test('chave incompleta é recusada antes de ir ao servidor', () => {
+    assert.equal(invoiceKeyError('123'), 'A chave da NF-e deve ter 44 dígitos')
+  })
+
+  test('letra no meio dos 44 caracteres é recusada', () => {
+    assert.equal(invoiceKeyError(`${'1'.repeat(43)}A`), 'A chave da NF-e deve ter 44 dígitos')
   })
 })

@@ -29,6 +29,7 @@ import { usePagination } from '@/composables/usePagination'
 import { useTableSort } from '@/composables/useTableSort'
 import type { Company } from '@/types'
 import PlatformUsersPanel from './PlatformUsersPanel.vue'
+import { LIMITES_TEXTO } from '@/lib/limits'
 
 const { page, pageSize, total, totalPages, applyMeta, reload, watchSearch, paginationProps } = usePagination()
 const { sortBy, sortOrder, toggleSort } = useTableSort(() => reload(loadCompanies), 'name')
@@ -365,15 +366,15 @@ onMounted(loadCompanies)
         <div v-show="modalTab === 'company'" class="space-y-5">
           <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Identificação</p>
           <div class="grid gap-4 sm:grid-cols-2">
-            <BaseInput v-model="form.name" label="Nome fantasia" :error="fieldErrors.name" required />
-            <BaseInput v-model="form.legalName" label="Razão social" :error="fieldErrors.legalName" required />
+            <BaseInput v-model="form.name" label="Nome fantasia" :maxlength="LIMITES_TEXTO.razaoSocial" :error="fieldErrors.name" required />
+            <BaseInput v-model="form.legalName" label="Razão social" :maxlength="LIMITES_TEXTO.razaoSocial" :error="fieldErrors.legalName" required />
             <BaseInput v-model="form.document" mask="cnpj" label="CNPJ" placeholder="00.000.000/0000-00" :error="fieldErrors.document" required />
-            <BaseInput v-model="form.stateRegistration" label="Inscrição estadual (opcional)" :error="fieldErrors.stateRegistration" />
+            <BaseInput v-model="form.stateRegistration" label="Inscrição estadual (opcional)" :maxlength="LIMITES_TEXTO.inscricaoEstadual" :error="fieldErrors.stateRegistration" />
           </div>
           <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Contato</p>
           <div class="grid gap-4 sm:grid-cols-2">
-            <BaseInput v-model="form.contactName" label="Responsável" :error="fieldErrors.contactName" required />
-            <BaseInput v-model="form.contactEmail" type="email" label="E-mail de contato" :error="fieldErrors.contactEmail" required />
+            <BaseInput v-model="form.contactName" label="Responsável" :maxlength="LIMITES_TEXTO.nome" :error="fieldErrors.contactName" required />
+            <BaseInput v-model="form.contactEmail" type="email" label="E-mail de contato" :maxlength="LIMITES_TEXTO.email" :error="fieldErrors.contactEmail" required />
             <BaseInput v-model="form.phone" mask="phone" label="Telefone / WhatsApp" placeholder="(00) 00000-0000" :error="fieldErrors.phone" required />
           </div>
         </div>
@@ -384,23 +385,23 @@ onMounted(loadCompanies)
               <BaseInput v-model="form.postalCode" mask="cep" label="CEP" placeholder="00000-000" :error="fieldErrors.postalCode" required />
               <span v-if="lookingUpCep" class="mt-1 block text-xs text-gray-500 dark:text-gray-400">Buscando endereço...</span>
             </div>
-            <BaseInput v-model="form.street" label="Logradouro" :error="fieldErrors.street" required />
-            <BaseInput v-model="form.addressNumber" label="Número" :error="fieldErrors.addressNumber" required />
-            <BaseInput v-model="form.complement" label="Complemento (opcional)" :error="fieldErrors.complement" />
-            <BaseInput v-model="form.district" label="Bairro" :error="fieldErrors.district" required />
-            <BaseInput v-model="form.city" label="Cidade" :error="fieldErrors.city" required />
+            <BaseInput v-model="form.street" label="Logradouro" :maxlength="LIMITES_TEXTO.endereco" :error="fieldErrors.street" required />
+            <BaseInput v-model="form.addressNumber" label="Número" :maxlength="LIMITES_TEXTO.numeroEndereco" :error="fieldErrors.addressNumber" required />
+            <BaseInput v-model="form.complement" label="Complemento (opcional)" :maxlength="LIMITES_TEXTO.complemento" :error="fieldErrors.complement" />
+            <BaseInput v-model="form.district" label="Bairro" :maxlength="LIMITES_TEXTO.endereco" :error="fieldErrors.district" required />
+            <BaseInput v-model="form.city" label="Cidade" :maxlength="LIMITES_TEXTO.endereco" :error="fieldErrors.city" required />
             <BaseSelect v-model="form.state" label="UF" :options="ufOptions" placeholder="Selecione a UF" :error="fieldErrors.state" required />
           </div>
         </div>
         <div v-if="!editingId" v-show="modalTab === 'admin'" class="space-y-5">
           <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Administrador da empresa</p>
           <div class="grid gap-4 sm:grid-cols-2">
-            <BaseInput v-model="adminForm.name" label="Nome" :error="fieldErrors.adminName" required />
-            <BaseInput v-model="adminForm.email" type="email" label="E-mail" :error="fieldErrors.adminEmail" required />
+            <BaseInput v-model="adminForm.name" label="Nome" :maxlength="LIMITES_TEXTO.nome" :error="fieldErrors.adminName" required />
+            <BaseInput v-model="adminForm.email" type="email" label="E-mail" :maxlength="LIMITES_TEXTO.email" :error="fieldErrors.adminEmail" required />
           </div>
           <div class="grid gap-4 sm:grid-cols-2">
             <div>
-              <BaseInput v-model="adminForm.password" type="password" label="Senha" :error="fieldErrors.adminPassword" required />
+              <BaseInput v-model="adminForm.password" type="password" label="Senha" :maxlength="LIMITES_TEXTO.senha" :error="fieldErrors.adminPassword" required />
               <button type="button" class="mt-1.5 inline-flex items-center gap-1 text-xs text-primary-600 hover:underline dark:text-primary-400" @click="handleGeneratePassword">
                 <Wand2 :size="12" /> Gerar senha aleatória
               </button>
@@ -409,6 +410,7 @@ onMounted(loadCompanies)
               v-model="adminForm.passwordConfirm"
               type="password"
               label="Confirmar senha"
+              :maxlength="LIMITES_TEXTO.senha"
               :error="fieldErrors.adminPasswordConfirm"
               required
             />

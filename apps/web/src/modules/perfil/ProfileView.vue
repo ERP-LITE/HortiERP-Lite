@@ -10,6 +10,7 @@ import { toastError, toastSuccess } from '@/lib/alerts'
 import { Download } from '@lucide/vue'
 import { downloadBlob } from '@/lib/download'
 import { roleLabel } from '@/lib/roles'
+import { LIMITES_TEXTO } from '@/lib/limits'
 
 const auth = useAuthStore()
 
@@ -119,9 +120,27 @@ async function handleDownloadPersonalData() {
       <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
         <h2 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-4">Redefinir senha</h2>
         <form class="space-y-4" @submit.prevent="handleSubmit">
-          <BaseInput v-model="currentPassword" type="password" label="Senha atual" required />
-          <BaseInput v-model="newPassword" type="password" label="Nova senha" required />
-          <BaseInput v-model="confirmPassword" type="password" label="Confirmar nova senha" required />
+          <BaseInput
+            v-model="currentPassword"
+            type="password"
+            label="Senha atual"
+            :maxlength="LIMITES_TEXTO.senha"
+            required
+          />
+          <BaseInput
+            v-model="newPassword"
+            type="password"
+            label="Nova senha"
+            :maxlength="LIMITES_TEXTO.senha"
+            required
+          />
+          <BaseInput
+            v-model="confirmPassword"
+            type="password"
+            label="Confirmar nova senha"
+            :maxlength="LIMITES_TEXTO.senha"
+            required
+          />
 
           <p v-if="errorMessage" class="text-sm text-red-600 dark:text-red-400">{{ errorMessage }}</p>
 

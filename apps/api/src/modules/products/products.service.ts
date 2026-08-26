@@ -7,6 +7,7 @@ import { assertUniqueField } from '../../shared/db/assertUniqueField.js'
 import { buildPaginatedResult } from '../../shared/db/paginate.js'
 import { softDeleteById, softDeleteManyWithActivity } from '../../shared/db/softDelete.js'
 import { recordActivity, recordActivitySafe } from '../../shared/db/recordActivity.js'
+import { LIMITES_NUMERO, LIMITES_TEXTO } from '../../shared/schemas/limits.js'
 import type {
   CreateProductInput,
   ImportProductsInput,
@@ -194,7 +195,7 @@ const MAX_REPORTED_ROWS = 200
 
 type ImportRowError = { line: number; name: string; errors: string[] }
 
-function parseDecimal(raw: string | undefined) {
+function parseDecimal(raw: string | undefined, max: number) {
   const value = (raw ?? '').trim()
   if (!value) return { ok: true as const, value: undefined }
 
@@ -208,7 +209,7 @@ function parseDecimal(raw: string | undefined) {
   }
 
   const parsed = Number(normalized)
-  if (!Number.isFinite(parsed) || parsed < 0) return { ok: false as const, value: undefined }
+  if (!Number.isFinite(parsed) || parsed < 0 || parsed > max) return { ok: false as const, value: undefined }
   return { ok: true as const, value: parsed }
 }
 
@@ -295,15 +296,25 @@ export async function importProducts(companyId: string, userId: string, input: I
     const barcode = row.barcode?.trim() || undefined
 
     if (!name) rowErrors.push('Nome é obrigatório')
+    else if (name.length > LIMITES_TEXTO.nome) rowErrors.push(`Nome: use no máximo ${LIMITES_TEXTO.nome} caracteres`)
     else if (takenNames.has(lower(name))) rowErrors.push(`Já existe um produto chamado "${name}"`)
 
+    if (sku && sku.length > LIMITES_TEXTO.sku) rowErrors.push(`Código: use no máximo ${LIMITES_TEXTO.sku} caracteres`)
+    if (barcode && barcode.length > LIMITES_TEXTO.codigoBarras) {
+      rowErrors.push(`Código de barras: use no máximo ${LIMITES_TEXTO.codigoBarras} caracteres`)
+    }
+
     if (!categoryName) rowErrors.push('Categoria é obrigatória')
+    else if (categoryName.length > LIMITES_TEXTO.nome) {
+      rowErrors.push(`Categoria: use no máximo ${LIMITES_TEXTO.nome} caracteres`)
+    }
     else if (!categoryByName.has(lower(categoryName)) && !newCategories.has(lower(categoryName))) {
       if (input.createMissingRefs) newCategories.set(lower(categoryName), categoryName)
       else rowErrors.push(`Categoria "${categoryName}" não existe`)
     }
 
     if (!unitName) rowErrors.push('Unidade é obrigatória')
+    else if (unitName.length > LIMITES_TEXTO.nome) rowErrors.push(`Unidade: use no máximo ${LIMITES_TEXTO.nome} caracteres`)
     else if (!unitByName.has(lower(unitName)) && !newUnits.has(lower(unitName))) {
       if (input.createMissingRefs) newUnits.set(lower(unitName), unitName)
       else rowErrors.push(`Unidade "${unitName}" não existe`)
@@ -311,13 +322,13 @@ export async function importProducts(companyId: string, userId: string, input: I
 
     if (sku && takenSkus.has(lower(sku))) rowErrors.push(`O código "${sku}" já está em uso`)
 
-    const costPrice = parseDecimal(row.costPrice)
+    const costPrice = parseDecimal(row.costPrice, LIMITES_NUMERO.valorUnitario)
     if (!costPrice.ok) rowErrors.push('Custo inválido')
-    const salePrice = parseDecimal(row.salePrice)
+    const salePrice = parseDecimal(row.salePrice, LIMITES_NUMERO.valorUnitario)
     if (!salePrice.ok) rowErrors.push('Preço de venda inválido')
-    const minStock = parseDecimal(row.minStock)
+    const minStock = parseDecimal(row.minStock, LIMITES_NUMERO.quantidade)
     if (!minStock.ok) rowErrors.push('Estoque mínimo inválido')
-    const initialStock = parseDecimal(row.currentStock)
+    const initialStock = parseDecimal(row.currentStock, LIMITES_NUMERO.quantidade)
     if (!initialStock.ok) rowErrors.push('Estoque atual inválido')
     const active = parseActive(row.active)
     if (!active.ok) rowErrors.push('Situação inválida (use "sim" ou "não")')

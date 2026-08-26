@@ -1,3 +1,5 @@
+// Efeito colateral proposital: traduz as mensagens do Zod antes de qualquer schema ser usado.
+import './shared/schemas/zodErrorMap.js'
 import Fastify from 'fastify'
 import cookie from '@fastify/cookie'
 import cors from '@fastify/cors'

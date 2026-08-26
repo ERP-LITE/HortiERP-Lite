@@ -76,6 +76,12 @@ histórico das ações dele sem depender de pedir para ninguém.
 | Anexos por entrada de mercadoria | 3 |
 | Tamanho por arquivo anexado | 10 MB |
 | Produtos por importação de planilha | 2.000 |
+| Itens por entrada de mercadoria | 200 |
+| Caracteres em nome de cadastro | 120 |
+| Caracteres em observação de perda | 500 |
+| Caracteres em observação de entrada | 2.000 |
+| Quantidade por lançamento | 999.999,999 |
+| Preço unitário | R$ 9.999.999,99 |
 | Período máximo por consulta no painel e nos gráficos | 90 dias |
 | Sessão fecha por inatividade | 30 minutos |
 | Retenção da cópia de segurança | 30 dias |

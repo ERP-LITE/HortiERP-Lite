@@ -33,6 +33,7 @@ import { usePagination } from '@/composables/usePagination'
 import { useBulkSelection } from '@/composables/useBulkSelection'
 import { useFilterModal } from '@/composables/useFilterModal'
 import { useTableSort } from '@/composables/useTableSort'
+import { LIMITES_TEXTO } from '@/lib/limits'
 import type { Category } from '@/types'
 
 const auth = useAuthStore()
@@ -205,15 +206,15 @@ onMounted(loadCategories)
             <SortableTableHeader field="name" :active-field="sortBy" :order="sortOrder" @sort="toggleSort">Nome</SortableTableHeader>
             <SortableTableHeader field="description" :active-field="sortBy" :order="sortOrder" class="hidden sm:table-cell" @sort="toggleSort">Descrição</SortableTableHeader>
             <SortableTableHeader field="active" :active-field="sortBy" :order="sortOrder" @sort="toggleSort">Situação</SortableTableHeader>
-            <th data-actions class="print:hidden px-4 py-3 text-right text-xs font-medium uppercase text-gray-500 dark:text-gray-400">Ações</th>
+            <th v-if="canManage" data-actions class="print:hidden px-4 py-3 text-right text-xs font-medium uppercase text-gray-500 dark:text-gray-400">Ações</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
           <tr v-if="loading">
-            <td :colspan="canManage ? 5 : 4" class="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">Carregando...</td>
+            <td :colspan="canManage ? 5 : 3" class="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">Carregando...</td>
           </tr>
           <tr v-else-if="categories.length === 0">
-            <td :colspan="canManage ? 5 : 4" class="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">
+            <td :colspan="canManage ? 5 : 3" class="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">
               Nenhuma categoria cadastrada.
             </td>
           </tr>
@@ -258,7 +259,6 @@ onMounted(loadCategories)
                 <Trash2 :size="16" />
               </button>
             </td>
-            <td v-else class="print:hidden px-4 py-3" />
           </tr>
         </tbody>
       </table>
@@ -277,8 +277,19 @@ onMounted(loadCategories)
 
     <BaseModal :open="modalOpen" :title="editingId ? 'Editar categoria' : 'Nova categoria'" @close="modalOpen = false">
       <form class="space-y-4" @submit.prevent="handleSubmit">
-        <BaseInput v-model="form.name" label="Nome" :error="fieldErrors.name" required />
-        <BaseInput v-model="form.description" label="Descrição" />
+        <BaseInput
+          v-model="form.name"
+          label="Nome"
+          :maxlength="LIMITES_TEXTO.nome"
+          :error="fieldErrors.name"
+          required
+        />
+        <BaseInput
+          v-model="form.description"
+          label="Descrição"
+          :maxlength="LIMITES_TEXTO.descricao"
+          :error="fieldErrors.description"
+        />
         <BaseToggle v-model="form.active" label="Categoria ativa" />
         <p class="text-xs text-gray-500 dark:text-gray-400">
           Categoria inativa continua valendo para os produtos que já usam ela, e deixa de aparecer na hora de

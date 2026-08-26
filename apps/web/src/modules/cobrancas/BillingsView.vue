@@ -33,6 +33,7 @@ import { confirmDelete, toastError, toastSuccess } from '@/lib/alerts'
 import { resolveFormError } from '@/services/api'
 import { formatCurrency, formatDateOnly, formatMonthYear } from '@/lib/format'
 import { todayIso, type PeriodValue } from '@/lib/period'
+import { LIMITES_NUMERO, LIMITES_TEXTO } from '@/lib/limits'
 
 const { page, pageSize, total, totalPages, applyMeta, reload, watchSearch, paginationProps } = usePagination()
 const { sortBy, sortOrder, toggleSort } = useTableSort(() => reload(loadBillings), 'dueDate', 'desc')
@@ -307,17 +308,36 @@ onMounted(async () => {
         <div class="grid gap-4 sm:grid-cols-2">
           <MonthInput v-model="form.referenceMonth" label="Competência" :error="fieldErrors.referenceMonth" required />
           <DateInput v-model="form.dueDate" label="Vencimento" :error="fieldErrors.dueDate" required />
-          <BaseInput v-model="form.amount" :decimal-places="2" label="Valor da mensalidade (R$)" :error="fieldErrors.amount" required />
+          <BaseInput
+            v-model="form.amount"
+            :decimal-places="2"
+            :max="LIMITES_NUMERO.mensalidade"
+            label="Valor da mensalidade (R$)"
+            :error="fieldErrors.amount"
+            required
+          />
         </div>
         <div class="flex items-center gap-3 rounded-lg bg-gray-50 p-3 dark:bg-gray-900/50">
           <BaseToggle v-model="markedPaid" />
           <span class="text-sm text-gray-700 dark:text-gray-300">Pagamento recebido</span>
         </div>
         <div v-if="markedPaid" class="grid gap-4 sm:grid-cols-2">
-          <BaseInput v-model="form.paidAmount" :decimal-places="2" label="Valor pago (R$)" :error="fieldErrors.paidAmount" required />
+          <BaseInput
+            v-model="form.paidAmount"
+            :decimal-places="2"
+            :max="LIMITES_NUMERO.mensalidade"
+            label="Valor pago (R$)"
+            :error="fieldErrors.paidAmount"
+            required
+          />
           <DateInput v-model="form.paidAt" label="Data do pagamento" :error="fieldErrors.paidAt" required />
         </div>
-        <BaseInput v-model="form.notes" label="Observações (opcional)" />
+        <BaseInput
+          v-model="form.notes"
+          label="Observações (opcional)"
+          :maxlength="LIMITES_TEXTO.observacoes"
+          :error="fieldErrors.notes"
+        />
         <div class="flex justify-end gap-2 pt-2">
           <BaseButton type="button" variant="secondary" @click="modalOpen = false">Cancelar</BaseButton>
           <BaseButton type="submit" :disabled="saving">{{ saving ? 'Salvando...' : 'Salvar' }}</BaseButton>

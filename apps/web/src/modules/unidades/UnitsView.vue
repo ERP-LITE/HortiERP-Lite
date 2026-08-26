@@ -26,6 +26,7 @@ import { usePagination } from '@/composables/usePagination'
 import { useBulkSelection } from '@/composables/useBulkSelection'
 import { useFilterModal } from '@/composables/useFilterModal'
 import { useTableSort } from '@/composables/useTableSort'
+import { LIMITES_TEXTO } from '@/lib/limits'
 import type { Unit } from '@/types'
 
 const auth = useAuthStore()
@@ -199,15 +200,15 @@ onMounted(loadUnits)
             <SortableTableHeader field="name" :active-field="sortBy" :order="sortOrder" @sort="toggleSort">Nome</SortableTableHeader>
             <SortableTableHeader field="abbreviation" :active-field="sortBy" :order="sortOrder" @sort="toggleSort">Abreviação</SortableTableHeader>
             <SortableTableHeader field="active" :active-field="sortBy" :order="sortOrder" @sort="toggleSort">Situação</SortableTableHeader>
-            <th data-actions class="print:hidden px-4 py-3 text-right text-xs font-medium uppercase text-gray-500 dark:text-gray-400">Ações</th>
+            <th v-if="canManage" data-actions class="print:hidden px-4 py-3 text-right text-xs font-medium uppercase text-gray-500 dark:text-gray-400">Ações</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
           <tr v-if="loading">
-            <td :colspan="canManage ? 5 : 4" class="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">Carregando...</td>
+            <td :colspan="canManage ? 5 : 3" class="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">Carregando...</td>
           </tr>
           <tr v-else-if="units.length === 0">
-            <td :colspan="canManage ? 5 : 4" class="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">
+            <td :colspan="canManage ? 5 : 3" class="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">
               Nenhuma unidade cadastrada.
             </td>
           </tr>
@@ -250,7 +251,6 @@ onMounted(loadUnits)
                 <Trash2 :size="16" />
               </button>
             </td>
-            <td v-else class="print:hidden px-4 py-3" />
           </tr>
         </tbody>
       </table>
@@ -269,8 +269,20 @@ onMounted(loadUnits)
 
     <BaseModal :open="modalOpen" :title="editingId ? 'Editar unidade' : 'Nova unidade'" @close="modalOpen = false">
       <form class="space-y-4" @submit.prevent="handleSubmit">
-        <BaseInput v-model="form.name" label="Nome" :error="fieldErrors.name" required />
-        <BaseInput v-model="form.abbreviation" label="Abreviação" :error="fieldErrors.abbreviation" required />
+        <BaseInput
+          v-model="form.name"
+          label="Nome"
+          :maxlength="LIMITES_TEXTO.nome"
+          :error="fieldErrors.name"
+          required
+        />
+        <BaseInput
+          v-model="form.abbreviation"
+          label="Abreviação"
+          :maxlength="LIMITES_TEXTO.abreviacao"
+          :error="fieldErrors.abbreviation"
+          required
+        />
         <BaseToggle v-model="form.active" label="Unidade ativa" />
         <p class="text-xs text-gray-500 dark:text-gray-400">
           Unidade inativa continua valendo para os produtos que já usam ela, e deixa de aparecer na hora de

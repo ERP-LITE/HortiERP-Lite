@@ -14,6 +14,8 @@ const props = defineProps<{
   invalid?: boolean
   step?: string
   decimalPlaces?: number
+  max?: number
+  maxlength?: number
   mask?: InputMask
 }>()
 
@@ -74,6 +76,12 @@ function handleInput(event: Event) {
   const integerPart = normalized.slice(0, -places).replace(/^0+(?=\d)/, '') || '0'
   const decimalPart = normalized.slice(-places)
   const valor = places > 0 ? `${integerPart}.${decimalPart}` : integerPart
+
+  if (props.max !== undefined && Number(valor) > props.max) {
+    emitirValor(input, String(props.modelValue ?? ''), String(displayValue.value))
+    return
+  }
+
   emitirValor(input, valor, Number(valor).toLocaleString('pt-BR', {
     minimumFractionDigits: places,
     maximumFractionDigits: places,
@@ -95,6 +103,7 @@ defineExpose({
         :type="resolvedType"
         :inputmode="numericKeyboard ? 'numeric' : undefined"
         :placeholder="placeholder"
+        :maxlength="maxlength"
         :aria-required="required || undefined"
         :step="step"
         class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-100 dark:placeholder:text-gray-500"
