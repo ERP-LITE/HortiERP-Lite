@@ -92,6 +92,32 @@ services:
       # para a internet. Mesmo motivo do backup.
       - egress
 
+  error-alert:
+    image: hortierp-api:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    environment:
+      <<: *api_environment
+      ERROR_ALERT_HEARTBEAT_URL: ${ERROR_ALERT_HEARTBEAT_URL:-}
+      ERROR_ALERT_INTERVAL_SECONDS: ${ERROR_ALERT_INTERVAL_SECONDS:-900}
+      ERROR_ALERT_THRESHOLD: ${ERROR_ALERT_THRESHOLD:-1}
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        # Mesmo `trap` do container de retenção: sem ele o shell (PID 1) ignora o SIGTERM.
+        trap 'exit 0' TERM INT
+        while true; do
+          node dist/scripts/errorRateAlert.js || echo "[alerta-erros] falhou; nova tentativa em ${ERROR_ALERT_INTERVAL_SECONDS:-900}s" >&2
+          sleep ${ERROR_ALERT_INTERVAL_SECONDS:-900} &
+          wait $$!
+        done
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    networks:
+      - backend
+      # `egress` para alcançar o monitor externo, igual ao backup e à retenção.
+      - egress
+
   web:
     image: hortierp-web:${IMAGE_TAG:-latest}
     build:

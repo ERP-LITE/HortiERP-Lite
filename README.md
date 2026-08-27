@@ -89,6 +89,11 @@ O ambiente de produção usa imagens compiladas, Nginx para o frontend, Caddy pa
 checks, migrations obrigatórias e backups criptografados com teste seguro de restauração. Consulte o
 [guia de deploy](./docs/deploy-producao.md).
 
+Quatro sinais externos vigiam a instalação: disponibilidade (UptimeRobot consultando `/api/health` a cada 5 minutos), a
+execução do backup diário e da retenção semanal, e erro de servidor (um contêiner conta os 5xx de `system_logs` a cada 15
+minutos e manda o resumo no alerta). Os três últimos usam o mesmo monitor externo, que avisa por falta de sinal ou por
+`/fail`. Ver [monitoramento externo](./docs/deploy-producao.md#monitoramento-externo).
+
 ## Testes
 
 A suíte de integração usa um PostgreSQL temporário e isolado na porta `5434`. Ela cobre isolamento multiempresa,

@@ -71,6 +71,16 @@ const envSchema = z
       .optional()
       .transform((value) => value || undefined)
       .pipe(z.string().url('RETENTION_HEARTBEAT_URL deve ser uma URL válida').optional()),
+    ERROR_ALERT_HEARTBEAT_URL: z
+      .string()
+      .trim()
+      .optional()
+      .transform((value) => value || undefined)
+      .pipe(z.string().url('ERROR_ALERT_HEARTBEAT_URL deve ser uma URL válida').optional()),
+    // A janela consultada é este intervalo mais uma folga, para nenhum erro cair entre duas rodadas.
+    ERROR_ALERT_INTERVAL_SECONDS: z.coerce.number().int().min(60).default(900),
+    // 1 = todo erro de servidor merece um olhar. Num sistema saudável esse número fica em zero.
+    ERROR_ALERT_THRESHOLD: z.coerce.number().int().min(1).default(1),
   })
   .superRefine((value, context) => {
     if (value.NODE_ENV !== 'production') return

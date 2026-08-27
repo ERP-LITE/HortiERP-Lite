@@ -56,6 +56,11 @@ const TRAVESSIAS_LEGITIMAS = [
     motivo: 'manutenção operacional: varre o disco de todas as empresas comparando com o banco, por definição transversal',
   },
   {
+    arquivo: 'modules/logs/error-alert.service.ts',
+    tabela: 'systemLogs',
+    motivo: 'alerta operacional: conta erro de servidor do sistema todo — filtrar por empresa esconderia o erro que está acontecendo em outra',
+  },
+  {
     arquivo: 'modules/retention/retention.service.ts',
     tabela: 'systemLogs',
     motivo: 'retenção de dados: o corte é por data, não por empresa — filtrar por empresa deixaria log vencido de outra para trás',

@@ -378,6 +378,103 @@ montado falha ao criar o diretório e permissão incompatível falha no `access(
 monitoramento de espaço livre nem uma gravação real periódica, necessários para detectar disco cheio e alguns erros
 de I/O.
 
+## Monitoramento externo
+
+Três sinais, em dois serviços. Nenhum deles mora no servidor de propósito: monitor que roda na mesma
+máquina que ele vigia não avisa quando a máquina cai.
+
+| sinal | serviço | o que prova |
+|---|---|---|
+| `HortiERP — sistema` | UptimeRobot, HTTP a cada 5 min em `https://<APP_DOMAIN>/api/health` | o sistema está no ar **e** o banco e a pasta de anexos respondem |
+| `HortiERP — backup diário` | healthchecks.io, período 1 dia, carência 6 h | o backup do dia rodou até o fim |
+| `HortiERP — retenção semanal` | healthchecks.io, período 1 semana, carência 1 dia | o expurgo de dados pessoais rodou |
+| `HortiERP — erros` | healthchecks.io, período 15 min, carência 5 min | nenhuma rota está devolvendo 5xx |
+
+Os dois primeiros funcionam de formas opostas, e isso é intencional. O UptimeRobot **consulta** o
+sistema, então detecta queda mesmo que nada no servidor esteja funcionando o suficiente para pedir
+socorro. O healthchecks.io **espera um sinal** que o próprio container envia ao terminar, o que é o
+único jeito de vigiar tarefa que roda uma vez por dia ou por semana: não existe o que consultar entre
+duas execuções.
+
+### O monitor precisa apontar para `/api/health`, não para `/health`
+
+Os dois caminhos existem e devolvem `ok`, mas por motivos diferentes:
+
+- **`/api/health`** é da API (`HEALTH_PATHS` em `shared/config/health.ts`). O Caddy manda `/api/*`
+  para o container `api`, e a rota executa um `select 1` no banco e confere permissão de escrita na
+  pasta de anexos. Falha em qualquer um dos dois devolve **503**, e o monitor acusa.
+- **`/health`** cai no `handle` genérico do Caddy, que serve o frontend, e o nginx tem um
+  `location = /health` que devolve `ok` **estático**. Ele prova que o nginx subiu, mais nada.
+
+Ou seja: apontar o monitor para `/health` produz **monitor verde com banco morto**, e a falha só
+aparece quando um cliente liga. Se algum dia alguém "simplificar" a URL do monitor, é esse o prejuízo.
+
+### As URLs de ping são credenciais
+
+O endereço `https://hc-ping.com/<uuid>` de cada verificação é uma capacidade: **quem tem a URL
+consegue enviar o sinal de sucesso**, e portanto calar o alarme sem que o backup tenha rodado. Elas
+moram apenas no `.env.production` (`BACKUP_HEARTBEAT_URL`, `RETENTION_HEARTBEAT_URL`), que fica fora
+do Git pela regra do `.gitignore`. Não colar em documento, em issue nem em mensagem.
+
+### O que estes três sinais não cobrem
+
+- **Até 5 minutos de queda sem aviso**, que é o intervalo da verificação de disponibilidade no plano
+  em uso.
+- **Lentidão.** O monitor mede o tempo de resposta e guarda o histórico, mas não há alerta por
+  degradação, só por indisponibilidade.
+
+### Alerta de erro de servidor
+
+O monitor de disponibilidade não vê rota quebrada: `/api/health` continua respondendo 200 enquanto
+`/api/produtos` devolve 500. Quem cobre isso é o contêiner `error-alert`, que a cada 15 minutos conta
+os erros 5xx registrados em `system_logs` e avisa o mesmo monitor externo.
+
+```
+sem erro na janela  ->  GET  <URL>            (sinal de vida)
+com erro na janela  ->  POST <URL>/fail       (corpo com o resumo)
+banco inacessível   ->  POST <URL>/fail       (corpo com o erro de conexão)
+URL não configurada ->  não faz nada, e diz isso no log
+```
+
+O corpo do `POST` é o que aparece no e-mail, e é ele que evita a ida à tela de logs para saber o que
+quebrou:
+
+```
+3 erro(s) de servidor desde 2026-08-27T17:14:03.294Z:
+2x GET /api/products -> 500: Erro interno do servidor
+1x POST /api/stock/adjust -> 500: deadlock detected
+```
+
+Quatro decisões que valem registro:
+
+- **A verificação também vigia a si mesma.** Se o contêiner morrer, o sinal de vida para de chegar e o
+  monitor acusa quando a carência vence. Um alerta que só fala quando está tudo bem não serve.
+- **Erro que persiste rende um e-mail, não um por rodada**, porque o healthchecks.io notifica na
+  mudança de estado. É o motivo de o script não guardar nada: o estado mora no monitor.
+- **O limite padrão é 1.** Num sistema saudável esse número fica em zero, então todo 5xx merece um
+  olhar. Se algum dia uma rota conhecida ficar barulhenta, suba `ERROR_ALERT_THRESHOLD` em vez de
+  desligar o alerta.
+- **A janela consultada é o intervalo mais 60 segundos de folga.** Sem a folga, um erro no limite
+  exato entre duas rodadas não seria contado por nenhuma das duas.
+
+A consulta roda em escopo de plataforma (`comEscopoDePlataforma`) porque `system_logs` tem RLS: sem
+isso as políticas devolveriam zero linha e o alerta **silenciaria em vez de falhar**, que é o pior dos
+dois defeitos. A exceção está declarada no `check:tenant-scope`, e há teste fixando que o resumo
+enxerga erro de qualquer empresa e também o que aconteceu sem sessão (`tests/error-alert.test.ts`).
+
+Para conferir à mão, dentro do servidor:
+
+```bash
+docker compose --env-file .env.production -f docker-compose.production.yml logs --tail=20 error-alert
+```
+
+### Onde as contas ficam
+
+As duas contas são pessoais do fornecedor (não são contas da empresa). É o único ponto de falha
+humano do monitoramento: se essas contas ficarem inacessíveis, o sistema continua funcionando e
+ninguém é avisado quando parar. Vale migrar para uma conta da empresa antes de o número de clientes
+crescer.
+
 ## Primeiro super administrador
 
 Depois do primeiro deploy, crie a empresa Plataforma e o primeiro acesso sem registrar a senha no histórico do shell:
@@ -560,8 +657,8 @@ laço num container, e não por cron.
 O intervalo é ajustável por `RETENTION_INTERVAL_SECONDS` no `.env.production` (padrão: 604800, uma
 semana).
 
-**Configure o `RETENTION_HEARTBEAT_URL`.** Crie uma verificação **nova** no monitor, não reaproveite a
-do backup: se as duas apontarem para a mesma URL, o sinal da retenção mascara uma falha de backup — o
+**Configure o `RETENTION_HEARTBEAT_URL`.** Crie uma verificação **nova** no monitor (ver
+[monitoramento externo](#monitoramento-externo)), não reaproveite a do backup: se as duas apontarem para a mesma URL, o sinal da retenção mascara uma falha de backup — o
 alerta mais importante que existe aqui. O período esperado é semanal, diferente do backup, que é
 diário.
 
