@@ -378,6 +378,33 @@ montado falha ao criar o diretório e permissão incompatível falha no `access(
 monitoramento de espaço livre nem uma gravação real periódica, necessários para detectar disco cheio e alguns erros
 de I/O.
 
+## Comando manual na VM precisa de `IMAGE_TAG`
+
+Os serviços declaram `image: hortierp-api:${IMAGE_TAG:-latest}`, e o deploy etiqueta as imagens com o
+SHA do commit. Rodar `docker compose ... up` à mão **sem** `IMAGE_TAG` resolve para `latest`, que não
+existe na máquina, e o Docker tenta buscar no registro público:
+
+```
+Error response from daemon: pull access denied for hortierp-api, repository does not exist
+```
+
+A mensagem fala de permissão, mas o problema é o nome da imagem. `ps`, `logs` e `stop` funcionam sem
+a variável porque não precisam resolver imagem; `up`, `run` e `build` precisam.
+
+A etiqueta em uso sai do contêiner que já está rodando, sem precisar digitar o SHA:
+
+```bash
+IMAGE_TAG=$(docker compose --env-file .env.production -f docker-compose.production.yml ps -q api \
+  | xargs docker inspect --format '{{.Config.Image}}' | cut -d: -f2)
+
+IMAGE_TAG="$IMAGE_TAG" docker compose --env-file .env.production -f docker-compose.production.yml \
+  up -d --no-deps --force-recreate <servico>
+```
+
+O `--no-deps` evita que o compose avalie as dependências e reexecute o `migrate`; nomear o serviço
+evita encostar em API, gateway e banco. Recriar é necessário quando o que mudou foi uma variável do
+`.env.production`: contêiner em execução não relê o arquivo.
+
 ## Monitoramento externo
 
 Três sinais, em dois serviços. Nenhum deles mora no servidor de propósito: monitor que roda na mesma
