@@ -17,8 +17,6 @@ import TableCheckbox from '@/components/ui/TableCheckbox.vue'
 import SortableTableHeader from '@/components/ui/SortableTableHeader.vue'
 import ExpandableText from '@/components/ui/ExpandableText.vue'
 import StatusBadge from '@/components/ui/StatusBadge.vue'
-import { getApiErrorMessage, resolveFormError } from '@/services/api'
-import { confirmDelete, toastError, toastSuccess } from '@/lib/alerts'
 import { statusFilterOptionsFor } from '@/lib/status'
 import {
   createCategory,
@@ -28,16 +26,18 @@ import {
   updateCategory,
   type CategoryInput,
 } from '@/services/categoriesService'
-import { useAuthStore } from '@/stores/auth'
-import { usePagination } from '@/composables/usePagination'
+import { useAsyncState } from '@/composables/useAsyncState'
 import { useBulkSelection } from '@/composables/useBulkSelection'
+import { useCrudModal } from '@/composables/useCrudModal'
 import { useFilterModal } from '@/composables/useFilterModal'
+import { usePagination } from '@/composables/usePagination'
+import { usePermissions } from '@/composables/usePermissions'
+import { useRecordDeletion } from '@/composables/useRecordDeletion'
 import { useTableSort } from '@/composables/useTableSort'
 import { LIMITES_TEXTO } from '@/lib/limits'
 import type { Category } from '@/types'
 
-const auth = useAuthStore()
-const canManage = computed(() => auth.user?.role === 'admin' || auth.user?.role === 'gerente')
+const { canManage } = usePermissions()
 
 const { page, pageSize, total, totalPages, applyMeta, reload, watchSearch, paginationProps } = usePagination()
 const { sortBy, sortOrder, toggleSort } = useTableSort(() => reload(loadCategories), 'name')
@@ -46,9 +46,7 @@ const categories = ref<Category[]>([])
 const { selectedIds, allVisibleSelected, toggleOne, toggleAllVisible, clearSelection } = useBulkSelection(() =>
   categories.value.map(({ id }) => id),
 )
-const deletingSelected = ref(false)
-const loading = ref(true)
-const errorMessage = ref('')
+const { loading, errorMessage, withLoading } = useAsyncState()
 
 const search = ref('')
 const { filters, draftFilters, filterModalOpen, openFilterModal, applyFilters, clearFilters } = useFilterModal(
@@ -58,16 +56,8 @@ const { filters, draftFilters, filterModalOpen, openFilterModal, applyFilters, c
 const activeFilterCount = computed(() => Number(filters.value.active !== 'todos'))
 const statusFilterOptions = statusFilterOptionsFor('f')
 
-const modalOpen = ref(false)
-const editingId = ref<string | null>(null)
-const emptyForm: Required<CategoryInput> = { name: '', description: '', active: true }
-const form = ref<Required<CategoryInput>>({ ...emptyForm })
-const saving = ref(false)
-const fieldErrors = ref<Record<string, string>>({})
-
 async function loadCategories() {
-  loading.value = true
-  try {
+  await withLoading(async () => {
     const result = await listCategories({
       page: page.value,
       pageSize: pageSize.value,
@@ -79,26 +69,27 @@ async function loadCategories() {
     categories.value = result.data
     clearSelection()
     applyMeta(result)
-  } catch (error) {
-    errorMessage.value = getApiErrorMessage(error)
-  } finally {
-    loading.value = false
-  }
+  })
 }
 
-function openCreateModal() {
-  editingId.value = null
-  form.value = { ...emptyForm }
-  fieldErrors.value = {}
-  modalOpen.value = true
-}
-
-function openEditModal(category: Category) {
-  editingId.value = category.id
-  form.value = { name: category.name, description: category.description ?? '', active: category.active }
-  fieldErrors.value = {}
-  modalOpen.value = true
-}
+const { modalOpen, editingId, saving, form, fieldErrors, openCreateModal, openEditModal, handleSubmit } = useCrudModal<
+  Required<CategoryInput>,
+  Category
+>({
+  emptyForm: () => ({ name: '', description: '', active: true }),
+  toForm: (category) => ({
+    name: category.name,
+    description: category.description ?? '',
+    active: category.active,
+  }),
+  create: (values) => createCategory(values),
+  update: (id, values) => updateCategory(id, values),
+  reload: loadCategories,
+  createdMessage: 'Categoria criada com sucesso',
+  updatedMessage: 'Categoria atualizada com sucesso',
+  saveErrorMessage: 'Não foi possível salvar a categoria',
+  validate,
+})
 
 function validate(): boolean {
   fieldErrors.value = {}
@@ -106,64 +97,15 @@ function validate(): boolean {
   return Object.keys(fieldErrors.value).length === 0
 }
 
-async function handleSubmit() {
-  if (!validate()) return
-
-  saving.value = true
-  try {
-    if (editingId.value) {
-      await updateCategory(editingId.value, form.value)
-      toastSuccess('Categoria atualizada com sucesso')
-    } else {
-      await createCategory(form.value)
-      toastSuccess('Categoria criada com sucesso')
-    }
-    modalOpen.value = false
-    await loadCategories()
-  } catch (error) {
-    const result = resolveFormError(error, 'Não foi possível salvar a categoria')
-    fieldErrors.value = result.fieldErrors
-    if (result.message) toastError(result.message)
-  } finally {
-    saving.value = false
-  }
-}
-
-async function handleDelete(category: Category) {
-  const confirmed = await confirmDelete({
-    title: `Excluir a categoria "${category.name}"?`,
-    text: 'Essa ação não pode ser desfeita.',
-  })
-  if (!confirmed) return
-
-  try {
-    await deleteCategory(category.id)
-    await loadCategories()
-    toastSuccess('Categoria excluída com sucesso')
-  } catch (error) {
-    toastError(getApiErrorMessage(error, 'Não foi possível excluir a categoria'))
-  }
-}
-
-async function handleBulkDelete() {
-  const count = selectedIds.value.length
-  const confirmed = await confirmDelete({
-    title: `Excluir ${count} ${count === 1 ? 'categoria selecionada' : 'categorias selecionadas'}?`,
-    text: 'Os registros serão excluídos logicamente e deixarão de aparecer no sistema.',
-  })
-  if (!confirmed) return
-
-  deletingSelected.value = true
-  try {
-    const result = await deleteCategories(selectedIds.value)
-    await loadCategories()
-    toastSuccess(`${result.deleted} ${result.deleted === 1 ? 'categoria excluída' : 'categorias excluídas'} com sucesso`)
-  } catch (error) {
-    toastError(getApiErrorMessage(error, 'Não foi possível excluir as categorias selecionadas'))
-  } finally {
-    deletingSelected.value = false
-  }
-}
+const { deletingSelected, handleDelete, handleBulkDelete } = useRecordDeletion<Category>({
+  singular: 'categoria',
+  plural: 'categorias',
+  genero: 'f',
+  remove: deleteCategory,
+  removeMany: deleteCategories,
+  selectedIds,
+  reload: loadCategories,
+})
 
 watchSearch(search, loadCategories)
 onMounted(loadCategories)

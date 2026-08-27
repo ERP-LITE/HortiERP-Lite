@@ -16,6 +16,7 @@ import DateInput from '@/components/ui/DateInput.vue'
 import MonthInput from '@/components/ui/MonthInput.vue'
 import SortableTableHeader from '@/components/ui/SortableTableHeader.vue'
 import ExpandableText from '@/components/ui/ExpandableText.vue'
+import { useAsyncState } from '@/composables/useAsyncState'
 import { usePagination } from '@/composables/usePagination'
 import { useFilterModal } from '@/composables/useFilterModal'
 import { useTableSort } from '@/composables/useTableSort'
@@ -39,14 +40,13 @@ const { page, pageSize, total, totalPages, applyMeta, reload, watchSearch, pagin
 const { sortBy, sortOrder, toggleSort } = useTableSort(() => reload(loadBillings), 'dueDate', 'desc')
 const billings = ref<Billing[]>([])
 const companies = ref<{ value: string; label: string }[]>([])
-const loading = ref(true)
+const { loading, errorMessage, withLoading } = useAsyncState()
 const saving = ref(false)
 const search = ref('')
 const modalOpen = ref(false)
 const editingId = ref<string | null>(null)
 const markedPaid = ref(false)
 const fieldErrors = ref<Record<string, string>>({})
-const errorMessage = ref('')
 
 function emptyFilters() {
   return { status: 'todos', period: { preset: 'todos', from: '', to: '' } as PeriodValue }
@@ -96,9 +96,7 @@ function statusVariant(value: BillingStatus) {
 }
 
 async function loadBillings() {
-  loading.value = true
-  errorMessage.value = ''
-  try {
+  await withLoading(async () => {
     const result = await listBillings({
       page: page.value,
       pageSize: pageSize.value,
@@ -111,11 +109,7 @@ async function loadBillings() {
     })
     billings.value = result.data
     applyMeta(result)
-  } catch (error) {
-    errorMessage.value = resolveFormError(error, 'Não foi possível carregar as cobranças').message
-  } finally {
-    loading.value = false
-  }
+  }, 'Não foi possível carregar as cobranças')
 }
 
 function openCreate() {

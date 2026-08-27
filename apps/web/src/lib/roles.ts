@@ -11,3 +11,8 @@ export function roleLabel(role: string | null | undefined) {
   if (!role) return '—'
   return roleLabels[role as UserRole] ?? role
 }
+
+/** Admin e gerente são os papéis que podem cadastrar, editar e excluir dentro da empresa. */
+export function isManagerRole(role: string | null | undefined) {
+  return role === 'admin' || role === 'gerente'
+}

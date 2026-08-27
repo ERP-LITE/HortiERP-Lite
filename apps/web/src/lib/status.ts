@@ -1,4 +1,6 @@
-export type Genero = 'm' | 'f'
+import type { Genero } from './grammar'
+
+export type { Genero }
 
 export function statusLabel(active: boolean, genero: Genero = 'm') {
   if (genero === 'f') return active ? 'Ativa' : 'Inativa'

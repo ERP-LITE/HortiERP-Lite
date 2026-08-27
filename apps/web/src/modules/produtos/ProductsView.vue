@@ -20,24 +20,24 @@ import BulkSelectionBar from '@/components/ui/BulkSelectionBar.vue'
 import TableCheckbox from '@/components/ui/TableCheckbox.vue'
 import SortableTableHeader from '@/components/ui/SortableTableHeader.vue'
 import StatusBadge from '@/components/ui/StatusBadge.vue'
-import { getApiErrorMessage, resolveFormError } from '@/services/api'
-import { confirmDelete, toastError, toastSuccess } from '@/lib/alerts'
 import { listAllCategories } from '@/services/categoriesService'
 import { listAllUnits } from '@/services/unitsService'
 import { createProduct, deleteProduct, deleteProducts, listAllProducts, listProducts, updateProduct } from '@/services/productsService'
 import { csvNumber } from '@/lib/csv'
-import { useAuthStore } from '@/stores/auth'
-import { usePagination } from '@/composables/usePagination'
+import { useAsyncState } from '@/composables/useAsyncState'
 import { useBulkSelection } from '@/composables/useBulkSelection'
+import { useCrudModal } from '@/composables/useCrudModal'
 import { useFilterModal } from '@/composables/useFilterModal'
+import { usePagination } from '@/composables/usePagination'
+import { usePermissions } from '@/composables/usePermissions'
+import { useRecordDeletion } from '@/composables/useRecordDeletion'
 import { useTableSort } from '@/composables/useTableSort'
 import { LIMITES_NUMERO, LIMITES_TEXTO } from '@/lib/limits'
 import type { Category, Product, Unit } from '@/types'
 import { formatQuantity } from '@/lib/format'
 import { statusFilterOptionsFor, statusLabel } from '@/lib/status'
 
-const auth = useAuthStore()
-const canManage = computed(() => auth.user?.role === 'admin' || auth.user?.role === 'gerente')
+const { canManage } = usePermissions()
 
 const { page, pageSize, total, totalPages, applyMeta, reload, watchSearch, paginationProps } = usePagination()
 const { sortBy, sortOrder, toggleSort } = useTableSort(() => reload(loadProducts), 'name')
@@ -46,11 +46,9 @@ const products = ref<Product[]>([])
 const { selectedIds, allVisibleSelected, toggleOne, toggleAllVisible, clearSelection } = useBulkSelection(() =>
   products.value.map(({ id }) => id),
 )
-const deletingSelected = ref(false)
 const categories = ref<Category[]>([])
 const units = ref<Unit[]>([])
-const loading = ref(true)
-const errorMessage = ref('')
+const { loading, errorMessage, withLoading, captureError } = useAsyncState()
 
 const search = ref('')
 const { filters, draftFilters, filterModalOpen, openFilterModal, applyFilters, clearFilters } = useFilterModal(
@@ -65,58 +63,10 @@ const activeFilterCount = computed(
 )
 const statusFilterOptions = statusFilterOptionsFor()
 
-const modalOpen = ref(false)
 const importModalOpen = ref(false)
-const editingId = ref<string | null>(null)
-const saving = ref(false)
-const fieldErrors = ref<Record<string, string>>({})
-
-const emptyForm = {
-  categoryId: '',
-  unitId: '',
-  name: '',
-  sku: '',
-  barcode: '',
-  costPrice: '',
-  salePrice: '',
-  minStock: '0',
-  active: true,
-}
-const form = ref({ ...emptyForm })
-
-const categoryOptions = computed(() =>
-  categories.value
-    .filter((c) => c.active || c.id === form.value.categoryId)
-    .map((c) => ({ value: c.id, label: c.active ? c.name : `${c.name} (inativa)` })),
-)
-const unitOptions = computed(() =>
-  units.value
-    .filter((u) => u.active || u.id === form.value.unitId)
-    .map((u) => ({
-      value: u.id,
-      label: u.active ? `${u.name} (${u.abbreviation})` : `${u.name} (${u.abbreviation}) inativa`,
-    })),
-)
-const categoryFilterOptions = computed(() => [
-  { value: 'todas', label: 'Todas as categorias' },
-  ...categories.value.map((c) => ({ value: c.id, label: c.name })),
-])
-const unitFilterOptions = computed(() => [
-  { value: 'todas', label: 'Todas as unidades' },
-  ...units.value.map((u) => ({ value: u.id, label: `${u.name} (${u.abbreviation})` })),
-])
-
-function categoryName(id: string) {
-  return categories.value.find((c) => c.id === id)?.name ?? '—'
-}
-
-function unitAbbreviation(id: string) {
-  return units.value.find((u) => u.id === id)?.abbreviation ?? '—'
-}
 
 async function loadProducts() {
-  loading.value = true
-  try {
+  await withLoading(async () => {
     const result = await listProducts({
       page: page.value,
       pageSize: pageSize.value,
@@ -130,21 +80,15 @@ async function loadProducts() {
     products.value = result.data
     clearSelection()
     applyMeta(result)
-  } catch (error) {
-    errorMessage.value = getApiErrorMessage(error)
-  } finally {
-    loading.value = false
-  }
+  })
 }
 
 async function loadFormOptions() {
-  try {
+  await captureError(async () => {
     const [categoryOptions, unitOptions] = await Promise.all([listAllCategories(), listAllUnits()])
     categories.value = categoryOptions
     units.value = unitOptions
-  } catch (error) {
-    errorMessage.value = getApiErrorMessage(error)
-  }
+  })
 }
 
 async function exportCsv() {
@@ -179,16 +123,48 @@ async function loadAll() {
   await Promise.all([loadProducts(), loadFormOptions()])
 }
 
-function openCreateModal() {
-  editingId.value = null
-  form.value = { ...emptyForm }
-  fieldErrors.value = {}
-  modalOpen.value = true
+interface ProductForm {
+  categoryId: string
+  unitId: string
+  name: string
+  sku: string
+  barcode: string
+  costPrice: string
+  salePrice: string
+  minStock: string
+  active: boolean
 }
 
-function openEditModal(product: Product) {
-  editingId.value = product.id
-  form.value = {
+function toPayload(values: ProductForm) {
+  return {
+    categoryId: values.categoryId,
+    unitId: values.unitId,
+    name: values.name,
+    sku: values.sku || null,
+    barcode: values.barcode || null,
+    costPrice: values.costPrice ? Number(values.costPrice) : null,
+    salePrice: values.salePrice ? Number(values.salePrice) : null,
+    minStock: Number(values.minStock),
+    active: values.active,
+  }
+}
+
+const { modalOpen, editingId, saving, form, fieldErrors, openCreateModal, openEditModal, handleSubmit } = useCrudModal<
+  ProductForm,
+  Product
+>({
+  emptyForm: () => ({
+    categoryId: '',
+    unitId: '',
+    name: '',
+    sku: '',
+    barcode: '',
+    costPrice: '',
+    salePrice: '',
+    minStock: '0',
+    active: true,
+  }),
+  toForm: (product) => ({
     categoryId: product.categoryId,
     unitId: product.unitId,
     name: product.name,
@@ -198,10 +174,15 @@ function openEditModal(product: Product) {
     salePrice: product.salePrice ?? '',
     minStock: product.minStock,
     active: product.active,
-  }
-  fieldErrors.value = {}
-  modalOpen.value = true
-}
+  }),
+  create: (values) => createProduct(toPayload(values)),
+  update: (id, values) => updateProduct(id, toPayload(values)),
+  reload: loadAll,
+  createdMessage: 'Produto criado com sucesso',
+  updatedMessage: 'Produto atualizado com sucesso',
+  saveErrorMessage: 'Não foi possível salvar o produto',
+  validate,
+})
 
 function validate(): boolean {
   fieldErrors.value = {}
@@ -212,76 +193,44 @@ function validate(): boolean {
   return Object.keys(fieldErrors.value).length === 0
 }
 
-async function handleSubmit() {
-  if (!validate()) return
+const categoryOptions = computed(() =>
+  categories.value
+    .filter((c) => c.active || c.id === form.value.categoryId)
+    .map((c) => ({ value: c.id, label: c.active ? c.name : `${c.name} (inativa)` })),
+)
+const unitOptions = computed(() =>
+  units.value
+    .filter((u) => u.active || u.id === form.value.unitId)
+    .map((u) => ({
+      value: u.id,
+      label: u.active ? `${u.name} (${u.abbreviation})` : `${u.name} (${u.abbreviation}) inativa`,
+    })),
+)
+const categoryFilterOptions = computed(() => [
+  { value: 'todas', label: 'Todas as categorias' },
+  ...categories.value.map((c) => ({ value: c.id, label: c.name })),
+])
+const unitFilterOptions = computed(() => [
+  { value: 'todas', label: 'Todas as unidades' },
+  ...units.value.map((u) => ({ value: u.id, label: `${u.name} (${u.abbreviation})` })),
+])
 
-  saving.value = true
-  try {
-    const payload = {
-      categoryId: form.value.categoryId,
-      unitId: form.value.unitId,
-      name: form.value.name,
-      sku: form.value.sku || null,
-      barcode: form.value.barcode || null,
-      costPrice: form.value.costPrice ? Number(form.value.costPrice) : null,
-      salePrice: form.value.salePrice ? Number(form.value.salePrice) : null,
-      minStock: Number(form.value.minStock),
-      active: form.value.active,
-    }
-
-    if (editingId.value) {
-      await updateProduct(editingId.value, payload)
-      toastSuccess('Produto atualizado com sucesso')
-    } else {
-      await createProduct(payload)
-      toastSuccess('Produto criado com sucesso')
-    }
-    modalOpen.value = false
-    await loadAll()
-  } catch (error) {
-    const result = resolveFormError(error, 'Não foi possível salvar o produto')
-    fieldErrors.value = result.fieldErrors
-    if (result.message) toastError(result.message)
-  } finally {
-    saving.value = false
-  }
+function categoryName(id: string) {
+  return categories.value.find((c) => c.id === id)?.name ?? '—'
 }
 
-async function handleDelete(product: Product) {
-  const confirmed = await confirmDelete({
-    title: `Excluir o produto "${product.name}"?`,
-    text: 'Essa ação não pode ser desfeita.',
-  })
-  if (!confirmed) return
-
-  try {
-    await deleteProduct(product.id)
-    await loadAll()
-    toastSuccess('Produto excluído com sucesso')
-  } catch (error) {
-    toastError(getApiErrorMessage(error, 'Não foi possível excluir o produto'))
-  }
+function unitAbbreviation(id: string) {
+  return units.value.find((u) => u.id === id)?.abbreviation ?? '—'
 }
 
-async function handleBulkDelete() {
-  const count = selectedIds.value.length
-  const confirmed = await confirmDelete({
-    title: `Excluir ${count} ${count === 1 ? 'produto selecionado' : 'produtos selecionados'}?`,
-    text: 'Os registros serão excluídos logicamente e deixarão de aparecer no sistema.',
-  })
-  if (!confirmed) return
-
-  deletingSelected.value = true
-  try {
-    const result = await deleteProducts(selectedIds.value)
-    await loadProducts()
-    toastSuccess(`${result.deleted} ${result.deleted === 1 ? 'produto excluído' : 'produtos excluídos'} com sucesso`)
-  } catch (error) {
-    toastError(getApiErrorMessage(error, 'Não foi possível excluir os produtos selecionados'))
-  } finally {
-    deletingSelected.value = false
-  }
-}
+const { deletingSelected, handleDelete, handleBulkDelete } = useRecordDeletion<Product>({
+  singular: 'produto',
+  plural: 'produtos',
+  remove: deleteProduct,
+  removeMany: deleteProducts,
+  selectedIds,
+  reload: loadProducts,
+})
 
 watchSearch(search, loadProducts)
 onMounted(loadAll)

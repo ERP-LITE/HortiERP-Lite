@@ -38,10 +38,25 @@ const envSchema = z
           .array(z.string().url('CORS_ORIGIN deve conter apenas URLs válidas'))
           .min(1, 'CORS_ORIGIN deve ter ao menos uma origem'),
       ),
+    // Número de proxies na frente da API, não booleano. `true` confiaria em todos os saltos, e aí o
+    // `request.ip` passa a ser o valor mais à esquerda do X-Forwarded-For, que quem chama escreve:
+    // o limite de tentativas por IP viraria enfeite e o IP do log seria inventado.
     TRUST_PROXY: z
-      .enum(['true', 'false'])
+      .string()
       .default('false')
-      .transform((value) => value === 'true'),
+      .transform((value, ctx) => {
+        if (value === 'false') return false
+        const saltos = Number(value)
+        if (!Number.isInteger(saltos) || saltos < 1) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message:
+              'TRUST_PROXY deve ser `false` ou a quantidade de proxies na frente da API (1 com o gateway padrão). `true` não vale: confiaria em qualquer X-Forwarded-For enviado pelo cliente.',
+          })
+          return z.NEVER
+        }
+        return saltos
+      }),
     INVOICE_STORAGE_PATH: z.string().min(1).default('./storage/invoices'),
     INVOICE_MAX_FILE_SIZE: z.coerce.number().int().positive().default(10 * 1024 * 1024),
     TECHNICAL_LOG_RETENTION_DAYS: z.coerce
@@ -85,6 +100,15 @@ const envSchema = z
         path: ['APP_DATABASE_URL'],
         message:
           'APP_DATABASE_URL usa o mesmo usuário de DATABASE_URL; nesse caso a API segue com o papel dono e o RLS não vale nada',
+      })
+    }
+
+    if (value.TRUST_PROXY === false) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['TRUST_PROXY'],
+        message:
+          'TRUST_PROXY deve ser o número de proxies na frente da API (1 com o gateway padrão). Com false, todo cliente chega como o IP do gateway e o limite de tentativas passa a ser compartilhado por todos.',
       })
     }
 

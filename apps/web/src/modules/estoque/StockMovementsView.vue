@@ -14,10 +14,10 @@ import ExpandableText from '@/components/ui/ExpandableText.vue'
 import SortableTableHeader from '@/components/ui/SortableTableHeader.vue'
 import type { PeriodValue } from '@/lib/period'
 import { formatDate, formatDateTime, formatQuantity } from '@/lib/format'
-import { getApiErrorMessage } from '@/services/api'
 import { listAllStockMovements, listStockMovements } from '@/services/stockService'
 import { csvNumber } from '@/lib/csv'
 import { listAllProducts } from '@/services/productsService'
+import { useAsyncState } from '@/composables/useAsyncState'
 import { usePagination } from '@/composables/usePagination'
 import { useFilterModal } from '@/composables/useFilterModal'
 import { useTableSort } from '@/composables/useTableSort'
@@ -38,8 +38,7 @@ const { sortBy, sortOrder, toggleSort } = useTableSort(() => reload(loadMovement
 
 const movements = ref<StockMovement[]>([])
 const products = ref<Product[]>([])
-const loading = ref(true)
-const errorMessage = ref('')
+const { loading, errorMessage, withLoading, captureError } = useAsyncState()
 const search = ref('')
 
 const typeLabels: Record<MovementType, string> = {
@@ -80,8 +79,7 @@ const productFilterOptions = computed(() => [
 ])
 
 async function loadMovements() {
-  loading.value = true
-  try {
+  await withLoading(async () => {
     const result = await listStockMovements({
       page: page.value,
       pageSize: pageSize.value,
@@ -95,19 +93,13 @@ async function loadMovements() {
     })
     movements.value = result.data
     applyMeta(result)
-  } catch (error) {
-    errorMessage.value = getApiErrorMessage(error)
-  } finally {
-    loading.value = false
-  }
+  })
 }
 
 async function loadProductOptions() {
-  try {
+  await captureError(async () => {
     products.value = await listAllProducts()
-  } catch (error) {
-    errorMessage.value = getApiErrorMessage(error)
-  }
+  })
 }
 
 watchSearch(search, loadMovements)

@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm'
-import { boolean, pgTable, text, uniqueIndex, uuid } from 'drizzle-orm/pg-core'
+import { boolean, pgTable, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core'
 import { auditBy, timestamps } from './columns.js'
 import { companies } from './companies.js'
 import { userRoleEnum } from './enums.js'
@@ -14,6 +14,8 @@ export const users = pgTable('users', {
   passwordHash: text('password_hash').notNull(),
   role: userRoleEnum('role').notNull().default('operador'),
   active: boolean('active').notNull().default(true),
+  /** Token emitido antes disso não vale mais. Nulo = senha nunca trocada desde a migration 0009. */
+  passwordChangedAt: timestamp('password_changed_at', { withTimezone: true }),
   ...timestamps,
   ...auditBy,
 }, (table) => ({

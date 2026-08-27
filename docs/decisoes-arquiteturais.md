@@ -24,6 +24,46 @@ Não há tabela de junção usuário-empresa: um usuário pertence a exatamente 
 - Sessão = JWT assinado, guardado em cookie `httpOnly` + `sameSite=lax` (nunca exposto a JS no browser). Emissão centralizada em `apps/api/src/shared/auth/session.ts` (`issueSession`), reaproveitada por login, impersonação e saída de impersonação — evita duplicar a lógica de cookie/expiração em cada rota.
 - Rate limit dedicado em `/auth/login` e `/auth/password` (10 req/min) além do rate limit global da API.
 - Toda rota autenticada também confirma no banco que o usuário real, seu papel e a empresa da sessão continuam ativos. Em impersonação, tanto a empresa Plataforma do `super_admin` quanto a empresa acessada são verificadas. Assim, excluir/desativar usuário, mudar seu papel ou suspender uma empresa invalida imediatamente os JWTs já emitidos.
+- **Trocar a senha encerra as sessões abertas antes dela.** `users.password_changed_at` guarda o
+  instante da última troca, e toda requisição autenticada compara esse valor com o `iat` do token.
+  Antes, o JWT antigo seguia aceito até expirar (8h no padrão): quem tivesse roubado a sessão
+  continuava dentro por até 8 horas depois de a vítima trocar a senha, que é exatamente o que a
+  pessoa faz ao desconfiar de invasão. Vale também para senha redefinida por um admin. Dois detalhes
+  que não são acidentais: a coluna é **nula** nos usuários que já existiam, para subir a migration
+  não desconectar a empresa inteira de uma vez, e a comparação é feita **em segundos**, porque o
+  `iat` do JWT não tem fração; em milissegundos o cookie reemitido no mesmo instante da troca
+  nasceria velho e derrubaria justamente quem acabou de trocar a senha. A rota de troca reemite o
+  cookie com as mesmas credenciais (impersonação incluída), então quem trocou continua conectado e
+  só as outras sessões caem. **A troca de senha não acontece só na tela de perfil**: a pessoa pode
+  editar o próprio registro em Usuários (`PUT /users/:id`) ou em Super administradores
+  (`PUT /platform-users/:id`), e essas rotas gravam a mesma coluna. A primeira versão desta correção
+  só reemitia o cookie na rota de perfil, e o resultado foi exatamente um logout em quem trocou a
+  própria senha pela tela de super administradores. Por isso a reemissão mora num helper único,
+  `renewSession` em `shared/auth/session.ts`, chamado pelas três rotas: quem criar uma quarta rota que
+  grave senha encontra o helper em vez de reinventar o trecho e esquecer o caso.
+  Existe uma janela inerente nesse desenho: entre a senha ser gravada (quando o token antigo morre) e
+  a resposta com o cookie novo chegar ao navegador, qualquer requisição que já estava no ar leva o
+  cookie morto e volta `401`. O monitor de sessão do frontend dispara a cada 45 segundos e também ao
+  focar a aba, então isso acontece na prática. Como um `401` manda para o login, quem trocou a senha
+  com sucesso era deslogado por causa de uma requisição paralela. Por isso existe a **trégua** em
+  `lib/sessionRedirect.ts`: a troca de senha suspende por 5 segundos apenas o *redirecionamento* para
+  o login (o `401` continua sendo erro para quem chamou), e a trégua é renovada no fim da chamada
+  porque numa conexão ruim a resposta pode voltar depois de a primeira ter vencido. Sem isso a
+  correção de segurança viraria um logout a cada troca de senha, e alguém acabaria removendo ela.
+- **O login gasta o mesmo tempo com e-mail que existe e com e-mail que não existe.** A mensagem já
+  era genérica, mas a comparação do bcrypt só rodava quando a conta era utilizável: e-mail
+  inexistente respondia em poucos milissegundos e e-mail real demorava o tempo do hash, o que
+  entrega a lista de quem tem conta a quem cronometrar as respostas. Agora a comparação roda sempre,
+  contra um hash de descarte quando a conta não serve.
+- **Freio por conta no login, além do freio por IP** (`shared/security/loginThrottle.ts`): 5 falhas
+  bloqueiam aquele e-mail por 1 minuto, 10 por 5 minutos, 15 por 15 minutos, contando numa janela de
+  15 minutos e zerando no primeiro acerto. O limite por IP sozinho não segura teste de senha
+  distribuído. É bloqueio **temporário e curto**, não travamento até um admin destravar: travar
+  deixaria qualquer pessoa derrubar o acesso de um colega só errando a senha dele algumas vezes. A
+  contagem vive em memória de propósito, porque gravar cada falha no banco custa uma escrita por
+  tentativa (justamente o que quem ataca controla) e transformaria a tabela de usuários em registro
+  de tentativa de invasão; o preço é que reiniciar a API zera a contagem. A mensagem é a mesma do
+  limite por IP: dizer "esta conta está bloqueada" contaria que o e-mail existe.
 - O frontend valida `/auth/me` a cada 45 segundos e quando a aba volta ao foco/visibilidade. Isso não substitui a proteção por requisição do backend: serve para retirar proativamente da interface quem ficou parado numa tela depois de a empresa ser suspensa, o usuário ser desativado ou o papel ser alterado. Um `401` redireciona ao login com mensagem genérica, sem revelar a causa administrativa.
 - O logout é idempotente e não exige que o JWT ainda seja válido: `POST /auth/logout` sempre tenta remover o cookie. O frontend também registra localmente a intenção de sair antes da chamada; se a API estiver indisponível, um F5 não restaura por engano o JWT que possa ter permanecido no navegador.
 - **Logout por inatividade** (`composables/useIdleLogout.ts`): 30 minutos sem interação encerram a sessão, com um aviso e contagem regressiva no último minuto. Mouse, teclado, roda e toque contam como presença (com limite de um reset por segundo, para `mousemove` não reagendar o cronômetro a cada pixel). **Depois que o aviso aparece, só o clique explícito em "continuar conectado" conta**: um movimento incidental do mouse não deve dispensar o aviso em silêncio, senão o usuário nunca fica sabendo que a sessão ia cair. É proteção de estação desacompanhada — o backend continua com sua própria expiração de 8h no JWT, independente disso.
@@ -359,6 +399,31 @@ mora num componente ou num composable, não copiada nas duas.
   duas colunas e sobra altura, e a prévia com chevron do `ExpandableText` espremia a coluna de
   quantidade para fora da tela no celular. O papel não tem clique, então a lista completa é
   renderizada oculta e só aparece na impressão, no lugar do botão.
+- **`useCrudModal`** é o modal de cadastro/edição de toda tela com formulário: `modalOpen`,
+  `editingId`, `form`, `fieldErrors`, `saving`, o `openCreateModal`/`openEditModal` que zera o
+  formulário e o `handleSubmit` que decide entre criar e atualizar, avisa, fecha e recarrega. Esse
+  bloco estava copiado em 7 telas, com o mesmo `try/catch` de `resolveFormError` no fim. A tela passa
+  o formulário em branco, o mapeamento do registro para o formulário, as duas chamadas do service e
+  os textos; o que é só daquela tela continua nela, via `validate`, `onOpen` (confirmação de senha,
+  aba ativa) e `onSaveError` (o Empresas usa para pular para a aba que tem erro). O formulário em
+  branco é uma **função**, não um objeto: o de Perdas tem a data de hoje dentro, e um objeto
+  compartilhado congelaria o dia da primeira abertura.
+- **`useRecordDeletion`** cobre exclusão individual e em massa. As seis mensagens de cada tela
+  (confirmação, sucesso e erro, nos dois modos) eram escritas à mão, e a flexão em português é
+  onde isso errava: "1 unidades excluídas". Agora a tela informa só `singular`, `plural` e o gênero,
+  e os textos saem de `lib/deletionMessages.ts`, que é puro justamente para ter teste
+  (`tests/deletionMessages.test.ts`) fixando artigo, particípio e o caso da contagem 1. Quem tem
+  texto próprio de confirmação passa `confirmText`/`bulkConfirmText` em vez de reescrever o resto.
+- **`useAsyncState`** entrega `loading`, `errorMessage` e o `withLoading` que embrulha a carga da
+  listagem, no lugar do `loading.value = true` / `try` / `catch` / `finally` repetido em 16 telas. Ele
+  **limpa o `errorMessage` no começo de cada tentativa**: só 5 das 16 faziam isso, e nas outras o
+  aviso de falha ficava na tela por cima de uma lista que já havia recarregado com sucesso. Cargas de
+  apoio que rodam em paralelo com a principal (as opções dos selects) usam `captureError`, que
+  registra o erro sem mexer no `loading`: se mexessem, a que terminasse primeiro apagaria o
+  indicador da que ainda está carregando.
+- **`usePermissions().canManage`** é o `admin || gerente` que estava escrito igual em 5 telas, agora
+  sobre `isManagerRole` em `lib/roles.ts`. E **`useGeneratedPassword`** guarda o gerar/copiar/avisar
+  das três telas que criam senha; a tela só diz em quais campos o valor entra.
 - **`StatusBadge`** e `lib/status.ts` guardam as palavras e a cor de ativo/inativo. A etiqueta, a
   opção do filtro e a coluna do CSV saem do mesmo lugar, com o gênero como parâmetro (unidade é
   "Inativa", produto é "Inativo") e um texto alternativo para o caso de Empresas, onde inativo se

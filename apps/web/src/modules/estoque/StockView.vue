@@ -24,23 +24,22 @@ import { adjustStock, listAllCurrentStock, listCurrentStock } from '@/services/s
 import { csvNumber } from '@/lib/csv'
 import { listAllCategories } from '@/services/categoriesService'
 import { listAllProducts } from '@/services/productsService'
-import { useAuthStore } from '@/stores/auth'
+import { useAsyncState } from '@/composables/useAsyncState'
+import { usePermissions } from '@/composables/usePermissions'
 import { usePagination } from '@/composables/usePagination'
 import { useFilterModal } from '@/composables/useFilterModal'
 import { useTableSort } from '@/composables/useTableSort'
 import { LIMITES_NUMERO, LIMITES_TEXTO } from '@/lib/limits'
 import type { Category, Product, ProductWithRelations } from '@/types'
 
-const auth = useAuthStore()
-const canManage = computed(() => auth.user?.role === 'admin' || auth.user?.role === 'gerente')
+const { canManage } = usePermissions()
 
 const { page, pageSize, total, totalPages, applyMeta, reload, watchSearch, paginationProps } = usePagination()
 const { sortBy, sortOrder, toggleSort } = useTableSort(() => reload(loadStock), 'name')
 
 const products = ref<ProductWithRelations[]>([])
 const categories = ref<Category[]>([])
-const loading = ref(true)
-const errorMessage = ref('')
+const { loading, errorMessage, withLoading, captureError } = useAsyncState()
 
 const search = ref('')
 const { filters, draftFilters, filterModalOpen, openFilterModal, applyFilters, clearFilters } = useFilterModal(
@@ -56,8 +55,7 @@ const categoryFilterOptions = computed(() => [
 ])
 
 async function loadStock() {
-  loading.value = true
-  try {
+  await withLoading(async () => {
     const result = await listCurrentStock({
       page: page.value,
       pageSize: pageSize.value,
@@ -69,19 +67,13 @@ async function loadStock() {
     })
     products.value = result.data
     applyMeta(result)
-  } catch (error) {
-    errorMessage.value = getApiErrorMessage(error)
-  } finally {
-    loading.value = false
-  }
+  })
 }
 
 async function loadCategoryOptions() {
-  try {
+  await captureError(async () => {
     categories.value = await listAllCategories()
-  } catch (error) {
-    errorMessage.value = getApiErrorMessage(error)
-  }
+  })
 }
 
 const allProducts = ref<Product[]>([])

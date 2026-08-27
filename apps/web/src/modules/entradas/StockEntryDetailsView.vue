@@ -23,16 +23,16 @@ import {
   uploadStockEntryAttachment,
 } from '@/services/stockEntriesService'
 import type { StockEntry, StockEntryAttachment } from '@/types'
-import { useAuthStore } from '@/stores/auth'
+import { useAsyncState } from '@/composables/useAsyncState'
+import { usePermissions } from '@/composables/usePermissions'
 import { useLocalTableSort } from '@/composables/useTableSort'
 import { useIsMobile } from '@/composables/useIsMobile'
 import { LIMITES_NUMERO, LIMITES_TEXTO } from '@/lib/limits'
 
 const route = useRoute()
 const router = useRouter()
-const auth = useAuthStore()
 const isMobile = useIsMobile()
-const canDeleteAttachments = computed(() => auth.user?.role === 'admin' || auth.user?.role === 'gerente')
+const { canManage: canDeleteAttachments } = usePermissions()
 const canEditDetails = canDeleteAttachments
 const entry = ref<StockEntry | null>(null)
 const entryItems = computed(() => entry.value?.items ?? [])
@@ -41,9 +41,8 @@ const itemSort = useLocalTableSort(entryItems, {
   quantity: (item) => Number(item.quantity),
   unitCost: (item) => Number(item.unitCost ?? 0),
 }, 'product')
-const loading = ref(true)
+const { loading, errorMessage, withLoading } = useAsyncState()
 const uploading = ref(false)
-const errorMessage = ref('')
 const previewUrl = ref('')
 const previewAttachment = ref<StockEntryAttachment | null>(null)
 const previewLoading = ref(false)
@@ -67,15 +66,9 @@ function isPreviewable(attachment: StockEntryAttachment) {
 }
 
 async function loadEntry() {
-  loading.value = true
-  errorMessage.value = ''
-  try {
+  await withLoading(async () => {
     entry.value = await getStockEntry(entryId.value)
-  } catch (error) {
-    errorMessage.value = getApiErrorMessage(error, 'Não foi possível carregar a entrada')
-  } finally {
-    loading.value = false
-  }
+  }, 'Não foi possível carregar a entrada')
 }
 
 function openEdit() {

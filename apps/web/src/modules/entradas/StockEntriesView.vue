@@ -17,9 +17,9 @@ import BaseBadge from '@/components/ui/BaseBadge.vue'
 import SortableTableHeader from '@/components/ui/SortableTableHeader.vue'
 import type { PeriodValue } from '@/lib/period'
 import { formatDate } from '@/lib/format'
-import { getApiErrorMessage } from '@/services/api'
 import { listAllStockEntries, listStockEntries } from '@/services/stockEntriesService'
 import { csvNumber } from '@/lib/csv'
+import { useAsyncState } from '@/composables/useAsyncState'
 import { usePagination } from '@/composables/usePagination'
 import { useFilterModal } from '@/composables/useFilterModal'
 import { useTableSort } from '@/composables/useTableSort'
@@ -29,8 +29,7 @@ const { page, pageSize, total, totalPages, applyMeta, reload, watchSearch, pagin
 const { sortBy, sortOrder, toggleSort } = useTableSort(() => reload(loadEntries), 'entryDate', 'desc')
 
 const entries = ref<StockEntrySummary[]>([])
-const loading = ref(true)
-const errorMessage = ref('')
+const { loading, errorMessage, withLoading } = useAsyncState()
 
 const search = ref('')
 function emptyFilters() {
@@ -63,8 +62,7 @@ function invoiceBadge(entry: StockEntrySummary) {
 }
 
 async function loadEntries() {
-  loading.value = true
-  try {
+  await withLoading(async () => {
     const result = await listStockEntries({
       page: page.value,
       pageSize: pageSize.value,
@@ -76,11 +74,7 @@ async function loadEntries() {
     })
     entries.value = result.data
     applyMeta(result)
-  } catch (error) {
-    errorMessage.value = getApiErrorMessage(error)
-  } finally {
-    loading.value = false
-  }
+  })
 }
 
 watchSearch(search, loadEntries)

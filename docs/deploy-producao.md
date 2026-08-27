@@ -34,6 +34,14 @@ O backend recusa iniciar em produção quando o JWT tem menos de 32 caracteres o
 no desenvolvimento a lista atende ao mesmo tempo o desktop (`http://localhost:5173`) e o celular no IP da máquina na
 rede local. Cada entrada é validada como URL, e em produção todas precisam ser HTTPS.
 
+`TRUST_PROXY` é a **quantidade de proxies na frente da API**, e o `docker-compose.production.yml` já traz `1` (o
+Caddy). Não troque por `true`: o Fastify passaria a confiar em todos os saltos e o `request.ip` viraria o primeiro valor
+do `X-Forwarded-For`, que é escrito por quem chama. Na prática, o limite de 10 tentativas de login por minuto deixaria
+de existir (bastaria mudar o cabeçalho a cada tentativa) e o IP gravado em `system_logs` passaria a ser inventado, o que
+esvazia a trilha de auditoria. O outro extremo, `false`, também não serve atrás do gateway: todo cliente chegaria como o
+IP do container do Caddy e os limites por IP passariam a ser compartilhados por todo mundo. Em produção a API **recusa
+subir** com `false`.
+
 Evite caracteres reservados de URL na senha do PostgreSQL porque o Compose monta `DATABASE_URL` a partir dela.
 
 ## Primeiro deploy e atualizações
@@ -445,6 +453,7 @@ Isso **desliga** o RLS sem apagar as políticas: elas voltam a valer com um
 | `0003` — `losses.cancelled_at`, `cancelled_by`, `cancel_reason` | **Sim** | Três colunas nuláveis. O Drizzle lista as colunas explicitamente no `select`, então a versão anterior simplesmente não as enxerga, e o `insert` antigo as deixa nulas. Rollback por troca de imagem é seguro, sem tocar no banco. |
 | `0005` — `stock_movements.movement_date` | **Sim** | Coluna `not null`, mas com `default now()`: o `insert` da versão anterior a omite e o banco preenche com o instante do lançamento, que é o comportamento dela. Rollback por troca de imagem é seguro. A ressalva é de leitura, não de escrita — a versão anterior filtra período por `created_at`, então movimentações lançadas com data retroativa aparecem no dia em que foram digitadas enquanto ela estiver no ar. |
 | `0008` — `categories.active`, `units.active` | **Sim** | Duas colunas `not null` com `default true`: o `insert` da versão anterior as omite e nascem ativas, que é o comportamento dela. Rollback por troca de imagem é seguro. A ressalva é de leitura: enquanto a versão anterior estiver no ar, cadastro inativado volta a aparecer nas opções de produto novo, porque ela não conhece a coluna. |
+| `0009` — `users.password_changed_at` | **Sim** | Coluna nulável que só a versão atual lê. A versão anterior a ignora, e o efeito de voltar para ela é perder a checagem: token emitido antes de uma troca de senha volta a ser aceito até expirar. Rollback por troca de imagem é seguro, sem tocar no banco. |
 
 O sentido inverso **não** é compatível e vale para qualquer migration: restaurar um dump anterior à migration e apontar
 o código **atual** para ele quebra toda consulta que use as colunas novas. Depois de restaurar um backup antigo, rode as

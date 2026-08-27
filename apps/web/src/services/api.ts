@@ -1,6 +1,7 @@
 import axios from 'axios'
 import { ref } from 'vue'
 import type { ApiErrorPayload } from '@/types'
+import { treguaDeSessao } from '@/lib/sessionRedirect'
 
 declare module 'axios' {
   export interface AxiosRequestConfig {
@@ -39,6 +40,7 @@ api.interceptors.response.use(
     if (
       error.response?.status === 401 &&
       !error.config?.suppressSessionEndedRedirect &&
+      !treguaDeSessao.ativa() &&
       window.location.pathname !== '/login'
     ) {
       if (!redirectingToLogin) {

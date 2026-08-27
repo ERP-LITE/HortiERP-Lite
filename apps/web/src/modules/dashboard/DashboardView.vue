@@ -11,12 +11,12 @@ import PeriodPicker from '@/components/ui/PeriodPicker.vue'
 import ExpandableText from '@/components/ui/ExpandableText.vue'
 import { rangeForPreset, type PeriodValue } from '@/lib/period'
 import { formatCurrency, formatDate, formatDateOnly, formatQuantity } from '@/lib/format'
+import { useAsyncState } from '@/composables/useAsyncState'
 import { useFilterModal } from '@/composables/useFilterModal'
 import DonutChart from '@/components/charts/DonutChart.vue'
 import MovementsTrendChart from '@/components/charts/MovementsTrendChart.vue'
 import LossesByReasonChart from '@/components/charts/LossesByReasonChart.vue'
 import DashboardSkeleton from './DashboardSkeleton.vue'
-import { getApiErrorMessage } from '@/services/api'
 import { fetchDashboardSummary } from '@/services/dashboardService'
 import type { DashboardSummary, MovementType } from '@/types'
 
@@ -35,8 +35,7 @@ const {
 const activeFilterCount = computed(() => (period.value.preset === '30dias' ? 0 : 1))
 
 const summary = ref<DashboardSummary | null>(null)
-const loading = ref(true)
-const errorMessage = ref('')
+const { loading, errorMessage, withLoading } = useAsyncState()
 
 const typeLabels: Record<MovementType, string> = {
   entrada: 'Entrada',
@@ -55,15 +54,9 @@ function formatMovementTime(value: string) {
 }
 
 async function loadSummary() {
-  loading.value = true
-  errorMessage.value = ''
-  try {
+  await withLoading(async () => {
     summary.value = await fetchDashboardSummary({ from: period.value.from || undefined, to: period.value.to || undefined })
-  } catch (error) {
-    errorMessage.value = getApiErrorMessage(error)
-  } finally {
-    loading.value = false
-  }
+  })
 }
 
 onMounted(loadSummary)

@@ -115,6 +115,7 @@ export async function createCompanyWithAdmin(data: CreateCompanyInput) {
           name: data.adminName,
           email: data.adminEmail,
           passwordHash,
+          passwordChangedAt: new Date(),
           role: 'admin',
         })
         .returning()

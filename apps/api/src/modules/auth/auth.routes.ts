@@ -1,7 +1,8 @@
 import type { FastifyInstance } from 'fastify'
 import { authenticate } from '../../shared/middlewares/auth.js'
-import { clearSessionCookie, issueSession } from '../../shared/auth/session.js'
+import { clearSessionCookie, issueSession, renewSession } from '../../shared/auth/session.js'
 import { AppError } from '../../shared/errors/AppError.js'
+import { loginThrottle } from '../../shared/security/loginThrottle.js'
 import { getCompany } from '../companies/companies.service.js'
 import { changePasswordSchema, loginSchema } from './auth.schema.js'
 import { authenticateUser, changeOwnPassword, getUserProfile } from './auth.service.js'
@@ -12,10 +13,20 @@ export async function authRoutes(app: FastifyInstance) {
     '/auth/login',
     { config: { rateLimit: { max: 10, timeWindow: '1 minute' } } },
     async (request, reply) => {
+      // `emailSchema` já normaliza (trim + minúsculas), então a chave do freio é a mesma sempre.
       const { email, password } = loginSchema.parse(request.body)
 
-      const user = await authenticateUser(email, password)
+      loginThrottle.assertLoginAllowed(email)
 
+      const user = await authenticateUser(email, password).catch((error) => {
+        // Só credencial errada conta como tentativa. Dados inválidos ou falha do banco, não.
+        if (error instanceof AppError && error.statusCode === 401) {
+          loginThrottle.registerLoginFailure(email)
+        }
+        throw error
+      })
+
+      loginThrottle.clearLoginFailures(email)
       await issueSession(reply, user)
 
       return {
@@ -95,7 +106,7 @@ export async function authRoutes(app: FastifyInstance) {
   app.patch(
     '/auth/password',
     { preHandler: [authenticate], config: { rateLimit: { max: 10, timeWindow: '1 minute' } } },
-    async (request) => {
+    async (request, reply) => {
       const { currentPassword, newPassword } = changePasswordSchema.parse(request.body)
 
       await changeOwnPassword(
@@ -104,6 +115,10 @@ export async function authRoutes(app: FastifyInstance) {
         currentPassword,
         newPassword,
       )
+
+      // A troca invalida todo token emitido antes dela, e sem cookie novo quem trocou cairia no
+      // login junto com os invasores.
+      await renewSession(request, reply)
 
       return { success: true }
     },

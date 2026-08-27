@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify'
 import { authenticate, requireRole } from '../../shared/middlewares/auth.js'
 import { permitirTravessiaDePlataforma } from '../../db/scope.js'
-import { issueSession } from '../../shared/auth/session.js'
+import { issueSession, renewSession } from '../../shared/auth/session.js'
 import { getUserProfile } from '../auth/auth.service.js'
 import {
   createCompanySchema,
@@ -55,9 +55,15 @@ export async function companiesRoutes(app: FastifyInstance) {
     return reply.status(201).send(user)
   })
 
-  app.put<{ Params: { id: string } }>('/platform-users/:id', async (request) => {
+  app.put<{ Params: { id: string } }>('/platform-users/:id', async (request, reply) => {
     const data = updatePlatformUserSchema.parse(request.body)
-    return updatePlatformUser(request.user.companyId, request.user.sub, request.params.id, data)
+    const user = await updatePlatformUser(request.user.companyId, request.user.sub, request.params.id, data)
+
+    // Editar o próprio registro trocando a senha invalida o token atual, igual à tela de perfil.
+    // Sem o cookie novo, quem trocou a própria senha por aqui cai no login.
+    if (data.password && request.params.id === request.user.sub) await renewSession(request, reply)
+
+    return user
   })
 
   app.delete<{ Params: { id: string } }>('/platform-users/:id', async (request, reply) => {

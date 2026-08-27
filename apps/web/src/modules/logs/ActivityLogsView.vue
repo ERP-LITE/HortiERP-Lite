@@ -15,7 +15,7 @@ import Pagination from '@/components/ui/Pagination.vue'
 import PeriodPicker from '@/components/ui/PeriodPicker.vue'
 import SearchInput from '@/components/ui/SearchInput.vue'
 import SortableTableHeader from '@/components/ui/SortableTableHeader.vue'
-import { getApiErrorMessage } from '@/services/api'
+import { useAsyncState } from '@/composables/useAsyncState'
 import { useIsMobile } from '@/composables/useIsMobile'
 import { formatDateTime } from '@/lib/format'
 import { activityDetailsText, describeActivityDetails } from '@/lib/activityDetails'
@@ -30,8 +30,7 @@ const { page, pageSize, total, totalPages, applyMeta, reload, watchSearch, pagin
 const { sortBy, sortOrder, toggleSort } = useTableSort(() => reload(loadLogs), 'createdAt')
 
 const logs = ref<ActivityLog[]>([])
-const loading = ref(true)
-const errorMessage = ref('')
+const { loading, errorMessage, withLoading } = useAsyncState()
 const search = ref('')
 
 const actionOptions = [
@@ -113,16 +112,11 @@ function describe(log: ActivityLog) {
 }
 
 async function loadLogs() {
-  loading.value = true
-  try {
+  await withLoading(async () => {
     const result = await listActivityLogs({ page: page.value, pageSize: pageSize.value, ...queryParams() })
     logs.value = result.data
     applyMeta(result)
-  } catch (error) {
-    errorMessage.value = getApiErrorMessage(error)
-  } finally {
-    loading.value = false
-  }
+  })
 }
 
 async function exportCsv() {

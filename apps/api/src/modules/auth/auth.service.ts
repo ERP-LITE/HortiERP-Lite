@@ -11,11 +11,17 @@ type UserWithCompany = InferSelectModel<typeof users> & { company: Company | nul
 
 type UsableUser = InferSelectModel<typeof users> & { company: Company }
 
-function assertAccountUsable(user: UserWithCompany | undefined, message: string): UsableUser {
-  if (!user || !user.active) throw AppError.unauthorized(message)
+function isAccountUsable(user: UserWithCompany | undefined): UsableUser | null {
+  if (!user || !user.active) return null
   const { company } = user
-  if (!company || !company.active || company.deletedAt) throw AppError.unauthorized(message)
+  if (!company || !company.active || company.deletedAt) return null
   return { ...user, company }
+}
+
+function assertAccountUsable(user: UserWithCompany | undefined, message: string): UsableUser {
+  const usable = isAccountUsable(user)
+  if (!usable) throw AppError.unauthorized(message)
+  return usable
 }
 
 export async function authenticateUser(email: string, password: string) {
@@ -23,21 +29,28 @@ export async function authenticateUser(email: string, password: string) {
   return comEscopoDePlataforma(() => localizarParaLogin(email, password))
 }
 
+/**
+ * Hash de uma senha aleatória que ninguém conhece. Existe para o `bcrypt.compare` rodar mesmo
+ * quando a conta não serve, gastando o mesmo tempo de CPU: sem isso, e-mail inexistente responde em
+ * poucos milissegundos e e-mail real demora o tempo do bcrypt, o que entrega a lista de quem tem
+ * conta a quem cronometrar as respostas.
+ */
+const HASH_DE_DESCARTE = '$2a$10$Uue7ZegyZVimRb.z6mrtDeZv623DUsMjfoWq8wauEHrPyCKL6HF1m'
+
 async function localizarParaLogin(email: string, password: string) {
   const found = await db.query.users.findFirst({
     where: and(eq(users.email, email), isNull(users.deletedAt)),
     with: { company: true },
   })
 
-  const user = assertAccountUsable(found, 'E-mail ou senha incorretos')
+  const contaUsavel = isAccountUsable(found)
+  const passwordMatches = await bcrypt.compare(password, contaUsavel?.passwordHash ?? HASH_DE_DESCARTE)
 
-  const passwordMatches = await bcrypt.compare(password, user.passwordHash)
-
-  if (!passwordMatches) {
+  if (!contaUsavel || !passwordMatches) {
     throw AppError.unauthorized('E-mail ou senha incorretos')
   }
 
-  return user
+  return contaUsavel
 }
 
 // Travessia declarada: durante impersonação a conta de quem está logado é de outra empresa.
@@ -73,7 +86,7 @@ export async function changeOwnPassword(
   await comEscopoDePlataforma(() =>
     db
       .update(users)
-      .set({ passwordHash, updatedAt: new Date() })
+      .set({ passwordHash, passwordChangedAt: new Date(), updatedAt: new Date() })
       .where(and(eq(users.id, userId), eq(users.companyId, companyId))),
   )
 }

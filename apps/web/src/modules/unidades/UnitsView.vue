@@ -17,20 +17,20 @@ import BulkSelectionBar from '@/components/ui/BulkSelectionBar.vue'
 import TableCheckbox from '@/components/ui/TableCheckbox.vue'
 import SortableTableHeader from '@/components/ui/SortableTableHeader.vue'
 import StatusBadge from '@/components/ui/StatusBadge.vue'
-import { getApiErrorMessage, resolveFormError } from '@/services/api'
-import { confirmDelete, toastError, toastSuccess } from '@/lib/alerts'
 import { statusFilterOptionsFor } from '@/lib/status'
 import { createUnit, deleteUnit, deleteUnits, listUnits, updateUnit, type UnitInput } from '@/services/unitsService'
-import { useAuthStore } from '@/stores/auth'
-import { usePagination } from '@/composables/usePagination'
+import { useAsyncState } from '@/composables/useAsyncState'
 import { useBulkSelection } from '@/composables/useBulkSelection'
+import { useCrudModal } from '@/composables/useCrudModal'
 import { useFilterModal } from '@/composables/useFilterModal'
+import { usePagination } from '@/composables/usePagination'
+import { usePermissions } from '@/composables/usePermissions'
+import { useRecordDeletion } from '@/composables/useRecordDeletion'
 import { useTableSort } from '@/composables/useTableSort'
 import { LIMITES_TEXTO } from '@/lib/limits'
 import type { Unit } from '@/types'
 
-const auth = useAuthStore()
-const canManage = computed(() => auth.user?.role === 'admin' || auth.user?.role === 'gerente')
+const { canManage } = usePermissions()
 
 const { page, pageSize, total, totalPages, applyMeta, reload, watchSearch, paginationProps } = usePagination()
 const { sortBy, sortOrder, toggleSort } = useTableSort(() => reload(loadUnits), 'name')
@@ -39,9 +39,7 @@ const units = ref<Unit[]>([])
 const { selectedIds, allVisibleSelected, toggleOne, toggleAllVisible, clearSelection } = useBulkSelection(() =>
   units.value.map(({ id }) => id),
 )
-const deletingSelected = ref(false)
-const loading = ref(true)
-const errorMessage = ref('')
+const { loading, errorMessage, withLoading } = useAsyncState()
 
 const search = ref('')
 const { filters, draftFilters, filterModalOpen, openFilterModal, applyFilters, clearFilters } = useFilterModal(
@@ -51,16 +49,8 @@ const { filters, draftFilters, filterModalOpen, openFilterModal, applyFilters, c
 const activeFilterCount = computed(() => Number(filters.value.active !== 'todos'))
 const statusFilterOptions = statusFilterOptionsFor('f')
 
-const modalOpen = ref(false)
-const editingId = ref<string | null>(null)
-const emptyForm: Required<UnitInput> = { name: '', abbreviation: '', active: true }
-const form = ref<Required<UnitInput>>({ ...emptyForm })
-const saving = ref(false)
-const fieldErrors = ref<Record<string, string>>({})
-
 async function loadUnits() {
-  loading.value = true
-  try {
+  await withLoading(async () => {
     const result = await listUnits({
       page: page.value,
       pageSize: pageSize.value,
@@ -72,26 +62,23 @@ async function loadUnits() {
     units.value = result.data
     clearSelection()
     applyMeta(result)
-  } catch (error) {
-    errorMessage.value = getApiErrorMessage(error)
-  } finally {
-    loading.value = false
-  }
+  })
 }
 
-function openCreateModal() {
-  editingId.value = null
-  form.value = { ...emptyForm }
-  fieldErrors.value = {}
-  modalOpen.value = true
-}
-
-function openEditModal(unit: Unit) {
-  editingId.value = unit.id
-  form.value = { name: unit.name, abbreviation: unit.abbreviation, active: unit.active }
-  fieldErrors.value = {}
-  modalOpen.value = true
-}
+const { modalOpen, editingId, saving, form, fieldErrors, openCreateModal, openEditModal, handleSubmit } = useCrudModal<
+  Required<UnitInput>,
+  Unit
+>({
+  emptyForm: () => ({ name: '', abbreviation: '', active: true }),
+  toForm: (unit) => ({ name: unit.name, abbreviation: unit.abbreviation, active: unit.active }),
+  create: (values) => createUnit(values),
+  update: (id, values) => updateUnit(id, values),
+  reload: loadUnits,
+  createdMessage: 'Unidade criada com sucesso',
+  updatedMessage: 'Unidade atualizada com sucesso',
+  saveErrorMessage: 'Não foi possível salvar a unidade',
+  validate,
+})
 
 function validate(): boolean {
   fieldErrors.value = {}
@@ -100,64 +87,15 @@ function validate(): boolean {
   return Object.keys(fieldErrors.value).length === 0
 }
 
-async function handleSubmit() {
-  if (!validate()) return
-
-  saving.value = true
-  try {
-    if (editingId.value) {
-      await updateUnit(editingId.value, form.value)
-      toastSuccess('Unidade atualizada com sucesso')
-    } else {
-      await createUnit(form.value)
-      toastSuccess('Unidade criada com sucesso')
-    }
-    modalOpen.value = false
-    await loadUnits()
-  } catch (error) {
-    const result = resolveFormError(error, 'Não foi possível salvar a unidade')
-    fieldErrors.value = result.fieldErrors
-    if (result.message) toastError(result.message)
-  } finally {
-    saving.value = false
-  }
-}
-
-async function handleDelete(unit: Unit) {
-  const confirmed = await confirmDelete({
-    title: `Excluir a unidade "${unit.name}"?`,
-    text: 'Essa ação não pode ser desfeita.',
-  })
-  if (!confirmed) return
-
-  try {
-    await deleteUnit(unit.id)
-    await loadUnits()
-    toastSuccess('Unidade excluída com sucesso')
-  } catch (error) {
-    toastError(getApiErrorMessage(error, 'Não foi possível excluir a unidade'))
-  }
-}
-
-async function handleBulkDelete() {
-  const count = selectedIds.value.length
-  const confirmed = await confirmDelete({
-    title: `Excluir ${count} ${count === 1 ? 'unidade selecionada' : 'unidades selecionadas'}?`,
-    text: 'Os registros serão excluídos logicamente e deixarão de aparecer no sistema.',
-  })
-  if (!confirmed) return
-
-  deletingSelected.value = true
-  try {
-    const result = await deleteUnits(selectedIds.value)
-    await loadUnits()
-    toastSuccess(`${result.deleted} ${result.deleted === 1 ? 'unidade excluída' : 'unidades excluídas'} com sucesso`)
-  } catch (error) {
-    toastError(getApiErrorMessage(error, 'Não foi possível excluir as unidades selecionadas'))
-  } finally {
-    deletingSelected.value = false
-  }
-}
+const { deletingSelected, handleDelete, handleBulkDelete } = useRecordDeletion<Unit>({
+  singular: 'unidade',
+  plural: 'unidades',
+  genero: 'f',
+  remove: deleteUnit,
+  removeMany: deleteUnits,
+  selectedIds,
+  reload: loadUnits,
+})
 
 watchSearch(search, loadUnits)
 onMounted(loadUnits)

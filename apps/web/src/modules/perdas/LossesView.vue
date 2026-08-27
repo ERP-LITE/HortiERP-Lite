@@ -21,20 +21,21 @@ import SortableTableHeader from '@/components/ui/SortableTableHeader.vue'
 import { oldestEventDateIso, todayIso, type PeriodValue } from '@/lib/period'
 import { formatDate, formatQuantity } from '@/lib/format'
 import { reasonLabels, reasonOptions } from '@/lib/losses'
-import { getApiErrorMessage, resolveFormError } from '@/services/api'
+import { resolveFormError } from '@/services/api'
 import { toastError, toastSuccess } from '@/lib/alerts'
 import { listAllProducts } from '@/services/productsService'
 import { cancelLoss, createLoss, listAllLosses, listLosses, updateLoss } from '@/services/lossesService'
 import { csvNumber } from '@/lib/csv'
-import { useAuthStore } from '@/stores/auth'
-import { usePagination } from '@/composables/usePagination'
+import { useAsyncState } from '@/composables/useAsyncState'
+import { useCrudModal } from '@/composables/useCrudModal'
 import { useFilterModal } from '@/composables/useFilterModal'
+import { usePagination } from '@/composables/usePagination'
+import { usePermissions } from '@/composables/usePermissions'
 import { useTableSort } from '@/composables/useTableSort'
 import { LIMITES_NUMERO, LIMITES_TEXTO } from '@/lib/limits'
 import type { Loss, LossReason, Product } from '@/types'
 
-const auth = useAuthStore()
-const canManage = computed(() => auth.user?.role === 'admin' || auth.user?.role === 'gerente')
+const { canManage } = usePermissions()
 const canCorrect = (loss: Loss) => canManage.value && !loss.cancelledAt
 
 const reasonFilterOptions = [{ value: 'todos', label: 'Todos os motivos' }, ...reasonOptions]
@@ -44,8 +45,7 @@ const { sortBy, sortOrder, toggleSort } = useTableSort(() => reload(loadLosses),
 
 const losses = ref<Loss[]>([])
 const products = ref<Product[]>([])
-const loading = ref(true)
-const errorMessage = ref('')
+const { loading, errorMessage, withLoading, captureError } = useAsyncState()
 
 const search = ref('')
 function emptyFilters() {
@@ -68,12 +68,7 @@ const activeFilterCount = computed(
     Number(filters.value.includeCancelled),
 )
 
-const modalOpen = ref(false)
-const saving = ref(false)
-const editingId = ref<string | null>(null)
 const editingLoss = ref<Loss | null>(null)
-const form = ref({ productId: '', quantity: '', lossDate: todayIso(), reason: '' as LossReason | '', notes: '' })
-const fieldErrors = ref<Record<string, string>>({})
 
 const cancelModalOpen = ref(false)
 const cancelling = ref(false)
@@ -85,8 +80,7 @@ const productOptions = computed(() => products.value.map((p) => ({ value: p.id, 
 const productFilterOptions = computed(() => [{ value: 'todos', label: 'Todos os produtos' }, ...productOptions.value])
 
 async function loadLosses() {
-  loading.value = true
-  try {
+  await withLoading(async () => {
     const result = await listLosses({
       page: page.value,
       pageSize: pageSize.value,
@@ -101,46 +95,59 @@ async function loadLosses() {
     })
     losses.value = result.data
     applyMeta(result)
-  } catch (error) {
-    errorMessage.value = getApiErrorMessage(error)
-  } finally {
-    loading.value = false
-  }
+  })
 }
 
 async function loadProductOptions() {
-  try {
+  await captureError(async () => {
     products.value = await listAllProducts({ active: true })
-  } catch (error) {
-    errorMessage.value = getApiErrorMessage(error)
-  }
+  })
 }
 
 async function loadAll() {
   await Promise.all([loadLosses(), loadProductOptions()])
 }
 
-function openCreateModal() {
-  editingId.value = null
-  editingLoss.value = null
-  form.value = { productId: '', quantity: '', lossDate: todayIso(), reason: '', notes: '' }
-  fieldErrors.value = {}
-  modalOpen.value = true
+interface LossForm {
+  productId: string
+  quantity: string
+  lossDate: string
+  reason: LossReason | ''
+  notes: string
 }
 
-function openEditModal(loss: Loss) {
-  editingId.value = loss.id
-  editingLoss.value = loss
-  form.value = {
+const { modalOpen, editingId, saving, form, fieldErrors, openCreateModal, openEditModal, handleSubmit } = useCrudModal<
+  LossForm,
+  Loss
+>({
+  emptyForm: () => ({ productId: '', quantity: '', lossDate: todayIso(), reason: '', notes: '' }),
+  toForm: (loss) => ({
     productId: loss.productId,
     quantity: String(Number(loss.quantity)),
     lossDate: loss.lossDate.slice(0, 10),
     reason: loss.reason,
     notes: loss.notes ?? '',
-  }
-  fieldErrors.value = {}
-  modalOpen.value = true
-}
+  }),
+  create: (values) =>
+    createLoss({
+      productId: values.productId,
+      quantity: Number(values.quantity),
+      lossDate: values.lossDate || undefined,
+      reason: values.reason as LossReason,
+      notes: values.notes || undefined,
+    }),
+  // Correção de perda mexe só no motivo e na observação: quantidade e data já viraram movimento de estoque.
+  update: (id, values) => updateLoss(id, { reason: values.reason as LossReason, notes: values.notes || null }),
+  reload: loadAll,
+  createdMessage: 'Perda registrada com sucesso',
+  updatedMessage: 'Perda corrigida com sucesso',
+  saveErrorMessage: (editing) =>
+    editing ? 'Não foi possível corrigir a perda' : 'Não foi possível registrar a perda',
+  validate,
+  onOpen: (loss) => {
+    editingLoss.value = loss
+  },
+})
 
 function validate(): boolean {
   fieldErrors.value = {}
@@ -155,42 +162,6 @@ function validate(): boolean {
   }
   if (!form.value.reason) fieldErrors.value.reason = 'Selecione o motivo'
   return Object.keys(fieldErrors.value).length === 0
-}
-
-async function handleSubmit() {
-  if (!validate()) return
-  if (!form.value.reason) return
-
-  saving.value = true
-  try {
-    if (editingId.value) {
-      await updateLoss(editingId.value, {
-        reason: form.value.reason,
-        notes: form.value.notes || null,
-      })
-      modalOpen.value = false
-      await loadAll()
-      toastSuccess('Perda corrigida com sucesso')
-    } else {
-      await createLoss({
-        productId: form.value.productId,
-        quantity: Number(form.value.quantity),
-        lossDate: form.value.lossDate || undefined,
-        reason: form.value.reason,
-        notes: form.value.notes || undefined,
-      })
-      modalOpen.value = false
-      await loadAll()
-      toastSuccess('Perda registrada com sucesso')
-    }
-  } catch (error) {
-    const fallback = editingId.value ? 'Não foi possível corrigir a perda' : 'Não foi possível registrar a perda'
-    const result = resolveFormError(error, fallback)
-    fieldErrors.value = result.fieldErrors
-    if (result.message) toastError(result.message)
-  } finally {
-    saving.value = false
-  }
 }
 
 function openCancelModal(loss: Loss) {

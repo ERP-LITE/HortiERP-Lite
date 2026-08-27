@@ -55,6 +55,7 @@ export async function createUser(companyId: string, requesterId: string, data: C
       name: data.name,
       email: data.email,
       passwordHash,
+      passwordChangedAt: new Date(),
       role: data.role,
       active: data.active,
       createdBy: requesterId,
@@ -95,7 +96,7 @@ export async function updateUser(companyId: string, requesterId: string, id: str
     .set({
       ...(data.name && { name: data.name }),
       ...(data.email && { email: data.email }),
-      ...(passwordHash && { passwordHash }),
+      ...(passwordHash && { passwordHash, passwordChangedAt: new Date() }),
       ...(data.role && { role: data.role }),
       ...(data.active !== undefined && { active: data.active }),
       updatedBy: requesterId,

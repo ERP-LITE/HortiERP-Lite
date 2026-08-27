@@ -7,6 +7,7 @@ import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
 import BaseSelect from '@/components/ui/BaseSelect.vue'
 import DateInput from '@/components/ui/DateInput.vue'
+import { useAsyncState } from '@/composables/useAsyncState'
 import { oldestEventDateIso, todayIso } from '@/lib/period'
 import { getApiErrorMessage } from '@/services/api'
 import { toastError, toastSuccess } from '@/lib/alerts'
@@ -25,9 +26,8 @@ interface ItemRow {
 
 const router = useRouter()
 const products = ref<Product[]>([])
-const loading = ref(true)
+const { loading, errorMessage, withLoading } = useAsyncState()
 const saving = ref(false)
-const errorMessage = ref('')
 
 const supplierName = ref('')
 const entryDate = ref(todayIso())
@@ -57,14 +57,9 @@ function removeItem(index: number) {
 }
 
 async function loadProducts() {
-  loading.value = true
-  try {
+  await withLoading(async () => {
     products.value = await listAllProducts({ active: true })
-  } catch (error) {
-    errorMessage.value = getApiErrorMessage(error)
-  } finally {
-    loading.value = false
-  }
+  })
 }
 
 function validate(): boolean {

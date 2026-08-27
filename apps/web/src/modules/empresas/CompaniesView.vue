@@ -12,10 +12,9 @@ import Pagination from '@/components/ui/Pagination.vue'
 import SearchInput from '@/components/ui/SearchInput.vue'
 import SortableTableHeader from '@/components/ui/SortableTableHeader.vue'
 import StatusBadge from '@/components/ui/StatusBadge.vue'
-import { getApiErrorMessage, resolveFormError } from '@/services/api'
+import { getApiErrorMessage } from '@/services/api'
 import { toastError, toastSuccess } from '@/lib/alerts'
 import { formatCnpj, formatPhone, normalizeCnpj } from '@/lib/format'
-import { generateRandomPassword } from '@/lib/password'
 import { isValidUf, ufOptions } from '@/lib/ufs'
 import { findAddressByCep } from '@/services/cepService'
 import {
@@ -25,6 +24,9 @@ import {
   updateCompany,
   type CompanyDetailsInput,
 } from '@/services/companiesService'
+import { useAsyncState } from '@/composables/useAsyncState'
+import { useCrudModal } from '@/composables/useCrudModal'
+import { useGeneratedPassword } from '@/composables/useGeneratedPassword'
 import { usePagination } from '@/composables/usePagination'
 import { useTableSort } from '@/composables/useTableSort'
 import type { Company } from '@/types'
@@ -35,19 +37,14 @@ const { page, pageSize, total, totalPages, applyMeta, reload, watchSearch, pagin
 const { sortBy, sortOrder, toggleSort } = useTableSort(() => reload(loadCompanies), 'name')
 
 const companies = ref<Company[]>([])
-const loading = ref(true)
-const errorMessage = ref('')
+const { loading, errorMessage, withLoading } = useAsyncState()
 
 const search = ref('')
 
-const modalOpen = ref(false)
-const editingId = ref<string | null>(null)
 const modalTab = ref<'company' | 'address' | 'admin'>('company')
 const lookingUpCep = ref(false)
 let lastLookedUpCep = ''
 let cepLookupSequence = 0
-const saving = ref(false)
-const fieldErrors = ref<Record<string, string>>({})
 
 const emptyCompanyDetails: CompanyDetailsInput = {
   name: '',
@@ -67,7 +64,6 @@ const emptyCompanyDetails: CompanyDetailsInput = {
 }
 const emptyAdmin = { name: '', email: '', password: '', passwordConfirm: '' }
 
-const form = ref<CompanyDetailsInput>({ ...emptyCompanyDetails })
 const adminForm = ref({ ...emptyAdmin })
 
 const generalFields = ['name', 'legalName', 'document', 'stateRegistration', 'contactName', 'contactEmail', 'phone']
@@ -78,44 +74,56 @@ function onlyDigits(value: string) {
 }
 
 async function loadCompanies() {
-  loading.value = true
-  try {
+  await withLoading(async () => {
     const result = await listCompanies({ page: page.value, pageSize: pageSize.value, search: search.value || undefined, sortBy: sortBy.value, sortOrder: sortOrder.value })
     companies.value = result.data
     applyMeta(result)
-  } catch (error) {
-    errorMessage.value = getApiErrorMessage(error)
-  } finally {
-    loading.value = false
-  }
+  })
 }
 
-function openModal(company: Company | null) {
-  editingId.value = company?.id ?? null
-  form.value = company
-    ? {
-        name: company.name,
-        legalName: company.legalName ?? '',
-        document: company.document ?? '',
-        stateRegistration: company.stateRegistration ?? '',
-        contactName: company.contactName ?? '',
-        contactEmail: company.contactEmail ?? '',
-        phone: company.phone ?? '',
-        postalCode: company.postalCode ?? '',
-        street: company.street ?? '',
-        addressNumber: company.addressNumber ?? '',
-        complement: company.complement ?? '',
-        district: company.district ?? '',
-        city: company.city ?? '',
-        state: company.state ?? '',
-      }
-    : { ...emptyCompanyDetails }
-  adminForm.value = { ...emptyAdmin }
-  fieldErrors.value = {}
-  modalTab.value = 'company'
-  lastLookedUpCep = onlyDigits(form.value.postalCode)
-  modalOpen.value = true
-}
+const { modalOpen, editingId, saving, form, fieldErrors, openModal, handleSubmit } = useCrudModal<
+  CompanyDetailsInput,
+  Company,
+  Awaited<ReturnType<typeof createCompany>>
+>({
+  emptyForm: () => ({ ...emptyCompanyDetails }),
+  toForm: (company) => ({
+    name: company.name,
+    legalName: company.legalName ?? '',
+    document: company.document ?? '',
+    stateRegistration: company.stateRegistration ?? '',
+    contactName: company.contactName ?? '',
+    contactEmail: company.contactEmail ?? '',
+    phone: company.phone ?? '',
+    postalCode: company.postalCode ?? '',
+    street: company.street ?? '',
+    addressNumber: company.addressNumber ?? '',
+    complement: company.complement ?? '',
+    district: company.district ?? '',
+    city: company.city ?? '',
+    state: company.state ?? '',
+  }),
+  create: (values) =>
+    createCompany({
+      ...values,
+      adminName: adminForm.value.name,
+      adminEmail: adminForm.value.email,
+      adminPassword: adminForm.value.password,
+    }),
+  update: (id, values) => updateCompany(id, values),
+  reload: loadCompanies,
+  createdMessage: (result) => `Empresa criada. Login do admin: ${result.admin.email}`,
+  updatedMessage: 'Empresa atualizada com sucesso',
+  saveErrorMessage: 'Não foi possível salvar a empresa',
+  validate,
+  onOpen: () => {
+    adminForm.value = { ...emptyAdmin }
+    modalTab.value = 'company'
+    // O CEP que já veio gravado não deve disparar consulta ao abrir a edição.
+    lastLookedUpCep = onlyDigits(form.value.postalCode)
+  },
+  onSaveError: focusTabWithError,
+})
 
 function validate(): boolean {
   const values = form.value
@@ -156,49 +164,12 @@ function focusTabWithError() {
   else modalTab.value = editingId.value ? 'company' : 'admin'
 }
 
-async function handleGeneratePassword() {
-  const password = generateRandomPassword()
+const { generatePassword: handleGeneratePassword } = useGeneratedPassword((password) => {
   adminForm.value.password = password
   adminForm.value.passwordConfirm = password
   delete fieldErrors.value.adminPassword
   delete fieldErrors.value.adminPasswordConfirm
-
-  try {
-    await navigator.clipboard.writeText(password)
-    toastSuccess('Senha gerada e copiada para a área de transferência')
-  } catch {
-    toastSuccess('Senha gerada')
-  }
-}
-
-async function handleSubmit() {
-  if (!validate()) return
-
-  saving.value = true
-  try {
-    if (editingId.value) {
-      await updateCompany(editingId.value, form.value)
-      toastSuccess('Empresa atualizada com sucesso')
-    } else {
-      const result = await createCompany({
-        ...form.value,
-        adminName: adminForm.value.name,
-        adminEmail: adminForm.value.email,
-        adminPassword: adminForm.value.password,
-      })
-      toastSuccess(`Empresa criada. Login do admin: ${result.admin.email}`)
-    }
-    modalOpen.value = false
-    await loadCompanies()
-  } catch (error) {
-    const result = resolveFormError(error, 'Não foi possível salvar a empresa')
-    fieldErrors.value = result.fieldErrors
-    focusTabWithError()
-    if (result.message) toastError(result.message)
-  } finally {
-    saving.value = false
-  }
-}
+})
 
 async function lookupCep() {
   const cep = onlyDigits(form.value.postalCode)

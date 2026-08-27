@@ -85,6 +85,7 @@ a badge da tela e o filtro por status nunca discordarem. Excluir uma cobrança a
 | `name`, `email`, `passwordHash` | text | `email` é **único globalmente** (não escopado por empresa), sempre gravado em minúsculas |
 | `role` | enum `user_role` | `admin` \| `gerente` \| `operador` \| `super_admin` |
 | `active` | boolean | default `true` — decisão individual do admin; **não** é sobrescrito por suspensão de empresa |
+| `passwordChangedAt` | timestamptz | nulável. Token emitido antes deste instante é recusado em toda rota autenticada. Nulo = senha nunca trocada desde a migration `0009`, e aí não há o que comparar |
 | `createdAt`/`updatedAt`/`deletedAt`, `createdBy`/`updatedBy` | | |
 
 O e-mail é único **globalmente** porque o login recebe só e-mail e senha, sem escolher empresa: dois usuários com o mesmo e-mail em empresas diferentes deixariam a sessão ambígua.

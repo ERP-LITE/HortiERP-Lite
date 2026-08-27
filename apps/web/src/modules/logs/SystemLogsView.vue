@@ -14,10 +14,10 @@ import PeriodPicker from '@/components/ui/PeriodPicker.vue'
 import PrintButton from '@/components/ui/PrintButton.vue'
 import SearchInput from '@/components/ui/SearchInput.vue'
 import SortableTableHeader from '@/components/ui/SortableTableHeader.vue'
+import { useAsyncState } from '@/composables/useAsyncState'
 import { useFilterModal } from '@/composables/useFilterModal'
 import { usePagination } from '@/composables/usePagination'
 import { useTableSort } from '@/composables/useTableSort'
-import { getApiErrorMessage } from '@/services/api'
 import { useIsMobile } from '@/composables/useIsMobile'
 import { listAllCompanies } from '@/services/companiesService'
 import { listTechnicalLogs } from '@/services/logsService'
@@ -33,8 +33,7 @@ const { sortBy, sortOrder, toggleSort } = useTableSort(() => reload(loadLogs), '
 
 const logs = ref<SystemLog[]>([])
 const companies = ref<Company[]>([])
-const loading = ref(true)
-const errorMessage = ref('')
+const { loading, errorMessage, withLoading, captureError } = useAsyncState()
 const search = ref('')
 const selectedLog = ref<SystemLog | null>(null)
 
@@ -121,9 +120,7 @@ function actionLabel(log: SystemLog) {
 }
 
 async function loadLogs() {
-  loading.value = true
-  errorMessage.value = ''
-  try {
+  await withLoading(async () => {
     const params = {
       page: page.value,
       pageSize: pageSize.value,
@@ -143,20 +140,14 @@ async function loadLogs() {
     const result = await listTechnicalLogs(params)
     logs.value = result.data
     applyMeta(result)
-  } catch (error) {
-    errorMessage.value = getApiErrorMessage(error)
-  } finally {
-    loading.value = false
-  }
+  })
 }
 
 async function loadCompanies() {
   if (!isTechnical.value) return
-  try {
+  await captureError(async () => {
     companies.value = await listAllCompanies()
-  } catch (error) {
-    errorMessage.value = getApiErrorMessage(error)
-  }
+  })
 }
 
 watchSearch(search, loadLogs)

@@ -55,6 +55,7 @@ export async function createPlatformUser(companyId: string, requesterId: string,
       name: data.name,
       email: data.email,
       passwordHash,
+      passwordChangedAt: new Date(),
       role: 'super_admin',
       createdBy: requesterId,
     })
@@ -78,7 +79,7 @@ export async function updatePlatformUser(
     .set({
       ...(data.name && { name: data.name }),
       ...(data.email && { email: data.email }),
-      ...(passwordHash && { passwordHash }),
+      ...(passwordHash && { passwordHash, passwordChangedAt: new Date() }),
       updatedBy: requesterId,
       updatedAt: new Date(),
     })

@@ -95,8 +95,9 @@ A suíte de integração usa um PostgreSQL temporário e isolado na porta `5434`
 permissões, invalidação de sessão, concorrência de estoque, busca/paginação, integridade de dados (índices únicos),
 identidade de e-mail sem depender de maiúsculas, identificação do usuário responsável pelas operações, impersonação
 (incluindo a recusa da empresa Plataforma), agregações do painel, controle manual de cobranças, data retroativa de
-entradas e perdas (limites e coerência entre listagem, histórico e painel), a garantia de que nenhuma mensagem de erro
-chega ao cliente em inglês e o tratamento de dados pessoais: expurgo dos logs por prazo, anonimização de usuário
+entradas e perdas (limites e coerência entre listagem, histórico e painel), encerramento das sessões abertas quando a
+senha muda (pela própria pessoa ou redefinida por um admin), o freio de tentativas de login por conta, a garantia de que
+nenhuma mensagem de erro chega ao cliente em inglês e o tratamento de dados pessoais: expurgo dos logs por prazo, anonimização de usuário
 excluído (inclusive do nome que fica no histórico de atividades), exportação dos dados do próprio titular sem vazar
 atividade de colega, e a exclusão definitiva de uma empresa sem encostar na empresa vizinha.
 
@@ -109,8 +110,12 @@ npm test
 O comando cria o container `hortierp-tests-postgres-test-1`, aplica as migrations, executa os testes e remove o
 container ao terminar. A suíte recusa executar se o nome do banco em `DATABASE_URL` não contiver `test`.
 
-Em seguida rodam os testes unitários do frontend (`apps/web/tests`, sem banco nem navegador — hoje cobrem a proteção
-contra fórmula nas planilhas exportadas) e duas verificações estáticas:
+Em seguida rodam os testes unitários do frontend (`apps/web/tests`, sem banco nem navegador). Eles cobrem os módulos
+puros de `apps/web/src/lib` e os composables que não dependem da API: proteção contra fórmula nas planilhas exportadas,
+formatação de datas, valores e documentos, espelho dos limites de tamanho, leitura do detalhe da trilha de atividades,
+seleção de anexos de nota fiscal, isolamento do rascunho do filtro, a flexão em português das mensagens de exclusão e a trégua que impede
+a troca de senha de mandar ao login quem acabou de trocá-la.
+Depois vêm três verificações estáticas:
 
 - `npm run csp:hash` — confere se o hash de `script-src` na CSP ainda corresponde ao script inline de
   `apps/web/index.html`.

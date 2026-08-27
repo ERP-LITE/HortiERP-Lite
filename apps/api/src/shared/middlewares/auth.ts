@@ -21,7 +21,7 @@ export async function authenticate(request: FastifyRequest) {
   // Travessia declarada: durante impersonação o usuário validado é de outra empresa.
   const { user, targetCompany } = await comEscopoDePlataforma(async () => {
     const [encontrado] = await db
-      .select({ role: users.role })
+      .select({ role: users.role, passwordChangedAt: users.passwordChangedAt })
       .from(users)
       .innerJoin(companies, eq(companies.id, users.companyId))
       .where(
@@ -65,8 +65,22 @@ export async function authenticate(request: FastifyRequest) {
     throw AppError.unauthorized('Sessão inválida ou acesso desativado')
   }
 
+  if (senhaTrocadaDepoisDoToken(user.passwordChangedAt, request.user.iat)) {
+    throw AppError.unauthorized('Sua senha foi alterada. Entre de novo.')
+  }
+
   // Único ponto onde a conexão da requisição ganha uma empresa.
   await usarEmpresa(request.user.companyId)
+}
+
+/**
+ * O `iat` do JWT vem em segundos inteiros, então a comparação também é feita em segundos: em
+ * milissegundos, o token reemitido no mesmo instante da troca nasceria "velho" e derrubaria a
+ * própria pessoa que acabou de trocar a senha.
+ */
+function senhaTrocadaDepoisDoToken(passwordChangedAt: Date | null, tokenEmitidoEm: number) {
+  if (!passwordChangedAt) return false
+  return tokenEmitidoEm < Math.floor(passwordChangedAt.getTime() / 1000)
 }
 
 export function requireRole(...roles: Array<'admin' | 'gerente' | 'operador' | 'super_admin'>) {

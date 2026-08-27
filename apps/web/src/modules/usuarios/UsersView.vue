@@ -17,14 +17,15 @@ import BulkSelectionBar from '@/components/ui/BulkSelectionBar.vue'
 import TableCheckbox from '@/components/ui/TableCheckbox.vue'
 import SortableTableHeader from '@/components/ui/SortableTableHeader.vue'
 import StatusBadge from '@/components/ui/StatusBadge.vue'
-import { getApiErrorMessage, resolveFormError } from '@/services/api'
-import { confirmDelete, toastError, toastSuccess } from '@/lib/alerts'
-import { generateRandomPassword } from '@/lib/password'
 import { statusFilterOptionsFor } from '@/lib/status'
 import { createUser, deleteUser, deleteUsers, listUsers, updateUser } from '@/services/usersService'
-import { usePagination } from '@/composables/usePagination'
+import { useAsyncState } from '@/composables/useAsyncState'
 import { useBulkSelection } from '@/composables/useBulkSelection'
+import { useCrudModal } from '@/composables/useCrudModal'
 import { useFilterModal } from '@/composables/useFilterModal'
+import { useGeneratedPassword } from '@/composables/useGeneratedPassword'
+import { usePagination } from '@/composables/usePagination'
+import { useRecordDeletion } from '@/composables/useRecordDeletion'
 import { useTableSort } from '@/composables/useTableSort'
 import type { User, UserRole } from '@/types'
 import { LIMITES_TEXTO } from '@/lib/limits'
@@ -44,9 +45,7 @@ const users = ref<User[]>([])
 const { selectedIds, allVisibleSelected, toggleOne, toggleAllVisible, clearSelection } = useBulkSelection(() =>
   users.value.map(({ id }) => id),
 )
-const deletingSelected = ref(false)
-const loading = ref(true)
-const errorMessage = ref('')
+const { loading, errorMessage, withLoading } = useAsyncState()
 
 const search = ref('')
 const { filters, draftFilters, filterModalOpen, openFilterModal, applyFilters, clearFilters } = useFilterModal(
@@ -57,18 +56,10 @@ const activeFilterCount = computed(
   () => Number(filters.value.role !== 'todos') + Number(filters.value.active !== 'todos'),
 )
 
-const modalOpen = ref(false)
-const editingId = ref<string | null>(null)
-const saving = ref(false)
-const fieldErrors = ref<Record<string, string>>({})
-
-const emptyForm = { name: '', email: '', password: '', role: 'operador' as UserRole, active: true }
-const form = ref({ ...emptyForm })
 const passwordConfirm = ref('')
 
 async function loadUsers() {
-  loading.value = true
-  try {
+  await withLoading(async () => {
     const result = await listUsers({
       page: page.value,
       pageSize: pageSize.value,
@@ -81,28 +72,33 @@ async function loadUsers() {
     users.value = result.data
     clearSelection()
     applyMeta(result)
-  } catch (error) {
-    errorMessage.value = getApiErrorMessage(error)
-  } finally {
-    loading.value = false
-  }
+  })
 }
 
-function openCreateModal() {
-  editingId.value = null
-  form.value = { ...emptyForm }
-  passwordConfirm.value = ''
-  fieldErrors.value = {}
-  modalOpen.value = true
+interface UserForm {
+  name: string
+  email: string
+  password: string
+  role: UserRole
+  active: boolean
 }
 
-function openEditModal(user: User) {
-  editingId.value = user.id
-  form.value = { name: user.name, email: user.email, password: '', role: user.role, active: user.active }
-  passwordConfirm.value = ''
-  fieldErrors.value = {}
-  modalOpen.value = true
-}
+const { modalOpen, editingId, saving, form, fieldErrors, clearFieldErrors, openCreateModal, openEditModal, handleSubmit } =
+  useCrudModal<UserForm, User>({
+    emptyForm: () => ({ name: '', email: '', password: '', role: 'operador', active: true }),
+    toForm: (user) => ({ name: user.name, email: user.email, password: '', role: user.role, active: user.active }),
+    create: (values) => createUser(values),
+    // Senha em branco na edição significa "não mexer", e não "gravar senha vazia".
+    update: (id, values) => updateUser(id, { ...values, password: values.password || undefined }),
+    reload: loadUsers,
+    createdMessage: 'Usuário criado com sucesso',
+    updatedMessage: 'Usuário atualizado com sucesso',
+    saveErrorMessage: 'Não foi possível salvar o usuário',
+    validate,
+    onOpen: () => {
+      passwordConfirm.value = ''
+    },
+  })
 
 function validate(): boolean {
   fieldErrors.value = {}
@@ -115,80 +111,21 @@ function validate(): boolean {
   return Object.keys(fieldErrors.value).length === 0
 }
 
-async function handleGeneratePassword() {
-  const password = generateRandomPassword()
+const { generatePassword: handleGeneratePassword } = useGeneratedPassword((password) => {
   form.value.password = password
   passwordConfirm.value = password
-  delete fieldErrors.value.password
-  delete fieldErrors.value.passwordConfirm
+  clearFieldErrors('password', 'passwordConfirm')
+})
 
-  try {
-    await navigator.clipboard.writeText(password)
-    toastSuccess('Senha gerada e copiada para a área de transferência')
-  } catch {
-    toastSuccess('Senha gerada')
-  }
-}
-
-async function handleSubmit() {
-  if (!validate()) return
-
-  saving.value = true
-  try {
-    if (editingId.value) {
-      const payload = { ...form.value, password: form.value.password || undefined }
-      await updateUser(editingId.value, payload)
-      toastSuccess('Usuário atualizado com sucesso')
-    } else {
-      await createUser(form.value)
-      toastSuccess('Usuário criado com sucesso')
-    }
-    modalOpen.value = false
-    await loadUsers()
-  } catch (error) {
-    const result = resolveFormError(error, 'Não foi possível salvar o usuário')
-    fieldErrors.value = result.fieldErrors
-    if (result.message) toastError(result.message)
-  } finally {
-    saving.value = false
-  }
-}
-
-async function handleDelete(user: User) {
-  const confirmed = await confirmDelete({
-    title: `Excluir o usuário "${user.name}"?`,
-    text: 'Essa ação não pode ser desfeita.',
-  })
-  if (!confirmed) return
-
-  try {
-    await deleteUser(user.id)
-    await loadUsers()
-    toastSuccess('Usuário excluído com sucesso')
-  } catch (error) {
-    toastError(getApiErrorMessage(error, 'Não foi possível excluir o usuário'))
-  }
-}
-
-async function handleBulkDelete() {
-  const count = selectedIds.value.length
-  const confirmed = await confirmDelete({
-    title: `Excluir ${count} ${count === 1 ? 'usuário selecionado' : 'usuários selecionados'}?`,
-    text: 'Os registros serão excluídos logicamente e os acessos serão desativados.',
-  })
-  if (!confirmed) return
-
-  deletingSelected.value = true
-  try {
-    const result = await deleteUsers(selectedIds.value)
-    await loadUsers()
-    toastSuccess(`${result.deleted} ${result.deleted === 1 ? 'usuário excluído' : 'usuários excluídos'} com sucesso`)
-  } catch (error) {
-    toastError(getApiErrorMessage(error, 'Não foi possível excluir os usuários selecionados'))
-  } finally {
-    deletingSelected.value = false
-  }
-}
+const { deletingSelected, handleDelete, handleBulkDelete } = useRecordDeletion<User>({
+  singular: 'usuário',
+  plural: 'usuários',
+  remove: deleteUser,
+  removeMany: deleteUsers,
+  selectedIds,
+  reload: loadUsers,
+  bulkConfirmText: 'Os registros serão excluídos logicamente e os acessos serão desativados.',
+})
 
 watchSearch(search, loadUsers)
 onMounted(loadUsers)

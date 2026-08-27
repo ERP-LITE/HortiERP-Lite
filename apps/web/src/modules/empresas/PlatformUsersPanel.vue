@@ -8,11 +8,12 @@ import BaseModal from '@/components/ui/BaseModal.vue'
 import Pagination from '@/components/ui/Pagination.vue'
 import SearchInput from '@/components/ui/SearchInput.vue'
 import SortableTableHeader from '@/components/ui/SortableTableHeader.vue'
+import { useAsyncState } from '@/composables/useAsyncState'
+import { useCrudModal } from '@/composables/useCrudModal'
+import { useGeneratedPassword } from '@/composables/useGeneratedPassword'
 import { usePagination } from '@/composables/usePagination'
+import { useRecordDeletion } from '@/composables/useRecordDeletion'
 import { useTableSort } from '@/composables/useTableSort'
-import { confirmDelete, toastError, toastSuccess } from '@/lib/alerts'
-import { generateRandomPassword } from '@/lib/password'
-import { getApiErrorMessage, resolveFormError } from '@/services/api'
 import {
   createPlatformUser,
   deletePlatformUser,
@@ -28,20 +29,11 @@ const { page, pageSize, total, totalPages, applyMeta, reload, watchSearch, pagin
 const { sortBy, sortOrder, toggleSort } = useTableSort(() => reload(loadUsers), 'name')
 const users = ref<User[]>([])
 const search = ref('')
-const loading = ref(true)
-const errorMessage = ref('')
-const modalOpen = ref(false)
-const editingId = ref<string | null>(null)
-const saving = ref(false)
-const fieldErrors = ref<Record<string, string>>({})
-const emptyForm = { name: '', email: '', password: '' }
-const form = ref({ ...emptyForm })
+const { loading, errorMessage, withLoading } = useAsyncState()
 const passwordConfirm = ref('')
 
 async function loadUsers() {
-  loading.value = true
-  errorMessage.value = ''
-  try {
+  await withLoading(async () => {
     const result = await listPlatformUsers({
       page: page.value,
       pageSize: pageSize.value,
@@ -51,30 +43,32 @@ async function loadUsers() {
     })
     users.value = result.data
     applyMeta(result)
-  } catch (error) {
-    errorMessage.value = getApiErrorMessage(error)
-  } finally {
-    loading.value = false
-  }
+  })
 }
 
-function openCreateModal() {
-  editingId.value = null
-  form.value = { ...emptyForm }
-  passwordConfirm.value = ''
-  fieldErrors.value = {}
-  modalOpen.value = true
+interface PlatformUserForm {
+  name: string
+  email: string
+  password: string
 }
 
-function openEditModal(user: User) {
-  editingId.value = user.id
-  form.value = { name: user.name, email: user.email, password: '' }
-  passwordConfirm.value = ''
-  fieldErrors.value = {}
-  modalOpen.value = true
-}
+const { modalOpen, editingId, saving, form, fieldErrors, clearFieldErrors, openCreateModal, openEditModal, handleSubmit } =
+  useCrudModal<PlatformUserForm, User>({
+    emptyForm: () => ({ name: '', email: '', password: '' }),
+    toForm: (user) => ({ name: user.name, email: user.email, password: '' }),
+    create: (values) => createPlatformUser(values),
+    update: (id, values) => updatePlatformUser(id, { ...values, password: values.password || undefined }),
+    reload: loadUsers,
+    createdMessage: 'Super administrador criado com sucesso',
+    updatedMessage: 'Super administrador atualizado com sucesso',
+    saveErrorMessage: 'Não foi possível salvar o super administrador',
+    validate,
+    onOpen: () => {
+      passwordConfirm.value = ''
+    },
+  })
 
-function validate() {
+function validate(): boolean {
   fieldErrors.value = {}
   if (!form.value.name.trim()) fieldErrors.value.name = 'Informe o nome'
   if (!form.value.email.trim()) fieldErrors.value.email = 'Informe o e-mail'
@@ -88,61 +82,19 @@ function validate() {
   return Object.keys(fieldErrors.value).length === 0
 }
 
-async function handleGeneratePassword() {
-  const password = generateRandomPassword()
+const { generatePassword: handleGeneratePassword } = useGeneratedPassword((password) => {
   form.value.password = password
   passwordConfirm.value = password
-  delete fieldErrors.value.password
-  delete fieldErrors.value.passwordConfirm
-  try {
-    await navigator.clipboard.writeText(password)
-    toastSuccess('Senha gerada e copiada para a área de transferência')
-  } catch {
-    toastSuccess('Senha gerada')
-  }
-}
+  clearFieldErrors('password', 'passwordConfirm')
+})
 
-async function handleSubmit() {
-  if (!validate()) return
-  saving.value = true
-  try {
-    if (editingId.value) {
-      await updatePlatformUser(editingId.value, {
-        name: form.value.name,
-        email: form.value.email,
-        password: form.value.password || undefined,
-      })
-      toastSuccess('Super administrador atualizado com sucesso')
-    } else {
-      await createPlatformUser(form.value)
-      toastSuccess('Super administrador criado com sucesso')
-    }
-    modalOpen.value = false
-    await loadUsers()
-  } catch (error) {
-    const result = resolveFormError(error, 'Não foi possível salvar o super administrador')
-    fieldErrors.value = result.fieldErrors
-    if (result.message) toastError(result.message)
-  } finally {
-    saving.value = false
-  }
-}
-
-async function handleDelete(user: User) {
-  const confirmed = await confirmDelete({
-    title: `Excluir o super administrador "${user.name}"?`,
-    text: 'O acesso deste usuário será removido.',
-  })
-  if (!confirmed) return
-
-  try {
-    await deletePlatformUser(user.id)
-    await loadUsers()
-    toastSuccess('Super administrador excluído com sucesso')
-  } catch (error) {
-    toastError(getApiErrorMessage(error, 'Não foi possível excluir o super administrador'))
-  }
-}
+const { handleDelete } = useRecordDeletion<User>({
+  singular: 'super administrador',
+  plural: 'super administradores',
+  remove: deletePlatformUser,
+  reload: loadUsers,
+  confirmText: 'O acesso deste usuário será removido.',
+})
 
 watchSearch(search, loadUsers)
 onMounted(loadUsers)
