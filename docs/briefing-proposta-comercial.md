@@ -42,10 +42,16 @@ estoque na hora e guarda o valor do momento. Motivo e observação podem ser cor
 produto errados exigem cancelar a perda — a quantidade volta ao estoque sozinha, a perda sai dos
 relatórios e do painel, e fica registrado quem cancelou e por quê.
 
-**Cadastros.** Produto, categoria e unidade de medida. Categoria e unidade podem ser **inativadas**
-quando a loja para de usar: saem das opções de produto novo e os produtos antigos continuam intactos. O
-sistema não deixa excluir categoria ou unidade que esteja em algum produto, para o cadastro não ficar
+**Cadastros.** Produto, categoria e unidade de medida. Os três podem ser **inativados** quando a loja
+para de usar: saem das opções na hora de cadastrar produto novo e o que já usava eles continua intacto.
+O sistema não deixa excluir categoria ou unidade que esteja em algum produto, para o cadastro não ficar
 apontando para o vazio.
+
+**Código de barras.** O produto tem campo de código de barras, preenchido na tela ou pela importação de
+planilha, e a busca da tela de Produtos encontra por nome, por SKU e por código de barras. Na prática
+isso faz um leitor comum de USB funcionar ali: ele se comporta como teclado, então basta clicar na busca
+e bipar. Ressalva que precisa ser dita junto: a busca da tela de **Estoque** procura só por nome, então
+bipar não funciona lá.
 
 **Importação.** Carga de produtos por planilha, com estoque inicial, conferência linha por linha antes
 de confirmar (o que vai entrar, o que vai ser criado, o que está sem custo) e
@@ -109,10 +115,20 @@ cada um pode alterar.
 O que pode ser afirmado:
 
 - **Acesso protegido**, com sessão que fecha sozinha após 30 minutos sem uso.
+- **Trocar a senha derruba as outras sessões.** Quem trocou continua trabalhando sem interrupção;
+  qualquer outra sessão aberta com a senha antiga cai na hora. Serve para cortar o acesso de quem sabia
+  a senha antiga, e vale também quando o administrador troca a senha de um funcionário.
+- **Bloqueio temporário por tentativa de senha errada.** Na mesma conta, 5 falhas seguidas travam o
+  acesso por 1 minuto, 10 falhas por 5 minutos e 15 falhas por 15 minutos. A contagem zera 15 minutos
+  depois da última tentativa, e um acerto limpa tudo.
 - **Isolamento entre clientes em duas camadas:** uma no sistema e outra no próprio banco de dados. A
   segunda existe para o caso de a primeira falhar — mesmo princípio de ter freio e freio de mão.
 - **Cópia de segurança diária, criptografada**, guardada por 30 dias, com uma cópia **fora do
   servidor**: se a máquina do sistema for perdida por inteiro, os dados continuam existindo.
+- **Vigilância externa, 24 horas por dia.** Um serviço independente verifica o sistema de fora a cada
+  5 minutos e avisa por e-mail se ele sair do ar. Um segundo aviso, a cada 15 minutos, reporta erro de
+  servidor já dizendo qual tela falhou. O backup diário e a limpeza semanal também avisam sozinhos se
+  deixarem de rodar.
 - **Limpeza automática**, semanal, do que passou dos prazos da tabela da seção 3. Guardar dado para
   sempre é risco, não zelo — e os prazos não são escolha: 180 dias é o mínimo que a lei exige de quem
   oferece serviço na internet (Marco Civil, art. 15), e 5 anos acompanha o prazo de fiscalização
@@ -147,6 +163,11 @@ A lei prevê responsabilidade dos dois, e deixar isso claro desde a proposta evi
 - O histórico de atividades é guardado por **5 anos**, não para sempre.
 - Para **usuário** excluído, o nome é substituído após 5 anos. A permanência do nome vale para
   produto, categoria e unidade.
+- A vigilância avisa **o prestador**, e não é plantão 24 horas. Se a proposta citar o monitoramento,
+  precisa deixar claro que o atendimento segue o horário de suporte combinado, senão a frase vira
+  promessa de resposta de madrugada.
+- A vigilância pega queda e erro de servidor. Não pega conta errada que devolve um número com
+  aparência normal, nem lentidão. Silêncio quer dizer "nenhuma tela quebrou", não "está tudo certo".
 
 ---
 
@@ -156,13 +177,27 @@ Não existe hoje, nem como "em breve":
 
 - Autenticação em dois fatores ou código por SMS
 - Plano documentado de resposta a incidente de segurança
-- Integração com balança, leitor de código de barras ou maquininha
+- Integração com balança ou maquininha de cartão
 - Leitura automática da nota fiscal (o arquivo é guardado; os produtos não entram sozinhos a partir
   dele)
 - Caixa (PDV), cupom fiscal, nota fiscal eletrônica de venda
 - Controle de vendas, contas a pagar ou a receber
 - Aplicativo instalável — é um site, aberto pelo navegador do celular ou do computador
 - Certificação, selo ou auditoria de segurança de terceiros
+
+Sobre **leitor de código de barras** a redação precisa de cuidado, porque os dois extremos estão
+errados. Integração não existe e não pode ser prometida. Mas o campo existe no produto e a busca da
+tela de Produtos encontra por ele, então um leitor de USB funciona ali. Negar por completo subvende o
+sistema; prometer "leitor de código de barras" sem qualificar é exagero. A redação honesta está na
+seção 2.
+
+### O manual prometido na implantação
+
+A proposta promete, na implantação, "material escrito de apoio pra consultar depois". Esse manual
+existe, foi gerado em 25/08/2026 a partir de `briefing-manual-do-usuario.md`, e a promessa está
+coberta. Duas ressalvas: a versão gerada naquela data **não trouxe a inativação de cadastro** nem a
+trava de exclusão de cadastro em uso, e não conhece as proteções de senha que entraram depois. Antes
+de entregar ao primeiro cliente, regere o manual a partir do briefing atualizado.
 
 ---
 
@@ -175,18 +210,42 @@ prestador e deve ser mantido como está na proposta vigente.
 
 ---
 
-## 8. O que mudou desde a proposta de 25/08/2026
+## 8. O que revisar na proposta em vigor
 
-Para revisar uma proposta já escrita, é isto que precisa entrar ou ser corrigido:
+A proposta de 27/08/2026 já incorporou a revisão anterior: aviso de privacidade, botão Baixar meus
+dados, limpeza automática, cópia fora do servidor com a transferência internacional declarada,
+isolamento em duas camadas, apagamento no cancelamento, a perda cancelada guardada por 5 anos e o nome
+de usuário excluído anonimizado após 5 anos. Nada disso precisa de mexida.
 
-**Acrescentar:** o aviso de privacidade em `/privacidade`; o botão **Baixar meus dados** no Perfil; a
-limpeza automática de registros antigos; a cópia de segurança fora do servidor **com a
-transferência internacional declarada**; o isolamento em duas camadas; o apagamento definitivo no
-cancelamento.
+Falta o que entrou depois. Para revisar a proposta atual, é isto:
 
-**Acrescentar também:** a inativação de categoria e unidade e a conferência linha por linha da
-importação.
+**Acrescentar na lista do que está incluído:**
 
-**Corrigir:** o trecho que diz que na perda cancelada "nada é apagado" (hoje o registro é guardado
-por 5 anos) e o que diz que o nome continua aparecendo depois de excluído (vale para produto,
-categoria e unidade; para usuário há o prazo de 5 anos).
+1. Inativar cadastro sem apagar (produto, categoria e unidade), e o bloqueio de exclusão de categoria
+   ou unidade que ainda esteja em uso. Ver seção 2.
+2. Código de barras no produto, com a busca da tela de Produtos encontrando por ele. Ver seção 2 para a
+   redação, que precisa citar a ressalva da tela de Estoque.
+
+**Acrescentar na lista de segurança:**
+
+3. Trocar a senha derruba as outras sessões.
+4. Bloqueio temporário depois de várias tentativas de senha errada.
+5. Vigilância externa 24 horas, com aviso automático de queda e de erro. Precisa vir acompanhada da
+   ressalva de horário de suporte, descrita na seção 5.
+
+**Corrigir:**
+
+6. A linha que nega leitor de código de barras. Hoje ela diz mais do que a verdade. Ver seção 6.
+
+**Decidir antes de mandar para cliente:**
+
+7. O manual do usuário existe, mas a versão de 25/08 está desatualizada. Regerar a partir do
+   `briefing-manual-do-usuario.md` antes de entregar ao primeiro cliente. Ver seção 6.
+
+---
+
+## 9. Verificação de 28/08/2026
+
+Todos os números da seção 3 foram conferidos contra o código nesta data, um por um, e batem. Também foi
+conferido que a tela de Cobranças é exclusiva do super admin da plataforma, ou seja, não é
+funcionalidade do cliente e não entra na proposta.

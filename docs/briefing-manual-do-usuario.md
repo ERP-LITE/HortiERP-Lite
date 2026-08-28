@@ -20,6 +20,14 @@
 > três situações da nota fiscal na listagem de entradas (seção 7.5).
 > O **manual gerado antes desta data está incompleto**: falta o aviso de privacidade e o botão
 > "Baixar meus dados", que já constam das seções 6.1 e 7.1.
+>
+> **Revisão de 28/08/2026:** entraram duas proteções novas de senha (seção 7.1) e a busca por SKU e
+> código de barras na tela de Produtos, com a ressalva da tela de Estoque (seções 7.3 e 7.8).
+> Entraram também quatro perguntas novas na seção 8.
+> Duas correções em cima do **manual gerado em 25/08**, que precisa ser regerado: ele **não trouxe a
+> inativação de categoria e unidade** nem a trava de exclusão de cadastro em uso, apesar de as duas
+> já estarem na seção 7.2 desde aquela data. Confira que o capítulo de cadastros do manual novo cobre
+> as duas coisas.
 
 ---
 
@@ -202,6 +210,18 @@ cliente**, não copie.
   confiança desde o começo — é a diferença entre um problema de dois minutos e uma manhã parada.
 - Cada um troca a própria senha em **Perfil**, informando a senha atual, a nova e a confirmação. O
   acesso a **Perfil** e a **Sair** está no menu do círculo com as iniciais, no canto superior direito.
+- **Trocar a senha derruba as outras sessões, e não a sua.** Quem trocou continua trabalhando na
+  mesma tela, sem precisar entrar de novo. Qualquer outra sessão aberta com a senha antiga (o celular
+  esquecido logado, o computador do depósito, o navegador de outra pessoa) cai na hora e pede login.
+  Diga isso de forma útil, como recurso e não como aviso técnico: é assim que se corta o acesso de
+  alguém que sabia a senha antiga. Vale a mesma explicação quando o **administrador redefine a senha
+  de um funcionário** pela tela de Usuários: o funcionário é desconectado na hora, em todos os
+  aparelhos, e precisa entrar com a senha nova.
+- **Errar a senha muitas vezes bloqueia por alguns minutos.** Na mesma conta, 5 erros seguidos travam
+  o acesso por 1 minuto, 10 erros por 5 minutos e 15 erros por 15 minutos. A tela mostra em quanto
+  tempo dá para tentar de novo, e acertar a senha limpa a contagem. No manual isso é uma frase curta,
+  para quem errou três vezes e ficou com medo de bloquear a conta de vez saber que **não é bloqueio
+  permanente** e que ninguém precisa ser chamado para desbloquear: é só esperar.
 - Existe um **Aviso de privacidade** acessível de qualquer tela, pelo link no rodapé — inclusive na
   tela de login, antes de entrar. Ele explica o que o sistema guarda sobre a pessoa, por quanto tempo
   e o que ela pode fazer. Mencione em uma frase no capítulo 2 e outra no capítulo 3 (ao descrever o
@@ -274,6 +294,14 @@ cliente**, não copie.
   entra nas contas valendo zero — outro **Atenção** importante.
 - O filtro da tela de produtos tem **categoria, unidade e situação**. Vale citar a unidade: é como
   responder "quais produtos eu vendo por quilo?" sem olhar linha por linha.
+- **A busca da tela de Produtos procura por nome, por SKU e por código de barras**, e o próprio campo
+  já diz isso. Consequência prática que vale um parágrafo no manual: um leitor de código de barras
+  comum, daqueles de USB, funciona como se fosse um teclado, então basta clicar na busca e bipar o
+  produto para ele aparecer. Não é integração com o sistema e não serve para lançar entrada nem
+  perda, mas resolve o "achar o produto" de quem tem muito item cadastrado. Só prometa isso se o
+  produto tiver o código de barras preenchido, o que também pode vir pela importação de planilha.
+- **Produto também pode ser inativado**, com a mesma lógica de categoria e unidade da seção 7.2: sai
+  das listas de escolha e dos números do painel, e o histórico dele continua intacto.
 
 ### 7.4 Importar produtos por planilha
 
@@ -415,6 +443,10 @@ Uma perda já cancelada não aceita mais correção, e a linha dela nem abre no 
   são produto, categoria, **unidade**, estoque atual e estoque mínimo: a unidade fica em coluna própria
   e as duas colunas de quantidade trazem só o número, alinhado à direita, para dar para comparar de
   cima a baixo. No celular, onde não há colunas, a unidade continua junto do número.
+- **A busca da tela de Estoque procura só pelo nome do produto**, diferente da tela de Produtos, que
+  também acha por SKU e por código de barras. Vale uma linha no manual: quem se acostumou a bipar o
+  produto em Produtos vai tentar o mesmo aqui e não vai achar nada. Se o comportamento das duas telas
+  for igualado depois, apague esta ressalva.
 - **Movimentações** é o histórico completo e imutável de tudo que mexeu no estoque, com três tipos:
   **entrada**, **perda** e **ajuste**. Filtra por produto, tipo e período, e mostra o usuário
   responsável por cada movimento.
@@ -561,6 +593,10 @@ o capítulo correspondente:
 19. Como mando o relatório do mês para o contador?
 20. O funcionário saiu. O que faço com o acesso dele?
 21. Quero ver quem alterou aquele produto.
+22. Troquei minha senha e fui desconectado no celular. É defeito?
+23. Errei a senha várias vezes e agora não deixa mais entrar. Bloqueou pra sempre?
+24. Dá pra usar leitor de código de barras?
+25. Parei de usar uma categoria. Apago ou tem outro jeito?
 
 ## 9. O que NÃO entra no manual
 
