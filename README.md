@@ -99,7 +99,8 @@ minutos e manda o resumo no alerta). Os três últimos usam o mesmo monitor exte
 A suíte de integração usa um PostgreSQL temporário e isolado na porta `5434`. Ela cobre isolamento multiempresa,
 permissões, invalidação de sessão, concorrência de estoque, busca/paginação, integridade de dados (índices únicos),
 identidade de e-mail sem depender de maiúsculas, identificação do usuário responsável pelas operações, impersonação
-(incluindo a recusa da empresa Plataforma), agregações do painel, controle manual de cobranças, data retroativa de
+(incluindo a recusa da empresa Plataforma), agregações do painel, os alertas do sino no cabeçalho (separação entre produto zerado e produto abaixo do mínimo, corte
+da lista, o que fica fora do contador e a recusa do alerta de cobrança a usuário de empresa-cliente), controle manual de cobranças, data retroativa de
 entradas e perdas (limites e coerência entre listagem, histórico e painel), encerramento das sessões abertas quando a
 senha muda (pela própria pessoa ou redefinida por um admin), o freio de tentativas de login por conta, a garantia de que
 nenhuma mensagem de erro chega ao cliente em inglês e o tratamento de dados pessoais: expurgo dos logs por prazo, anonimização de usuário

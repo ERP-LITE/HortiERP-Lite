@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Filter } from '@lucide/vue'
+import CountBadge from '@/components/ui/CountBadge.vue'
 
 defineProps<{ active?: number }>()
 defineEmits<{ click: [] }>()
@@ -13,11 +14,6 @@ defineEmits<{ click: [] }>()
     @click="$emit('click')"
   >
     <Filter :size="18" />
-    <span
-      v-if="active"
-      class="absolute -top-1.5 -right-1.5 flex items-center justify-center h-4 min-w-4 px-1 rounded-full bg-primary-600 text-white text-[10px] font-semibold leading-none"
-    >
-      {{ active }}
-    </span>
+    <CountBadge :value="active ?? 0" />
   </button>
 </template>

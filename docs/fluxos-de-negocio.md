@@ -229,6 +229,88 @@ Antes as bordas eram interpretadas em UTC e o dia final ficava de fora — o pre
 lançamentos feitos pela manhã. Detalhes em
 [decisoes-arquiteturais.md](./decisoes-arquiteturais.md#filtro-de-período-nas-listagens).
 
+## Alertas no cabeçalho (sino)
+
+O sino fica no cabeçalho, ao lado do seletor de tema, e aparece em todas as telas para todos os papéis. Ele existe
+porque o indicador de estoque baixo do painel só é visto por quem abre o painel: quem passa o dia em Entradas, Perdas
+ou Estoque nunca esbarrava com ele.
+
+**O sino é um espelho da situação atual, não uma caixa de entrada.** Nada é marcado como lido e não existe tabela de
+notificações. Um alerta some sozinho quando o estoque é reposto ou a cobrança é baixada, que é o comportamento certo
+para um aviso de estado — marcar como lido esconderia um problema que continua acontecendo. Ver
+[decisoes-arquiteturais.md](./decisoes-arquiteturais.md#o-sino-de-alertas-é-estado-atual-não-caixa-de-entrada).
+
+### Dentro da empresa-cliente
+
+`GET /api/notifications` (`notifications.service.ts::getOperationalAlerts`), disponível para `admin`, `gerente` e
+`operador` — todos precisam saber que um produto acabou, não só quem administra.
+
+O contador vermelho soma **apenas o que pede ação**:
+
+- **Produtos sem estoque**: `currentStock <= 0`.
+- **Produtos abaixo do mínimo**: `currentStock > 0 and currentStock <= minStock`.
+
+A condição de corte é a mesma do filtro "somente estoque baixo" da tela de estoque (`currentStock <= minStock`), e por
+isso o link "Ver todos no estoque" abre exatamente o mesmo conjunto que o painel do sino resumiu. Como `minStock` é
+validado como não negativo, produto zerado sempre satisfaz a condição, mesmo sem mínimo configurado.
+
+O painel também traz duas informações que **não** entram no contador, para o sino não viver vermelho por operação
+normal:
+
+- **Perdas de hoje**: quantidade de registros e valor, no dia civil de `America/Sao_Paulo`, ignorando perdas
+  canceladas. Registrar perda é rotina, não pendência.
+- **Produtos sem estoque mínimo definido** (`minStock <= 0`): enquanto o cliente não preenche os mínimos, "estoque
+  baixo" equivale na prática a "estoque zerado", e o alerta rende menos do que poderia. A linha leva para a tela de
+  produtos e desaparece quando os mínimos são configurados.
+
+A lista de produtos vem cortada nos cinco mais críticos (`MAX_PRODUTOS_NO_ALERTA`), ordenados com os zerados primeiro,
+depois pela distância até o mínimo, com o nome desempatando para a ordem não variar entre duas consultas iguais. O
+contador continua reportando o total real.
+
+O link do painel abre `/estoque?lowStockOnly=1`, e a tela de estoque liga o filtro a partir dessa query. Existe um
+`watch` sobre ela porque quem já está na tela de estoque não remonta o componente ao clicar no sino — sem o `watch`,
+o link não faria nada.
+
+O sino reaproveita as peças do sistema: `useDropdown` (o mesmo menu ancorado do menu do usuário), `CountBadge` (a
+mesma bolinha de contagem do botão de filtros) e `BaseBadge` nas etiquetas de situação. A posição e a altura do painel
+são medidas em JavaScript e presas às bordas da janela, porque o sino não é o último elemento do cabeçalho e o
+alinhamento puro pelo botão jogava o painel para fora da tela no celular. Ver
+[decisoes-arquiteturais.md](./decisoes-arquiteturais.md#o-painel-do-sino-é-preso-à-janela-não-ao-botão).
+
+### Para o super administrador
+
+`GET /api/billings/alerts` (`billings.service.ts::getBillingAlerts`), dentro do módulo de cobranças, que já exige
+`super_admin` e já declara a travessia de plataforma. O super admin fora de impersonação não tem telas de estoque, e a
+empresa Plataforma não tem produtos, então o sino dele mostra outra coisa:
+
+- **Cobranças atrasadas** (`paidAt is null and dueDate < hoje`): contagem, valor somado e as cinco mais antigas. É o
+  único item que entra no contador.
+- **Vencendo em até 7 dias**: contexto, fora do contador — vencimento futuro é agenda, não pendência.
+
+O link abre `/cobrancas?status=overdue`, com o mesmo mecanismo de query e `watch` da tela de estoque. Durante
+impersonação o papel do token passa a ser `admin`, então o sino volta a mostrar os alertas operacionais da
+empresa-cliente acessada, coerente com o menu.
+
+### Atualização
+
+O painel é consultado a cada 5 minutos e, fora do intervalo, em quatro situações:
+
+- **Depois de qualquer gravação bem-sucedida.** Repor estoque, lançar entrada, registrar ou cancelar perda, ajustar,
+  importar planilha e baixar cobrança mudam o alerta, e são fluxos em telas diferentes. Em vez de cada tela avisar o
+  sino, o composable observa um contador que sobe em `api.ts` a cada resposta bem-sucedida de requisição que não é de
+  leitura. As gravações em rajada (importação, exclusão em massa) são juntadas por uma espera de 700 ms, para virarem
+  uma consulta só.
+- **Ao abrir o sino**, porque quem clica está querendo conferir agora.
+- **Quando o papel do usuário muda**: entrar ou sair da impersonação troca a origem dos alertas, e sem essa consulta o
+  sino ficaria com o dado do contexto anterior.
+- **Quando a aba volta ao foco.**
+
+O intervalo mínimo entre consultas é de 1 minuto, ignorado nos três primeiros casos. A consulta é pulada com a aba em
+segundo plano. Consulta forçada que chega com outra em andamento **não é descartada**: ela roda ao final da que estava
+em voo, porque a resposta em voo é a de antes da mudança e deixá-la ganhar reporia o número velho na tela. Falha de rede não vira aviso na tela: o painel exibe que não
+foi possível consultar e a verificação se repete sozinha — alerta é informação secundária e não pode interromper quem
+está lançando entrada ou perda.
+
 ## Relatórios
 
 Os detalhamentos de perdas e entradas são paginados e pesquisados no backend, mantendo os agregados por motivo sobre todo o período selecionado. Isso evita respostas sem limite conforme o histórico da empresa cresce.

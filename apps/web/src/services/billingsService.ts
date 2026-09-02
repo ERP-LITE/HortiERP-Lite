@@ -57,3 +57,25 @@ export async function updateBilling(id: string, payload: BillingInput) {
 export async function deleteBilling(id: string) {
   await api.delete(`/billings/${id}`)
 }
+
+export interface OverdueBilling {
+  id: string
+  companyName: string
+  referenceMonth: string
+  dueDate: string
+  amount: string
+}
+
+export interface BillingAlerts {
+  generatedAt: string
+  total: number
+  overdueCount: number
+  overdueValue: number
+  dueSoonCount: number
+  billings: OverdueBilling[]
+}
+
+export async function fetchBillingAlerts() {
+  const { data } = await api.get<BillingAlerts>('/billings/alerts')
+  return data
+}

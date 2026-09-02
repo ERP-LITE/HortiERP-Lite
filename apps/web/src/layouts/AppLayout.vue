@@ -20,6 +20,7 @@ import {
   WalletCards,
 } from '@lucide/vue'
 import ThemeToggle from '@/components/ui/ThemeToggle.vue'
+import NotificationBell from '@/components/NotificationBell.vue'
 import AppUserMenu from '@/components/AppUserMenu.vue'
 import AppFooter from '@/components/AppFooter.vue'
 import BaseModal from '@/components/ui/BaseModal.vue'
@@ -153,6 +154,7 @@ function isActive(name: string) {
         </button>
         <div class="hidden lg:block" />
         <div class="flex items-center gap-3">
+          <NotificationBell />
           <ThemeToggle />
           <AppUserMenu />
         </div>

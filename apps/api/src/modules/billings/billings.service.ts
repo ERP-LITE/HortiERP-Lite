@@ -5,7 +5,7 @@ import { AppError } from '../../shared/errors/AppError.js'
 import { buildPaginatedResult } from '../../shared/db/paginate.js'
 import { orderByColumn } from '../../shared/db/sorting.js'
 import { getCompany, isPlatformCompany } from '../companies/companies.service.js'
-import { todayIsoDate } from '../../shared/utils/date.js'
+import { addDaysToIsoDate, todayIsoDate } from '../../shared/utils/date.js'
 import type { BillingStatus, CreateBillingInput, ListBillingsQuery, UpdateBillingInput } from './billings.schema.js'
 
 function normalizedValues(data: CreateBillingInput | UpdateBillingInput, actorId: string) {
@@ -106,4 +106,59 @@ export async function updateBilling(id: string, data: UpdateBillingInput, actorI
 export async function deleteBilling(id: string) {
   const [billing] = await db.delete(companyBillings).where(eq(companyBillings.id, id)).returning({ id: companyBillings.id })
   if (!billing) throw AppError.notFound('Cobrança não encontrada')
+}
+
+/** Quantas empresas o painel do sino lista antes de mandar o super admin para a tela de cobranças. */
+export const MAX_COBRANCAS_NO_ALERTA = 5
+
+/** Janela de "vence logo": o que ainda dá tempo de cobrar antes de virar atraso. */
+const DIAS_DE_VENCIMENTO_PROXIMO = 7
+
+export async function getBillingAlerts() {
+  const hoje = todayIsoDate()
+  const limiteProximo = addDaysToIsoDate(hoje, DIAS_DE_VENCIMENTO_PROXIMO)
+
+  const emAberto = and(isNull(companies.deletedAt), isNull(companyBillings.paidAt))
+  const atrasadas = and(emAberto, lt(companyBillings.dueDate, hoje))
+
+  const [[contagens], cobrancasAtrasadas] = await Promise.all([
+    db
+      .select({
+        overdue: sql<number>`count(*) filter (where ${companyBillings.dueDate} < ${hoje})`.mapWith(Number),
+        overdueValue:
+          sql<number>`coalesce(sum(${companyBillings.amount}) filter (where ${companyBillings.dueDate} < ${hoje}), 0)`.mapWith(
+            Number,
+          ),
+        dueSoon:
+          sql<number>`count(*) filter (where ${companyBillings.dueDate} >= ${hoje} and ${companyBillings.dueDate} <= ${limiteProximo})`.mapWith(
+            Number,
+          ),
+      })
+      .from(companyBillings)
+      .innerJoin(companies, eq(companies.id, companyBillings.companyId))
+      .where(emAberto),
+    db
+      .select({
+        id: companyBillings.id,
+        companyName: companies.name,
+        referenceMonth: companyBillings.referenceMonth,
+        dueDate: companyBillings.dueDate,
+        amount: companyBillings.amount,
+      })
+      .from(companyBillings)
+      .innerJoin(companies, eq(companies.id, companyBillings.companyId))
+      .where(atrasadas)
+      .orderBy(asc(companyBillings.dueDate), asc(companies.name))
+      .limit(MAX_COBRANCAS_NO_ALERTA),
+  ])
+
+  return {
+    generatedAt: new Date().toISOString(),
+    // Só o atraso conta no sino: vencimento futuro é agenda, não pendência.
+    total: contagens.overdue,
+    overdueCount: contagens.overdue,
+    overdueValue: contagens.overdueValue,
+    dueSoonCount: contagens.dueSoon,
+    billings: cobrancasAtrasadas,
+  }
 }

@@ -1,12 +1,11 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref } from 'vue'
 import { ChevronDown, LogOut, User } from '@lucide/vue'
 import { useAuthStore } from '@/stores/auth'
+import { useDropdown } from '@/composables/useDropdown'
 import { roleLabel } from '@/lib/roles'
 
 const auth = useAuthStore()
-const open = ref(false)
-const rootRef = ref<HTMLElement | null>(null)
+const { open, rootRef, toggle, close } = useDropdown()
 
 function initials(name?: string) {
   if (!name) return '?'
@@ -18,16 +17,6 @@ function initials(name?: string) {
     .join('')
 }
 
-function toggle() {
-  open.value = !open.value
-}
-
-function handleClickOutside(event: MouseEvent) {
-  if (rootRef.value && !rootRef.value.contains(event.target as Node)) {
-    open.value = false
-  }
-}
-
 async function handleLogout() {
   try {
     await auth.logout()
@@ -35,9 +24,6 @@ async function handleLogout() {
     window.location.replace('/login')
   }
 }
-
-onMounted(() => document.addEventListener('click', handleClickOutside))
-onBeforeUnmount(() => document.removeEventListener('click', handleClickOutside))
 </script>
 
 <template>
@@ -77,7 +63,7 @@ onBeforeUnmount(() => document.removeEventListener('click', handleClickOutside))
       <RouterLink
         :to="{ name: 'perfil' }"
         class="w-full flex items-center gap-2 px-4 py-2 text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
-        @click="open = false"
+        @click="close"
       >
         <User :size="16" /> Perfil
       </RouterLink>

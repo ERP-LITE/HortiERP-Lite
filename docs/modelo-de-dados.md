@@ -117,10 +117,12 @@ ou unidade em uso é recusada com `409` (`assertNotUsedByProducts`).
 | `name` | text | único por empresa |
 | `sku`, `barcode` | text | opcionais, `sku` único por empresa quando informado; campo em branco é gravado como `null`, nunca `''` (o índice único parcial só ignora nulos) |
 | `costPrice`, `salePrice` | numeric(12,2) | opcionais, podem ser limpos de volta para `null` pela edição |
-| `minStock` | numeric(12,3) | default `0` — limite pra alerta de "estoque baixo" |
+| `minStock` | numeric(12,3) | default `0`, validado como não negativo — limite do alerta de "estoque baixo", usado pelo filtro da tela de estoque, pelo painel e pelo sino do cabeçalho. Com o default, `currentStock <= minStock` equivale a "zerado": o alerta só avisa **antes** de acabar depois que o cliente preenche o mínimo |
 | `currentStock` | numeric(12,3) | default `0` — atualizado pelos fluxos de entrada, perda e ajuste manual; nunca editado direto no cadastro do produto |
 | `active` | boolean | default `true` |
 | timestamps, auditBy | | |
+
+Os alertas do sino não têm tabela: eles são derivados de `products` e `losses` a cada consulta, sem estado de "lido". Ver [decisoes-arquiteturais.md](./decisoes-arquiteturais.md#o-sino-de-alertas-é-estado-atual-não-caixa-de-entrada).
 
 `categoryId`/`unitId` são validados na criação/edição do produto para garantir que pertencem à mesma empresa e que não estão inativos (`assertCategoryAndUnitUsable`, em `products.service.ts`). Produto que já usa um cadastro inativo continua editável: a validação só recusa quando o id muda.
 

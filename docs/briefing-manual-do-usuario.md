@@ -28,6 +28,11 @@
 > inativação de categoria e unidade** nem a trava de exclusão de cadastro em uso, apesar de as duas
 > já estarem na seção 7.2 desde aquela data. Confira que o capítulo de cadastros do manual novo cobre
 > as duas coisas.
+>
+> **Revisão de 02/09/2026:** entrou o **sino de alertas** no cabeçalho (seção 7.14), com reflexo na
+> descrição da tela (seção 6) e na lista de capítulos (seção 4). Entraram também três perguntas novas
+> na seção 8 (26 a 28). O **manual gerado antes desta data não menciona o sino** e precisa ser
+> regerado: é a novidade mais visível da tela para quem já usava o sistema.
 
 ---
 
@@ -87,7 +92,8 @@ A equipe do cliente — dono/gerente da loja e os funcionários que mexem no est
 2. **Entrando no sistema** — login, esqueci a senha (falar com o administrador da empresa), **o que
    fazer quando é o próprio administrador que esqueceu**, trocar a própria senha, **baixar os próprios
    dados**, sair, e o encerramento automático por inatividade.
-3. **Conhecendo a tela** — menu lateral, o que cada item faz, como funciona no celular.
+3. **Conhecendo a tela** — menu lateral, o que cada item faz, o sino de alertas no canto superior
+   direito, como funciona no celular.
 4. **Cadastros que vêm antes de tudo** — categorias, unidades de medida, produtos.
 5. **Importar produtos por planilha** — capítulo próprio, é onde mais erram.
 6. **O dia a dia** — entrada de mercadoria, registro de perda, consulta de estoque.
@@ -122,6 +128,7 @@ Quem pode o quê:
 | Lançar entrada de mercadoria | sim | sim | **sim** |
 | Registrar perda | sim | sim | **sim** |
 | Consultar estoque, painel e relatórios | sim | sim | sim |
+| Ver o sino de alertas | sim | sim | sim |
 | Anexar e baixar nota fiscal | sim | sim | sim |
 | Excluir um anexo | sim | sim | não |
 | Cadastrar/editar categoria, unidade, produto | sim | sim | não |
@@ -166,6 +173,11 @@ Ao lado desse círculo existe um botão que **alterna entre modo claro e modo es
 diz "Ativar modo escuro" / "Ativar modo claro"). Vale duas linhas no manual: quem clicar sem querer e
 vir a tela ficar preta precisa saber que não quebrou nada e como voltar.
 
+Um pouco à esquerda fica o **sino de alertas**, com uma bolinha vermelha e um número quando há algo
+para olhar no estoque. Ele aparece em **todas as telas** e para **todos os perfis**. Está detalhado na
+seção 7.14 e merece capítulo curto próprio ou um bloco dentro de "Conhecendo a tela" — é a parte da
+tela que mais chama atenção e a que o cliente vai perguntar primeiro.
+
 ### 6.1 Nomes exatos dos botões
 
 Use estes nomes, em negrito, exatamente como estão. Não invente variação nem sinônimo:
@@ -183,6 +195,8 @@ Use estes nomes, em negrito, exatamente como estão. Não invente variação nem
 | Conferência de estoque em lote | **Ajuste em lote** |
 | Criar usuário | **Novo usuário** |
 | Filtro de estoque baixo | **Somente estoque baixo** |
+| Sino de alertas: dica do botão | **Alertas: nada pendente** / **N alertas** |
+| Link no rodapé do painel de alertas | **Ver todos no estoque** |
 | Filtro de perdas canceladas | **Mostrar perdas canceladas** |
 | Gerar o PDF do relatório | **Gerar PDF** |
 | Baixar os próprios dados pessoais (em Perfil) | **Baixar meus dados** |
@@ -565,6 +579,48 @@ O histórico é guardado por **5 anos** e depois disso o sistema o limpa sozinho
 alarme: é prazo de sobra para qualquer conferência, e guardar para sempre seria o problema, não a
 solução. Depois desse prazo, o nome de um usuário já excluído também deixa de aparecer no histórico.
 
+### 7.14 O sino de alertas
+
+O **sino** fica no canto superior direito, à esquerda do botão de modo claro/escuro. Vale para os três
+perfis e aparece em todas as telas — inclusive para o operador, que é justamente quem precisa saber
+que um produto acabou.
+
+Quando há algo para olhar, o sino ganha uma **bolinha vermelha com um número**. Clicando, abre um
+painel com o resumo. O número conta duas coisas, e só essas duas:
+
+- **Produtos sem estoque** — o saldo chegou a zero (ou abaixo).
+- **Produtos abaixo do mínimo** — ainda tem mercadoria, mas menos do que o estoque mínimo cadastrado
+  para aquele produto.
+
+O painel lista os **5 produtos mais críticos**, com os zerados primeiro, mostrando quanto tem e qual
+é o mínimo. O botão **Ver todos no estoque** abre a tela de Estoque já com o filtro **Somente estoque
+baixo** ligado, com a lista completa.
+
+Três coisas que precisam estar no manual, senão viram chamado de suporte:
+
+- **O sino não guarda histórico e não tem "marcar como lido".** Ele mostra a situação de agora. Assim
+  que a mercadoria é reposta e a entrada é lançada, o alerta some sozinho. Isso é de propósito: um
+  aviso que se apaga com um clique esconderia uma prateleira que continua vazia.
+- **O sino é o mesmo aviso do painel, só que sempre à vista.** Quem já conhecia o indicador "Produtos
+  com estoque baixo" do painel não está vendo um número novo, e sim o mesmo número onde ele não
+  precisa ir procurar.
+- **Enquanto ninguém cadastrar o estoque mínimo dos produtos, o sino só avisa o que zerou.** É por
+  isso que o painel mostra a linha *"N produtos ainda não têm estoque mínimo definido"*, que leva para
+  a tela de Produtos. Vale insistir nisso no capítulo de cadastro de produtos: **o estoque mínimo é o
+  campo que faz o sino ser útil**, porque é ele que permite avisar antes de acabar, e não depois.
+
+O painel ainda traz, embaixo e **fora da contagem**, as **perdas de hoje** (quantos registros e quanto
+custou). Explique por que isso não conta no número vermelho: registrar perda é o trabalho normal do
+dia, não uma pendência — se contasse, o sino viveria vermelho e ninguém mais olharia para ele.
+
+**O sino se atualiza sozinho, e isso precisa estar escrito com todas as letras.** Assim que a pessoa
+lança uma entrada, registra ou cancela uma perda, faz um ajuste ou importa uma planilha, o número do
+sino se corrige em seguida, sem recarregar a página e sem clicar no sino. Fora isso ele também se
+atualiza de poucos em poucos minutos e quando a pessoa volta para a aba do sistema. Diga isso na
+prática, com o exemplo de sempre: *repôs a batata e lançou a entrada, o alerta da batata sai do sino
+sozinho*. Se der algum problema de conexão na hora da consulta, o painel avisa que não conseguiu
+consultar e tenta de novo sozinho, sem atrapalhar o que estiver sendo lançado.
+
 ---
 
 ## 8. Perguntas que o cliente vai fazer
@@ -597,6 +653,11 @@ o capítulo correspondente:
 23. Errei a senha várias vezes e agora não deixa mais entrar. Bloqueou pra sempre?
 24. Dá pra usar leitor de código de barras?
 25. Parei de usar uma categoria. Apago ou tem outro jeito?
+26. O que é a bolinha vermelha no sininho lá em cima?
+27. Repus a mercadoria e o sino continua marcando. Está travado? (Resposta curta: o sino se corrige
+    sozinho depois do lançamento. Se ainda marcar, é porque a entrada não foi lançada, ou o produto
+    continua abaixo do mínimo cadastrado — que é diferente de estar zerado.)
+28. O sino só avisa quando o produto zera. Dá para avisar antes de acabar?
 
 ## 9. O que NÃO entra no manual
 
@@ -604,7 +665,9 @@ Importante, para não vazar coisa que não é do cliente:
 
 - **Nada sobre a administração da plataforma.** Existem telas de cadastro de empresas, cobranças,
   seleção de empresa e histórico técnico que pertencem a mim, o fornecedor do sistema. O cliente não
-  tem acesso a nada disso e não deve nem saber que existe. Não mencione.
+  tem acesso a nada disso e não deve nem saber que existe. Não mencione. Isso inclui o **sino de
+  alertas visto do meu lado**: para mim ele mostra cobranças atrasadas, e o manual só descreve o sino
+  do estoque, que é o que o cliente vê.
 - Nada de instalação, servidor, backup, banco de dados, atualização ou configuração técnica.
 - Nada de preço, contrato, plano ou suporte comercial — isso eu trato à parte.
 - Não invente atalho de teclado, aplicativo de celular, integração com balança, emissão de nota,

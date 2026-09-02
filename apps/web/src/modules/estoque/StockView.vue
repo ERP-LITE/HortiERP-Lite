@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
-import { RouterLink } from 'vue-router'
+import { computed, onMounted, ref, watch } from 'vue'
+import { RouterLink, useRoute } from 'vue-router'
 import { AlertTriangle, History, ListChecks, Pencil, Plus, Trash2 } from '@lucide/vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import BaseBadge from '@/components/ui/BaseBadge.vue'
@@ -48,6 +48,23 @@ const { filters, draftFilters, filterModalOpen, openFilterModal, applyFilters, c
 )
 const activeFilterCount = computed(
   () => Number(filters.value.categoryId !== 'todas') + Number(filters.value.lowStockOnly),
+)
+
+// O sino de alertas abre esta tela em /estoque?lowStockOnly=1. O watch existe porque quem já
+// está aqui não remonta o componente: sem ele, o link do sino não faria nada.
+const route = useRoute()
+function aplicarFiltroDaUrl(valor: unknown) {
+  if (valor !== '1' || filters.value.lowStockOnly) return false
+  filters.value.lowStockOnly = true
+  draftFilters.value.lowStockOnly = true
+  return true
+}
+aplicarFiltroDaUrl(route.query.lowStockOnly)
+watch(
+  () => route.query.lowStockOnly,
+  (valor) => {
+    if (aplicarFiltroDaUrl(valor)) reload(loadStock)
+  },
 )
 const categoryFilterOptions = computed(() => [
   { value: 'todas', label: 'Todas as categorias' },

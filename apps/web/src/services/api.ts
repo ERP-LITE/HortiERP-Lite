@@ -20,6 +20,16 @@ export const api = axios.create({
 
 export const pendingApiRequests = ref(0)
 
+/**
+ * Sobe a cada resposta bem-sucedida de requisição que altera dados. Quem exibe dado derivado
+ * (o sino de alertas) observa este contador em vez de cada tela lembrar de avisar: lançar uma
+ * entrada, ajustar estoque ou cancelar uma perda muda o alerta, e são fluxos diferentes em telas
+ * diferentes. Só requisições de leitura ficam de fora, para o observador não realimentar a si mesmo.
+ */
+export const mutacoesBemSucedidas = ref(0)
+
+const METODOS_DE_LEITURA = ['get', 'head', 'options']
+
 api.interceptors.request.use(
   (config) => {
     pendingApiRequests.value += 1
@@ -33,6 +43,9 @@ let redirectingToLogin = false
 api.interceptors.response.use(
   (response) => {
     pendingApiRequests.value = Math.max(0, pendingApiRequests.value - 1)
+    if (!METODOS_DE_LEITURA.includes((response.config.method ?? 'get').toLowerCase())) {
+      mutacoesBemSucedidas.value += 1
+    }
     return response
   },
   (error) => {

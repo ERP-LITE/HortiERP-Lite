@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify'
 import { authenticate, requireRole } from '../../shared/middlewares/auth.js'
 import { permitirTravessiaDePlataforma } from '../../db/scope.js'
 import { createBillingSchema, listBillingsQuerySchema, updateBillingSchema } from './billings.schema.js'
-import { createBilling, deleteBilling, listBillings, updateBilling } from './billings.service.js'
+import { createBilling, deleteBilling, getBillingAlerts, listBillings, updateBilling } from './billings.service.js'
 
 export async function billingsRoutes(app: FastifyInstance) {
   app.addHook('preHandler', authenticate)
@@ -10,6 +10,8 @@ export async function billingsRoutes(app: FastifyInstance) {
   app.addHook('preHandler', permitirTravessiaDePlataforma)
 
   app.get('/billings', async (request) => listBillings(listBillingsQuerySchema.parse(request.query)))
+
+  app.get('/billings/alerts', async () => getBillingAlerts())
 
   app.post('/billings', async (request, reply) => {
     const billing = await createBilling(createBillingSchema.parse(request.body), request.user.sub)

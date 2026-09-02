@@ -424,6 +424,20 @@ mora num componente ou num composable, não copiada nas duas.
 - **`usePermissions().canManage`** é o `admin || gerente` que estava escrito igual em 5 telas, agora
   sobre `isManagerRole` em `lib/roles.ts`. E **`useGeneratedPassword`** guarda o gerar/copiar/avisar
   das três telas que criam senha; a tela só diz em quais campos o valor entra.
+- **`useDropdown`** é o menu ancorado num botão do cabeçalho: abrir/fechar, fechar ao clicar fora e fechar com Esc. O
+  menu do usuário e o sino de alertas usavam a mesma lógica, e só o segundo tratava Esc. O `rootRef` precisa embrulhar
+  o botão **e** o painel: com o `ref` só no painel, o clique no próprio botão conta como clique fora e o menu reabre a
+  cada toque. Quem posiciona o painel à mão passa `onReposition`, e o composable liga os observadores de
+  redimensionamento e de rolagem só enquanto o menu está aberto — a rolagem é capturada (`true`), porque ela acontece
+  no `main`, que tem `overflow` próprio, e o evento não sobe até `window`. O calendário do `DateInput` resolve o mesmo
+  problema com código próprio: ele tem painel teleportado para o `body` e escolha de abrir acima ou abaixo, que o
+  composable não cobre, e unificar os dois hoje mexeria num componente com histórico de defeito de posicionamento sem
+  ganho funcional.
+- **`CountBadge`** é a bolinha de contagem sobre um botão de ícone, usada pelo botão de filtros e pelo sino. As duas
+  versões faziam a mesma coisa com medidas diferentes (`h-4 min-w-4` contra `min-w-[18px] h-[18px]`) e deslocamentos
+  diferentes, o que dava duas bolinhas visivelmente distintas na mesma aplicação. A cor é parâmetro, porque ali há
+  decisão: contagem de filtro é informativa (`primary`), alerta é pendência (`danger`). O corte em `99+` vive no
+  componente, para um número grande não esticar a bolinha por cima do ícone.
 - **`StatusBadge`** e `lib/status.ts` guardam as palavras e a cor de ativo/inativo. A etiqueta, a
   opção do filtro e a coluna do CSV saem do mesmo lugar, com o gênero como parâmetro (unidade é
   "Inativa", produto é "Inativo") e um texto alternativo para o caso de Empresas, onde inativo se
@@ -986,6 +1000,116 @@ A diferença entre os dois fluxos está no que se faz quando é justamente a qua
 - **Entrada** não tem: estornar uma entrada é decremento e poderia deixar o saldo negativo se a mercadoria já saiu. Ali a correção continua sendo o ajuste manual de estoque.
 
 O cancelamento de perda existe porque o ajuste manual, embora conserte o **saldo**, deixa o registro da perda intacto — e portanto o "valor perdido no período" do painel e o relatório de perdas seguiriam inflados. Num sistema cujo propósito é medir desperdício, esse número errado é o dano principal, não o saldo.
+
+## Alertas no cabeçalho (sino)
+
+### O sino de alertas é estado atual, não caixa de entrada
+
+Nenhuma tabela de notificações, nenhuma marcação de lido. O sino consulta a situação e a exibe; o alerta desaparece
+quando o problema deixa de existir.
+
+A alternativa — gravar cada alerta e deixar o usuário marcar como lido — foi descartada por dois motivos. O primeiro é
+que ela esconde problema que continua acontecendo: marcar "produto X zerado" como lido não repõe o produto, e no dia
+seguinte o sino estaria limpo com a prateleira vazia. O segundo é o custo: tabela nova, migration, política de RLS,
+expurgo por retenção e uma decisão sobre o que fazer quando o alerta é reaberto — tudo isso para um dado que já é
+derivável de `products` a qualquer momento.
+
+A consequência aceita é que não existe histórico de alertas. Quem quiser saber quando um produto ficou sem estoque
+consulta o histórico de movimentações, que é a fonte real desse fato.
+
+### Endpoint próprio e leve, não o resumo do painel
+
+`GET /dashboard/summary` já calculava a contagem de estoque baixo, e a tentação era pendurar o sino nele. Não dá:
+aquele endpoint dispara cerca de onze consultas em paralelo, com `row_number()` sobre três subconsultas de
+detalhamento, e foi desenhado para ser aberto sob demanda, uma vez por visita ao painel. O sino é consultado em
+intervalo fixo por **toda sessão aberta**, então cada consulta ali dentro se multiplica pelo número de usuários
+logados, e 90% do resultado seria descartado.
+
+`GET /notifications` faz três consultas: uma varredura de `products` com `count(*) filter` para os três contadores de
+uma vez, a lista dos cinco produtos mais críticos e o agregado de perdas do dia. Os `filter` existem justamente para
+não varrer a tabela três vezes.
+
+### Consulta em intervalo, não conexão persistente
+
+Cinco minutos, mais uma consulta quando a aba volta ao foco e outra quando o painel é aberto, com intervalo mínimo de
+um minuto entre elas (a abertura do painel ignora o mínimo). Consulta é pulada com a aba em segundo plano.
+
+Não há WebSocket nem SSE porque não há por que haver: estoque baixo não é evento de segundo, é situação que dura horas
+ou dias, e uma conexão persistente por sessão traria estado no servidor, reconexão e um proxy a mais para configurar no
+deploy. O intervalo também precisa caber no limite de 300 requisições por minuto por cliente que a API aplica.
+
+O padrão de consulta é o mesmo de `useSessionMonitor`, que já fazia isso para validar a sessão.
+
+### O alerta de cobrança mora no módulo de cobranças
+
+O sino do `super_admin` mostra cobranças atrasadas, e a consulta ficou em `billings.service.ts`, não no módulo de
+notificações. O motivo é de isolamento, não de organização: as rotas de cobrança já exigem `super_admin` e já declaram
+`permitirTravessiaDePlataforma`, porque cobrança é registro da plataforma **sobre** a empresa-cliente. Juntar as duas
+consultas numa rota só obrigaria a ligar a travessia de plataforma na mesma rota que lê o estoque de uma empresa, o que
+enfraqueceria a proteção de RLS do lado operacional para ganhar um endpoint a menos. Ver
+[as travessias legítimas ficam declaradas](#as-travessias-legítimas-ficam-declaradas).
+
+### O que entra no contador vermelho
+
+Só o que pede ação: produto sem estoque e produto abaixo do mínimo (ou, para o `super_admin`, cobrança atrasada).
+Perdas do dia, produtos sem mínimo definido e cobranças a vencer aparecem no painel como contexto, mas não somam.
+
+A regra tem uma razão prática: um contador que sobe com operação normal fica permanentemente vermelho, e um alerta que
+está sempre ligado deixa de ser lido. Registrar perda é o trabalho esperado de um hortifruti, não uma pendência.
+
+### O sino observa a gravação, não a tela
+
+O contador precisa mexer no instante em que o estoque muda, e o que muda estoque está espalhado: entrada, perda,
+cancelamento de perda, ajuste pontual, ajuste em lote, importação de planilha. Chamar uma função de atualização em cada
+um desses pontos funciona no dia em que é escrito e apodrece no primeiro fluxo novo que alguém esquecer de ligar — o
+sintoma seria um número velho na tela, que ninguém percebe revisando código.
+
+Em vez disso, `api.ts` conta as **respostas bem-sucedidas de requisição que não é de leitura**, e o composable do sino
+observa esse contador. Nenhuma tela precisa saber que o sino existe. Métodos de leitura ficam de fora justamente para o
+observador não realimentar a si mesmo, já que a consulta dos alertas é um `GET`.
+
+O custo aceito é consultar às vezes sem necessidade: trocar a senha ou editar uma categoria não muda alerta nenhum e
+ainda assim dispara uma consulta. É uma consulta leve, e o desperdício ocasional vale menos que um fluxo esquecido.
+
+Dois detalhes que só aparecem em uso real:
+
+- **Espera de 700 ms antes de consultar.** Importação de planilha e exclusão em massa disparam várias gravações
+  seguidas; sem a espera seriam várias consultas para o mesmo resultado. Para uma gravação sozinha o atraso não é
+  perceptível.
+- **Consulta forçada que chega com outra em andamento não é descartada.** A resposta em voo foi calculada antes da
+  gravação: deixá-la ganhar reporia o número velho. A consulta pendente roda ao final da anterior.
+
+### O painel do sino é preso à janela, não ao botão
+
+A primeira versão usava `absolute right-0`, alinhando a direita do painel com a direita do sino. **No celular o painel
+saía inteiro pela esquerda da tela.** O motivo: o sino não é o último elemento do cabeçalho — depois dele ainda vêm o
+seletor de tema e o menu do usuário, uns 140px. Com 358px de largura ancorados a 246px da esquerda, o painel começava
+fora da tela. Em desktop o defeito não aparece, porque sobra espaço à esquerda do sino.
+
+A correção é a mesma que o calendário do `DateInput` já usava: medir o gatilho com `getBoundingClientRect`, calcular
+`left`/`top`/`width` e aplicar como estilo em cima de `position: fixed`, prendendo o resultado às bordas da janela.
+Alinhamento pela direita do botão **quando cabe**, borda da tela quando não cabe. Em desktop a conta devolve exatamente
+a posição anterior, então nada muda ali.
+
+Ajustar isso por breakpoint não resolveria: `sm` é largura, e celular deitado costuma passar de 640px — cairia na regra
+de desktop, que é justamente a quebrada.
+
+A altura máxima sai da mesma medição (`window.innerHeight - topo - margem`), e não de um teto fixo. Um teto fixo
+cortaria o rodapé com "Ver todos no estoque" em tela baixa, sem como rolar até ele, porque a página não rola atrás de
+um elemento posicionado em cima dela. E a altura disponível não é previsível: a faixa de impersonação empurra o
+cabeçalho para baixo e muda de altura conforme o nome da empresa quebra em duas linhas.
+
+Dentro do painel, a área rolável **não** leva `flex-1`. Com `flex-basis: 0` ela esticaria até o teto de altura mesmo
+com dois itens na lista, deixando um vão vazio embaixo. Com o padrão (`flex: 0 1 auto`) o painel encolhe até o
+conteúdo e só passa a rolar quando encosta no teto. Cabeçalho e rodapé levam `shrink-0` para não serem espremidos, e a
+etiqueta de situação de cada produto também, senão nome comprido a espreme e "Abaixo do mínimo" quebra em duas linhas
+dentro da bolinha.
+
+### Falha do sino é silenciosa
+
+Erro na consulta dos alertas não vira aviso na tela; o painel mostra que não foi possível consultar e a verificação se
+repete no intervalo seguinte. Alerta é informação secundária, e um aviso de erro sobre o formulário de quem está
+lançando uma entrada custa mais atenção do que a informação valia.
 
 ## Retenção de dados pessoais: dois prazos, duas leis
 

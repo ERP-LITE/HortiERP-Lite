@@ -32,6 +32,19 @@ com estoque baixo. Ajuste de estoque com motivo obrigatório, registrado no hist
 quando e qual era o saldo antes. Tela de histórico por produto, movimento por movimento, com o saldo
 resultante de cada um.
 
+**Aviso de estoque baixo em qualquer tela.** Um sino no alto da tela mostra, com um número em
+vermelho, quantos produtos estão sem estoque e quantos caíram abaixo do mínimo cadastrado. Aparece
+para os três papéis e em todas as telas, e leva direto para a lista completa. Duas ressalvas que
+precisam ser ditas para a promessa não crescer sozinha:
+
+- **É aviso dentro do sistema, não notificação por e-mail, WhatsApp ou celular.** A pessoa vê quando
+  está com o sistema aberto. Não prometa alerta que chega sozinho para quem está fora. Dentro do
+  sistema, porém, o número se corrige sozinho: repôs a mercadoria e lançou a entrada, o alerta some
+  sem precisar recarregar a tela.
+- **Só avisa antes de acabar nos produtos que tiverem estoque mínimo cadastrado.** Sem esse campo
+  preenchido, o sino avisa quando o produto zera. Vale como argumento de implantação, não como
+  ressalva escondida: preencher o mínimo é parte de configurar o sistema direito.
+
 **Entradas.** Lançamento do que o fornecedor entregou — produtos, quantidade e custo — com o estoque
 atualizado na hora. Anexo do arquivo da nota (XML, PDF ou foto). Correção posterior dos dados
 fiscais (número, série, chave de acesso, data de emissão, valor, fornecedor) sem mexer no estoque já
@@ -60,7 +73,7 @@ aparece valendo R$ 0,00 nos relatórios até o valor ser informado, e o sistema 
 confirmar.
 
 **Painel e relatórios.** Painel com produtos em estoque baixo, valor parado em estoque, valor perdido
-no período e maiores perdas. Relatórios de entradas, de perdas e de estoque por categoria, por
+no período e maiores perdas — os mesmos produtos em estoque baixo que o sino resume no alto da tela. Relatórios de entradas, de perdas e de estoque por categoria, por
 período, com botão de gerar PDF.
 
 **Exportação.** Botão de baixar planilha nas telas de Produtos, Estoque, Movimentações de estoque,
@@ -105,8 +118,8 @@ histórico das ações dele sem depender de pedir para ninguém.
 | Gerente | o do operador, mais cadastrar produto, categoria e unidade, corrigir e cancelar perda, corrigir dados da nota e ajustar estoque |
 | Administrador | tudo do gerente, mais gerenciar usuários e ver o histórico de atividades |
 
-Os três **veem as mesmas informações do negócio** — painel, estoque, relatórios. O que muda é o que
-cada um pode alterar.
+Os três **veem as mesmas informações do negócio** — painel, estoque, relatórios e o sino de aviso de
+estoque baixo. O que muda é o que cada um pode alterar.
 
 ---
 
@@ -183,6 +196,12 @@ Não existe hoje, nem como "em breve":
 - Caixa (PDV), cupom fiscal, nota fiscal eletrônica de venda
 - Controle de vendas, contas a pagar ou a receber
 - Aplicativo instalável — é um site, aberto pelo navegador do celular ou do computador
+- Aviso de estoque baixo por e-mail, SMS, WhatsApp ou notificação no celular — o aviso é o sino
+  dentro do sistema, visto por quem está com ele aberto (ver seção 2)
+- Aviso de validade ou vencimento de produto. O sistema **não guarda data de validade nem lote**:
+  "vencido" existe só como motivo de perda, registrado depois que a perda aconteceu. Prometer alerta
+  de vencimento é prometer o que não existe, e é a confusão mais provável de quem ler "alertas" numa
+  proposta de hortifruti
 - Certificação, selo ou auditoria de segurança de terceiros
 
 Sobre **leitor de código de barras** a redação precisa de cuidado, porque os dois extremos estão
@@ -225,21 +244,25 @@ Falta o que entrou depois. Para revisar a proposta atual, é isto:
    ou unidade que ainda esteja em uso. Ver seção 2.
 2. Código de barras no produto, com a busca da tela de Produtos encontrando por ele. Ver seção 2 para a
    redação, que precisa citar a ressalva da tela de Estoque.
+3. O sino de aviso de estoque baixo em todas as telas, com as duas ressalvas da seção 2 (é aviso
+   dentro do sistema, e depende do estoque mínimo estar cadastrado).
 
 **Acrescentar na lista de segurança:**
 
-3. Trocar a senha derruba as outras sessões.
-4. Bloqueio temporário depois de várias tentativas de senha errada.
-5. Vigilância externa 24 horas, com aviso automático de queda e de erro. Precisa vir acompanhada da
+4. Trocar a senha derruba as outras sessões.
+5. Bloqueio temporário depois de várias tentativas de senha errada.
+6. Vigilância externa 24 horas, com aviso automático de queda e de erro. Precisa vir acompanhada da
    ressalva de horário de suporte, descrita na seção 5.
 
 **Corrigir:**
 
-6. A linha que nega leitor de código de barras. Hoje ela diz mais do que a verdade. Ver seção 6.
+7. A linha que nega leitor de código de barras. Hoje ela diz mais do que a verdade. Ver seção 6.
+8. Se a proposta em vigor já falava em "alertas" de forma solta, prender o termo ao que existe: aviso
+   de estoque baixo dentro do sistema. Não pode ficar dando a entender vencimento nem aviso externo.
 
 **Decidir antes de mandar para cliente:**
 
-7. O manual do usuário existe, mas a versão de 25/08 está desatualizada. Regerar a partir do
+9. O manual do usuário existe, mas a versão de 25/08 está desatualizada. Regerar a partir do
    `briefing-manual-do-usuario.md` antes de entregar ao primeiro cliente. Ver seção 6.
 
 ---
@@ -249,3 +272,13 @@ Falta o que entrou depois. Para revisar a proposta atual, é isto:
 Todos os números da seção 3 foram conferidos contra o código nesta data, um por um, e batem. Também foi
 conferido que a tela de Cobranças é exclusiva do super admin da plataforma, ou seja, não é
 funcionalidade do cliente e não entra na proposta.
+
+## 10. Verificação de 02/09/2026
+
+Entrou o sino de aviso de estoque baixo, conferido no código nesta data: vale para os três papéis,
+aparece em todas as telas, conta produto zerado e produto abaixo do mínimo cadastrado, e não conta
+perda do dia. O sino também existe do lado da plataforma, mostrando cobranças atrasadas — como a tela
+de Cobranças, **não é funcionalidade do cliente e não entra na proposta**.
+
+Nenhum número da seção 3 mudou. Continua valendo que o sistema **não guarda data de validade nem
+lote**, então nada relacionado a vencimento pode ser prometido (seção 6).

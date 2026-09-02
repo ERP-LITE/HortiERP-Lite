@@ -26,6 +26,7 @@ import { stockEntriesRoutes } from './modules/stock-entries/stock-entries.routes
 import { stockRoutes } from './modules/stock/stock.routes.js'
 import { lossesRoutes } from './modules/losses/losses.routes.js'
 import { dashboardRoutes } from './modules/dashboard/dashboard.routes.js'
+import { notificationsRoutes } from './modules/notifications/notifications.routes.js'
 import { reportsRoutes } from './modules/reports/reports.routes.js'
 import { logsRoutes } from './modules/logs/logs.routes.js'
 import { registerSystemLogsHook } from './modules/logs/logs.hook.js'
@@ -112,6 +113,7 @@ export function buildApp(options: { systemLogs?: boolean } = {}) {
   app.register(stockRoutes, { prefix: '/api' })
   app.register(lossesRoutes, { prefix: '/api' })
   app.register(dashboardRoutes, { prefix: '/api' })
+  app.register(notificationsRoutes, { prefix: '/api' })
   app.register(reportsRoutes, { prefix: '/api' })
   app.register(logsRoutes, { prefix: '/api' })
   app.register(billingsRoutes, { prefix: '/api' })

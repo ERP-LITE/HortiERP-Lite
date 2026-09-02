@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { Pencil, Plus, Trash2 } from '@lucide/vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
@@ -57,6 +58,23 @@ const { filters, draftFilters, filterModalOpen, openFilterModal, applyFilters, c
 )
 const activeFilterCount = computed(
   () => Number(filters.value.status !== 'todos') + Number(filters.value.period.preset !== 'todos'),
+)
+
+// O sino de alertas abre esta tela em /cobrancas?status=overdue. O watch existe porque quem já
+// está aqui não remonta o componente: sem ele, o link do sino não faria nada.
+const route = useRoute()
+function aplicarStatusDaUrl(valor: unknown) {
+  if (valor !== 'overdue' || filters.value.status === 'overdue') return false
+  filters.value.status = 'overdue'
+  draftFilters.value.status = 'overdue'
+  return true
+}
+aplicarStatusDaUrl(route.query.status)
+watch(
+  () => route.query.status,
+  (valor) => {
+    if (aplicarStatusDaUrl(valor)) reload(loadBillings)
+  },
 )
 
 interface BillingForm {
