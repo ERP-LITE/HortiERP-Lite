@@ -29,8 +29,16 @@ services:
       JWT_SECRET: ${JWT_SECRET:?Defina JWT_SECRET}
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-8h}
       CORS_ORIGIN: https://${APP_DOMAIN:?Defina APP_DOMAIN}
-      # 1 = o Caddy. Ver apps/api/.env.example: `true` deixaria o IP nas mãos de quem chama.
-      TRUST_PROXY: "1"
+      # Faixas privadas: é onde vive o Caddy, e a API não publica porta, então ninguém de fora
+      # chega direto nela. Ver apps/api/.env.example: `true` deixaria o IP nas mãos de quem chama e
+      # contagem de saltos passou a valer o mesmo que `false`.
+      TRUST_PROXY: "uniquelocal"
+      RESEND_API_KEY: ${RESEND_API_KEY:?Defina RESEND_API_KEY}
+      MAIL_FROM: ${MAIL_FROM:?Defina MAIL_FROM}
+      # O link do e-mail aponta para o endereço público, o mesmo do CORS.
+      APP_PUBLIC_URL: https://${APP_DOMAIN}
+      PASSWORD_RESET_TTL_MINUTES: ${PASSWORD_RESET_TTL_MINUTES:-60}
+      PASSWORD_RESET_COOLDOWN_MINUTES: ${PASSWORD_RESET_COOLDOWN_MINUTES:-2}
       INVOICE_STORAGE_PATH: /app/storage/invoices
       INVOICE_MAX_FILE_SIZE: ${INVOICE_MAX_FILE_SIZE:-10485760}
       TECHNICAL_LOG_RETENTION_DAYS: ${TECHNICAL_LOG_RETENTION_DAYS:-180}

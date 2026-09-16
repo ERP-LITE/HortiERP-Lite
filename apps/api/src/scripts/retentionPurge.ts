@@ -45,6 +45,7 @@ async function run() {
   console.log(
     `${prefix}usuários excluídos ${dryRun ? 'a anonimizar' : 'anonimizados'}: ${summary.anonymizedUsers}.`,
   )
+  console.log(`${prefix}password_reset_tokens: ${summary.passwordResetTokens} linha(s) ${verb}.`)
 
   if (dryRun) {
     console.log('Nada foi alterado. Rode sem --dry-run para aplicar.')

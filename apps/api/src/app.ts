@@ -32,7 +32,7 @@ import { logsRoutes } from './modules/logs/logs.routes.js'
 import { registerSystemLogsHook } from './modules/logs/logs.hook.js'
 import { billingsRoutes } from './modules/billings/billings.routes.js'
 
-export function buildApp(options: { systemLogs?: boolean } = {}) {
+export function buildApp(options: { systemLogs?: boolean; rateLimit?: boolean } = {}) {
   const app = Fastify({
     trustProxy: env.TRUST_PROXY,
     logger: {
@@ -50,18 +50,23 @@ export function buildApp(options: { systemLogs?: boolean } = {}) {
     methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE'],
   })
 
-  app.register(rateLimit, {
-    max: 300,
-    timeWindow: '1 minute',
-    allowList: (request) =>
-      env.NODE_ENV !== 'production' && request.headers['user-agent'] === 'HortiERP-Load-Test/1.0',
-    errorResponseBuilder: (_request, context) =>
-      new AppError(
-        `Muitas tentativas em pouco tempo. Tente novamente em ${formatRetryDelay(context.ttl)}.`,
-        context.statusCode,
-        context.ban ? 'RATE_LIMIT_BANNED' : 'RATE_LIMITED',
-      ),
-  })
+  // Desligável só para teste, igual ao hook de log: o limitador é por IP e `app.inject` faz todas
+  // as chamadas do arquivo virem do mesmo endereço, então uma rota de janela longa esgotaria a cota
+  // no meio da suíte. Quem testa o próprio limitador deixa ligado.
+  if (options.rateLimit !== false) {
+    app.register(rateLimit, {
+      max: 300,
+      timeWindow: '1 minute',
+      allowList: (request) =>
+        env.NODE_ENV !== 'production' && request.headers['user-agent'] === 'HortiERP-Load-Test/1.0',
+      errorResponseBuilder: (_request, context) =>
+        new AppError(
+          `Muitas tentativas em pouco tempo. Tente novamente em ${formatRetryDelay(context.ttl)}.`,
+          context.statusCode,
+          context.ban ? 'RATE_LIMIT_BANNED' : 'RATE_LIMITED',
+        ),
+    })
+  }
 
   app.register(cookie)
 

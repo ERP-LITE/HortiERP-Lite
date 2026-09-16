@@ -33,6 +33,14 @@
 > descrição da tela (seção 6) e na lista de capítulos (seção 4). Entraram também três perguntas novas
 > na seção 8 (26 a 28). O **manual gerado antes desta data não menciona o sino** e precisa ser
 > regerado: é a novidade mais visível da tela para quem já usava o sistema.
+>
+> **Revisão de 16/09/2026:** entrou a **recuperação de senha pelo próprio usuário** (seção 7.1), com
+> reflexo na lista de capítulos (seção 4) e em duas perguntas da seção 8 (13 e 14). Esta revisão
+> **inverte** o que todas as versões anteriores deste briefing mandavam escrever: o sistema passou a
+> enviar e-mail, e "esqueci minha senha" deixou de depender do administrador. **Todo manual gerado
+> antes desta data está errado nesse ponto**, e não é omissão: é afirmação contrária ao que o sistema
+> faz hoje. Confira que o capítulo 2 do manual novo traz o "Esqueci minha senha" e que não sobrou
+> nenhuma frase dizendo que o sistema não envia e-mail.
 
 ---
 
@@ -89,8 +97,8 @@ A equipe do cliente — dono/gerente da loja e os funcionários que mexem no est
 1. **Primeiros 30 minutos** — uma página só, o caminho mínimo para o sistema começar a servir:
    entrar, cadastrar categorias e unidades, cadastrar (ou importar) os produtos, lançar o estoque
    inicial, lançar a primeira entrada. É a página mais importante do manual.
-2. **Entrando no sistema** — login, esqueci a senha (falar com o administrador da empresa), **o que
-   fazer quando é o próprio administrador que esqueceu**, trocar a própria senha, **baixar os próprios
+2. **Entrando no sistema** — login, **esqueci minha senha pelo próprio sistema**, o que fazer quando
+   se perdeu também o acesso ao e-mail, trocar a própria senha, **baixar os próprios
    dados**, sair, e o encerramento automático por inatividade.
 3. **Conhecendo a tela** — menu lateral, o que cada item faz, o sino de alertas no canto superior
    direito, como funciona no celular.
@@ -213,15 +221,24 @@ cliente**, não copie.
 
 - O login é por **e-mail e senha**. O e-mail não diferencia maiúsculas de minúsculas: pode digitar
   como quiser.
-- **O sistema não envia e-mail nenhum** — nem de boas-vindas, nem de recuperação de senha. Isso muda
-  a expectativa de quem está acostumado com o "esqueci minha senha" de outros sites, e precisa estar
-  explícito no manual.
-- Quem redefine a senha de um funcionário é o **administrador da empresa**, pela tela de Usuários.
-- **E se quem esqueceu for o próprio administrador?** Se a empresa tem mais de um administrador, o
-  outro redefine normalmente pela tela de Usuários. Se houver só um e for ele quem esqueceu, ninguém
-  dentro da empresa consegue resolver: é preciso falar com o suporte, pelo WhatsApp
-  **(47) 99154-0607**. Acrescente uma **Dica** recomendando cadastrar um segundo administrador de
-  confiança desde o começo — é a diferença entre um problema de dois minutos e uma manhã parada.
+- **Esqueci minha senha funciona sozinho.** Na tela de entrada existe o link **Esqueci minha senha**:
+  a pessoa informa o e-mail e recebe uma mensagem com um link para escolher uma senha nova. Não
+  precisa falar com o administrador nem com o suporte. Três pontos que o manual precisa deixar claros,
+  porque é onde a expectativa costuma errar:
+  - **A senha não vem por e-mail.** O que chega é um link; quem escolhe a senha nova é a própria pessoa.
+  - **O link vale por 1 hora e só funciona uma vez.** Passou disso, é pedir de novo. Diga isso como
+    proteção, não como limitação: link que vale para sempre é link que serve para quem invadir o e-mail.
+  - **A tela responde a mesma coisa para e-mail cadastrado e não cadastrado.** Quem digitar o e-mail
+    errado vai ver a mesma mensagem de sucesso e não vai receber nada. Vale uma **Dica** mandando
+    conferir a caixa de spam antes de concluir que não funcionou.
+- **Este é o único e-mail que o sistema envia.** Não existe e-mail de boas-vindas, de aviso de estoque
+  nem de novidade. Precisa estar explícito, senão o cliente passa a esperar alerta por e-mail.
+- O administrador da empresa **também** pode redefinir a senha de um funcionário pela tela de Usuários,
+  quando for mais rápido resolver na hora.
+- **E se quem esqueceu for o próprio administrador?** Agora ele resolve sozinho pelo "Esqueci minha
+  senha", desde que tenha acesso ao e-mail cadastrado. O suporte pelo WhatsApp **(47) 99154-0607** vira
+  o caminho para o caso em que a pessoa **perdeu também o acesso ao e-mail**. Mantenha a **Dica** de
+  cadastrar um segundo administrador de confiança: continua valendo como rede de segurança.
 - Cada um troca a própria senha em **Perfil**, informando a senha atual, a nova e a confirmação. O
   acesso a **Perfil** e a **Sair** está no menu do círculo com as iniciais, no canto superior direito.
 - **Trocar a senha derruba as outras sessões, e não a sua.** Quem trocou continua trabalhando na
@@ -249,7 +266,10 @@ cliente**, não copie.
 - A conta da empresa e o **primeiro administrador** (nome, e-mail e senha) são criados por mim, o
   fornecedor, que entrega as credenciais direto ao cliente. Não existe autocadastro.
 - **Onde as mensagens aparecem:** erro em campo preenchido errado sai em vermelho embaixo do próprio
-  campo. Erro de uma ação — estoque insuficiente, nome repetido, permissão negada — aparece como
+  campo, **e o campo ganha contorno vermelho**, para a pessoa achar o que precisa corrigir sem ler
+  o formulário inteiro. Vale em todas as telas e nos dois temas, claro e escuro. **O vermelho some
+  assim que a pessoa mexe naquele campo**, e só naquele: corrigir o e-mail não apaga o aviso da
+  senha. Vale uma frase no manual, porque tira o medo de "estraguei o formulário". Erro de uma ação — estoque insuficiente, nome repetido, permissão negada — aparece como
   **aviso no canto superior direito da tela**, por cima da janela aberta, com um X para fechar. Ele
   desaparece sozinho depois de alguns segundos. Isso vale a pena dizer no manual porque o aviso surge
   fora do formulário, e quem não souber olhar para o canto pode achar que o clique não fez nada.

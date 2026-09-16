@@ -32,6 +32,15 @@ export async function changePassword(currentPassword: string, newPassword: strin
   }
 }
 
+export async function requestPasswordReset(email: string) {
+  const { data } = await api.post<{ message: string }>('/auth/forgot-password', { email })
+  return data.message
+}
+
+export async function resetPassword(token: string, newPassword: string) {
+  await api.post('/auth/reset-password', { token, newPassword })
+}
+
 export async function fetchOwnPersonalData() {
   const { data } = await api.get<Record<string, unknown>>('/auth/me/personal-data')
   return data

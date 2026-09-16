@@ -18,6 +18,7 @@ import ExportCsvButton from '@/components/ui/ExportCsvButton.vue'
 import SearchInput from '@/components/ui/SearchInput.vue'
 import SortableTableHeader from '@/components/ui/SortableTableHeader.vue'
 import { getApiErrorMessage, resolveFormError } from '@/services/api'
+import { useFieldErrors, useRowErrors } from '@/composables/useFieldErrors'
 import { toastSuccess } from '@/lib/alerts'
 import { formatQuantity } from '@/lib/format'
 import { adjustStock, listAllCurrentStock, listCurrentStock } from '@/services/stockService'
@@ -105,7 +106,7 @@ async function loadAllProducts() {
 const adjustModalOpen = ref(false)
 const adjustingProduct = ref<ProductWithRelations | null>(null)
 const adjustForm = ref({ quantity: '', notes: '' })
-const adjustFieldErrors = ref<Record<string, string>>({})
+const { fieldErrors: adjustFieldErrors } = useFieldErrors(() => ({ ...adjustForm.value }))
 const adjustSaving = ref(false)
 const adjustErrorMessage = ref('')
 
@@ -158,8 +159,10 @@ interface BulkAdjustItemRow {
 const bulkAdjustModalOpen = ref(false)
 const bulkAdjustItems = ref<BulkAdjustItemRow[]>([])
 const bulkAdjustNotes = ref('')
-const bulkAdjustItemErrors = ref<{ productId?: string; quantity?: string }[]>([])
-const bulkAdjustNotesError = ref('')
+const { rowErrors: bulkAdjustItemErrors } = useRowErrors<'productId' | 'quantity'>(
+  () => bulkAdjustItems.value,
+)
+const { fieldErrors: bulkAdjustNotesErrors } = useFieldErrors(() => ({ notes: bulkAdjustNotes.value }))
 const bulkAdjustSaving = ref(false)
 const bulkAdjustErrorMessage = ref('')
 
@@ -170,7 +173,7 @@ async function openBulkAdjustModal() {
   bulkAdjustItems.value = [{ productId: '', quantity: '' }]
   bulkAdjustNotes.value = ''
   bulkAdjustItemErrors.value = []
-  bulkAdjustNotesError.value = ''
+  bulkAdjustNotesErrors.value = {}
   bulkAdjustErrorMessage.value = ''
   bulkAdjustModalOpen.value = true
 }
@@ -199,9 +202,9 @@ function validateBulkAdjustForm(): boolean {
     if (item.quantity === '' || Number(item.quantity) < 0) rowErrors.quantity = 'Informe uma quantidade válida'
     return rowErrors
   })
-  bulkAdjustNotesError.value = bulkAdjustNotes.value.trim() ? '' : 'Explique o motivo do ajuste'
+  bulkAdjustNotesErrors.value = bulkAdjustNotes.value.trim() ? {} : { notes: 'Explique o motivo do ajuste' }
 
-  return bulkAdjustItemErrors.value.every((rowErrors) => Object.keys(rowErrors).length === 0) && !bulkAdjustNotesError.value
+  return bulkAdjustItemErrors.value.every((rowErrors) => Object.keys(rowErrors).length === 0) && !bulkAdjustNotesErrors.value.notes
 }
 
 async function handleBulkAdjustSubmit() {
@@ -477,7 +480,7 @@ onMounted(() => {
           label="Motivo do ajuste"
           placeholder="Ex.: contagem física do inventário mensal"
           :maxlength="LIMITES_TEXTO.motivo"
-          :error="bulkAdjustNotesError"
+          :error="bulkAdjustNotesErrors.notes"
           required
         />
 

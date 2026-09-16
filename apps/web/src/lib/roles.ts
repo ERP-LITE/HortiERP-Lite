@@ -16,3 +16,8 @@ export function roleLabel(role: string | null | undefined) {
 export function isManagerRole(role: string | null | undefined) {
   return role === 'admin' || role === 'gerente'
 }
+
+/** Tela inicial do papel. O super admin não tem painel: ele escolhe a empresa antes de qualquer coisa. */
+export function homeRouteName(role: string | null | undefined) {
+  return role === 'super_admin' ? 'selecionar-empresa' : 'dashboard'
+}

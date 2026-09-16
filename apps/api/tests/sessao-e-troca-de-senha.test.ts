@@ -3,7 +3,7 @@ import { describe, test } from 'node:test'
 import bcrypt from 'bcryptjs'
 import { db } from './db.js'
 import { companies, users } from '../src/db/schema/index.js'
-import { setupTestApp } from './helpers.js'
+import { authCookie, setupTestApp } from './helpers.js'
 
 const ctx = setupTestApp()
 
@@ -25,15 +25,9 @@ async function criarAdmin(email: string) {
   return user
 }
 
-/** Token com `iat` no passado: o de agora cai na tolerância de 1 segundo da checagem. */
-function cookieAntigo(user: { id: string; companyId: string; role: string }) {
-  const token = ctx.app.jwt.sign({
-    sub: user.id,
-    companyId: user.companyId,
-    role: user.role as 'admin' | 'super_admin',
-    iat: Math.floor(Date.now() / 1000) - 60,
-  })
-  return `token=${token}`
+/** Token com `iat` no passado: o de agora cairia na tolerância de 1 segundo da checagem. */
+function cookieAntigo(user: Parameters<typeof authCookie>[1]) {
+  return authCookie(ctx.app, user, { emitidoHaSegundos: 60 })
 }
 
 function cookieDaResposta(response: { cookies: Array<{ name: string; value: string }> }) {

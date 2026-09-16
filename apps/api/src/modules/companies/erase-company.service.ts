@@ -9,6 +9,7 @@ import {
   companies,
   companyBillings,
   losses,
+  passwordResetTokens,
   products,
   stockEntries,
   stockEntryAttachments,
@@ -73,6 +74,7 @@ async function coletar(companyId: string): Promise<CompanyFootprint | null> {
       logsAtividade: await countBy(activityLogs, activityLogs.companyId, companyId),
       logsTecnicos: await countBy(systemLogs, systemLogs.companyId, companyId),
       cobrancas: await countBy(companyBillings, companyBillings.companyId, companyId),
+      pedidosDeSenha: await countBy(passwordResetTokens, passwordResetTokens.companyId, companyId),
     },
   }
 }
@@ -100,6 +102,7 @@ async function apagar(footprint: CompanyFootprint) {
     await tx.delete(activityLogs).where(eq(activityLogs.companyId, company.id))
     await tx.delete(systemLogs).where(eq(systemLogs.companyId, company.id))
     await tx.delete(companyBillings).where(eq(companyBillings.companyId, company.id))
+    await tx.delete(passwordResetTokens).where(eq(passwordResetTokens.companyId, company.id))
     await tx.delete(users).where(eq(users.companyId, company.id))
     await tx.delete(companies).where(eq(companies.id, company.id))
   })

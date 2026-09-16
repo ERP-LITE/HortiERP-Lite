@@ -2,6 +2,7 @@
 import { computed, nextTick, onBeforeUnmount, ref, watch, type CSSProperties } from 'vue'
 import { Check, ChevronDown, Search } from '@lucide/vue'
 import FieldLabel from './FieldLabel.vue'
+import { CLASSE_CAMPO_COM_ERRO } from './fieldClasses'
 
 const props = defineProps<{
   modelValue: string
@@ -119,7 +120,7 @@ onBeforeUnmount(() => {
       ref="trigger"
       type="button"
       class="app-field-trigger flex w-full items-center rounded-lg border border-gray-300 bg-white py-2.5 pl-3.5 pr-3 text-left text-sm text-gray-900 shadow-sm transition-colors hover:border-gray-400 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:hover:border-gray-500"
-      :class="{ 'border-red-400': error || invalid }"
+      :class="{ [CLASSE_CAMPO_COM_ERRO]: error || invalid }"
       :aria-expanded="open"
       :aria-required="required || undefined"
       aria-haspopup="listbox"

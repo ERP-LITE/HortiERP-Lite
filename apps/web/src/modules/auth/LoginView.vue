@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import axios from 'axios'
 import { computed, nextTick, ref } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
 import AuthLayout from '@/layouts/AuthLayout.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
 import { useAuthStore } from '@/stores/auth'
+import { useFieldErrors } from '@/composables/useFieldErrors'
 import { resolveFormError } from '@/services/api'
 import { LIMITES_TEXTO } from '@/lib/limits'
 
@@ -13,7 +14,7 @@ const email = ref('')
 const password = ref('')
 const loading = ref(false)
 const errorMessage = ref('')
-const fieldErrors = ref<Record<string, string>>({})
+const { fieldErrors } = useFieldErrors(() => ({ email: email.value, password: password.value }))
 const invalidCredentials = ref(false)
 const passwordInput = ref<{ focus: () => void } | null>(null)
 
@@ -26,11 +27,20 @@ const sessionMessage = computed(() =>
     : '',
 )
 
-async function handleSubmit() {
-  loading.value = true
-  errorMessage.value = ''
+// Mesmo formato do `validate()` das telas de cadastro: erro por campo, em vermelho embaixo dele.
+function validate(): boolean {
   fieldErrors.value = {}
+  if (!email.value.trim()) fieldErrors.value.email = 'Informe o e-mail'
+  if (!password.value) fieldErrors.value.password = 'Informe a senha'
+  return Object.keys(fieldErrors.value).length === 0
+}
+
+async function handleSubmit() {
+  errorMessage.value = ''
   invalidCredentials.value = false
+  if (!validate()) return
+
+  loading.value = true
 
   try {
     await auth.login(email.value, password.value)
@@ -67,6 +77,7 @@ async function handleSubmit() {
         :maxlength="LIMITES_TEXTO.email"
         :error="fieldErrors.email"
         :invalid="invalidCredentials"
+        required
       />
       <BaseInput
         ref="passwordInput"
@@ -76,6 +87,7 @@ async function handleSubmit() {
         placeholder="••••••••"
         :error="fieldErrors.password"
         :invalid="invalidCredentials"
+        required
       />
 
       <p v-if="errorMessage" class="text-sm text-red-600 dark:text-red-400">{{ errorMessage }}</p>
@@ -83,6 +95,13 @@ async function handleSubmit() {
       <BaseButton type="submit" class="w-full" :disabled="loading">
         {{ loading ? 'Entrando...' : 'Entrar' }}
       </BaseButton>
+
+      <RouterLink
+        :to="{ name: 'esqueci-senha' }"
+        class="block text-center text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+      >
+        Esqueci minha senha
+      </RouterLink>
     </form>
   </AuthLayout>
 </template>

@@ -71,6 +71,13 @@
       "when": 1787834923180,
       "tag": "0009_senha_alterada_em",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1787921323180,
+      "tag": "0010_recuperacao_de_senha",
+      "breakpoints": true
     }
   ]
 }

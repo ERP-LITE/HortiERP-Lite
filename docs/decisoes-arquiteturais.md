@@ -903,6 +903,48 @@ as duas ganharam a checagem em JavaScript na mesma mudança.
 A consequência prática é uma regra: **`required` é uma afirmação sobre a etiqueta, não sobre a
 validação**. Se o `validate()` da tela não cobre o campo, o asterisco está mentindo.
 
+### Campo com erro: um vermelho só, e ele some quando a pessoa corrige
+
+A mensagem sob o campo passava despercebida em tela de celular, então o campo com erro também ganhou
+borda e anel vermelhos. Três decisões seguraram isso em pé.
+
+**A aparência mora num lugar só.** `fieldClasses.ts` exporta `CLASSE_CAMPO_COM_ERRO`, e `BaseInput`,
+`BaseSelect` e `DateInput` apontam para lá. O `!` das classes não é preguiça: a borda padrão é
+`dark:border-gray-600`, que o Tailwind gera como `.dark\:border-gray-600:is(.dark *)`, duas classes de
+especificidade contra uma. Sem o `!`, o campo ficava vermelho no tema claro e não ficava no escuro,
+em silêncio.
+
+**Campo com erro não tem anel verde.** O anel de foco é `focus:ring-primary-500` e vencia o vermelho
+por especificidade, então clicar num campo errado dava borda vermelha com halo verde em volta, duas
+cores dizendo coisas opostas. O `focus:!ring-red-500` no token resolve: campo com erro é vermelho
+inteiro, focado ou não, e o foco muda a intensidade do anel, não a cor.
+
+**O erro some quando a pessoa mexe naquele campo.** Erro que continua vermelho enquanto se corrige
+ensina a ignorar o vermelho. Quem cuida disso é `useFieldErrors`, e ele apaga só o campo que mudou:
+corrigir o e-mail não pode dar a impressão de que a senha foi resolvida.
+
+O composable recebe **uma função** que monta o objeto de valores, não um objeto reativo. Isso é o que
+dá ao `watch` um "antes" de verdade: com `deep: true` sobre um objeto mutado no lugar, o Vue entrega
+o mesmo objeto nos dois argumentos e nada nunca parece ter mudado. De quebra, a função deixa a tela
+juntar campos que moram em `ref` separados (login, redefinição de senha) com os que moram num
+formulário só.
+
+O caso que derruba a solução ingênua é o reenvio: apagar o campo, enviar de novo e receber a **mesma**
+frase de erro. Como quem reexibe é o `validate()` da tela, e não o `watch`, o vermelho volta mesmo com
+a mensagem idêntica. Se fosse o observador a reexibir, ele não veria mudança nenhuma e o botão
+pareceria quebrado.
+
+**Lista de itens tem o erro na célula, não no formulário.** A entrada de mercadoria e o ajuste de
+estoque em lote têm produto e quantidade por linha, e corrigir a linha 3 não pode apagar o erro da
+linha 1. `useRowErrors` compara por índice **e** por campo. Linha adicionada ou removida embaralha os
+índices, e por isso as duas telas zeram a lista inteira de erros nessas ações, em vez de o composable
+tentar adivinhar o remanejamento.
+
+Nenhum estado de erro de campo vive solto numa tela: todos vêm de `useFieldErrors` ou `useRowErrors`
+(o `useCrudModal` também, que só repassa o primeiro). O que continua sendo `ref` de string na tela é
+mensagem de formulário, não de campo: o aviso de planilha inválida na importação de produtos e a
+mensagem de topo dos detalhes da entrada.
+
 ### Um jeito só de escolher numa lista
 
 O `BaseSelect` tinha dois modos: o normal (botão com a seta que gira, lista flutuante e campo de

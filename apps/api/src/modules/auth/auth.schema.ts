@@ -17,3 +17,16 @@ export const changePasswordSchema = z.object({
 })
 
 export type ChangePasswordInput = z.infer<typeof changePasswordSchema>
+
+export const forgotPasswordSchema = z.object({
+  email: emailSchema,
+})
+
+export const resetPasswordSchema = z.object({
+  // 32 bytes em base64url dão 43 caracteres. O limite existe para um corpo gigante não chegar até
+  // o SHA-256 e ao banco.
+  token: z.string().trim().min(1, 'Link inválido').max(200, 'Link inválido'),
+  newPassword: passwordSchema,
+})
+
+export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>

@@ -51,9 +51,20 @@ const TRAVESSIAS_LEGITIMAS = [
     motivo: 'login procura por e-mail, que é único globalmente — não existe sessão nem empresa ainda quando esta consulta roda',
   },
   {
+    arquivo: 'modules/retention/retention.service.ts',
+    tabela: 'passwordResetTokens',
+    motivo: 'retenção corta por data de vencimento e alcança todas as empresas, igual aos dois expurgos de log ao lado',
+  },
+  {
     arquivo: 'scripts/cleanupInvoiceOrphans.ts',
     tabela: 'stockEntryAttachments',
     motivo: 'manutenção operacional: varre o disco de todas as empresas comparando com o banco, por definição transversal',
+  },
+  {
+    arquivo: 'scripts/resetPlatformPassword.ts',
+    tabela: 'users',
+    motivo:
+      'recuperação da conta de plataforma, rodada no servidor sem sessão: procura por e-mail, que é único globalmente. O filtro que importa aqui não é a empresa e sim o papel — o script só alcança `super_admin`, e é isso que o impede de virar porta dos fundos para a conta de um cliente',
   },
   {
     arquivo: 'modules/logs/error-alert.service.ts',

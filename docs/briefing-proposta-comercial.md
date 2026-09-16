@@ -11,6 +11,12 @@ ele é a fonte da verdade do que o sistema faz.
 ficar velho, a proposta seguinte nasce errada — foi por isso que ele existe em vez de uma lista de
 correções solta.
 
+**Irmão deste arquivo:** o [briefing do contrato](./briefing-contrato.md). Este descreve o que é
+prometido ao prospecto; aquele, o que é assinado. Os dois precisam dizer a mesma coisa: promessa na
+proposta que não aparece no contrato vira discussão, e restrição no contrato que não estava na
+proposta vira quebra de confiança na assinatura. Ao mexer na seção 6 (o que não prometer) ou nas
+condições comerciais, confira a seção correspondente lá.
+
 ---
 
 ## 1. Tom
@@ -81,6 +87,15 @@ Entradas, Perdas e Histórico de atividades — já com os filtros aplicados.
 
 **Acessos.** Três papéis, descritos na seção 4.
 
+**Recuperação de senha pelo próprio usuário.** Quem esquece a senha clica em "Esqueci minha senha" na tela de
+entrada, informa o e-mail e recebe um link para escolher uma senha nova. Não depende de ligar para o suporte nem
+de pedir para o administrador da loja. Três detalhes que valem estar na proposta porque são o que diferencia isso
+de um envio de senha por e-mail, que é o que muita gente imagina ao ler "recuperação de senha":
+
+- **A senha nunca é enviada por e-mail.** O que vai é um link temporário; quem escolhe a senha nova é a pessoa.
+- **O link vale por 1 hora e serve uma única vez.** Depois disso, é pedir de novo.
+- **Ao redefinir, todas as sessões abertas com a senha antiga caem.** É a mesma proteção da troca de senha comum.
+
 **Dados pessoais.** Aviso de privacidade público em `/privacidade`, com link no rodapé de todas as
 telas e data da última revisão — qualquer pessoa lê antes de entrar, inclusive quem não tem conta.
 E, em **Perfil**, qualquer usuário tem o botão **Baixar meus dados**, que entrega o cadastro dele e o
@@ -103,6 +118,7 @@ histórico das ações dele sem depender de pedir para ninguém.
 | Preço unitário | R$ 9.999.999,99 |
 | Período máximo por consulta no painel e nos gráficos | 90 dias |
 | Sessão fecha por inatividade | 30 minutos |
+| Validade do link de redefinição de senha | 1 hora, uso único |
 | Retenção da cópia de segurança | 30 dias |
 | Registro técnico de acesso (data, hora, IP) | 180 dias |
 | Histórico de atividades | 5 anos |
@@ -131,6 +147,9 @@ O que pode ser afirmado:
 - **Trocar a senha derruba as outras sessões.** Quem trocou continua trabalhando sem interrupção;
   qualquer outra sessão aberta com a senha antiga cai na hora. Serve para cortar o acesso de quem sabia
   a senha antiga, e vale também quando o administrador troca a senha de um funcionário.
+- **Recuperação de senha sem expor a senha.** O e-mail leva um link temporário de uso único, nunca a senha. O
+  sistema responde a mesma frase para e-mail cadastrado e não cadastrado, para o formulário não virar um jeito de
+  descobrir quem tem conta.
 - **Bloqueio temporário por tentativa de senha errada.** Na mesma conta, 5 falhas seguidas travam o
   acesso por 1 minuto, 10 falhas por 5 minutos e 15 falhas por 15 minutos. A contagem zera 15 minutos
   depois da última tentativa, e um acerto limpa tudo.
@@ -160,8 +179,23 @@ dados e o cliente tem direito de saber. Redação sugerida:
 > consegue abrir. O sistema em si, com os seus dados do dia a dia, roda em servidor no Brasil
 > (São Paulo).
 
+**Uma segunda transferência entrou com a recuperação de senha, e ela é diferente da primeira.** O e-mail é
+enviado por um serviço especializado (Resend). A mensagem sai de um servidor no Brasil, mas o registro do envio
+(para quem foi e quando) fica em servidores nos Estados Unidos por 30 dias. Aqui **não existe criptografia que
+resolva**: para entregar o e-mail, o provedor precisa do endereço e do nome em claro. Redação sugerida:
+
+> Para enviar o e-mail de redefinição de senha, uso um serviço de envio de e-mails. Ele precisa saber o nome e o
+> endereço de e-mail de quem vai receber, e guarda o registro desse envio por 30 dias em servidores nos Estados
+> Unidos. Esse e-mail não leva senha nem nenhum dado do seu negócio.
+
 Não enfeitar e não omitir. É o tipo de informação que, faltando, vira problema justamente com o
 cliente que lê contrato.
+
+### Suboperadores a declarar
+
+Três, e os três precisam constar do contrato: **Oracle Cloud** (servidor, no Brasil), **Backblaze** (cópia de
+segurança cifrada, nos Estados Unidos) e **Resend** (envio do e-mail de redefinição de senha, registros nos
+Estados Unidos).
 
 ### Controlador e operador
 
@@ -197,7 +231,9 @@ Não existe hoje, nem como "em breve":
 - Controle de vendas, contas a pagar ou a receber
 - Aplicativo instalável — é um site, aberto pelo navegador do celular ou do computador
 - Aviso de estoque baixo por e-mail, SMS, WhatsApp ou notificação no celular — o aviso é o sino
-  dentro do sistema, visto por quem está com ele aberto (ver seção 2)
+  dentro do sistema, visto por quem está com ele aberto (ver seção 2). **Cuidado com a redação agora que existe
+  recuperação de senha por e-mail:** o sistema manda e-mail, mas só esse. Dizer "o sistema não manda e-mail"
+  virou mentira; dizer "o sistema manda e-mail" sem qualificar vira promessa de alerta que não existe
 - Aviso de validade ou vencimento de produto. O sistema **não guarda data de validade nem lote**:
   "vencido" existe só como motivo de perda, registrado depois que a perda aconteceu. Prometer alerta
   de vencimento é prometer o que não existe, e é a confusão mais provável de quem ler "alertas" numa
@@ -282,3 +318,16 @@ de Cobranças, **não é funcionalidade do cliente e não entra na proposta**.
 
 Nenhum número da seção 3 mudou. Continua valendo que o sistema **não guarda data de validade nem
 lote**, então nada relacionado a vencimento pode ser prometido (seção 6).
+
+
+## 11. Verificação de 16/09/2026
+
+Entrou a recuperação de senha pelo próprio usuário, conferida no código nesta data: link de 1 hora, uso único,
+senha nunca enviada por e-mail, resposta idêntica para e-mail cadastrado e não cadastrado, e todas as sessões
+antigas derrubadas ao redefinir.
+
+Duas coisas na proposta **precisam** ser revistas por causa disso, e nenhuma é opcional:
+
+1. A **segunda transferência internacional** (Resend), descrita na seção 5. Diferente do backup, aqui não há
+   criptografia que proteja o dado do provedor.
+2. Qualquer frase da proposta em vigor que diga que o sistema **não envia e-mail**. Ver seção 6.

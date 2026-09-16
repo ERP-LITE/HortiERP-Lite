@@ -18,6 +18,7 @@
     "db:migrate": "npm run db:migrate --workspace=apps/api",
     "db:seed": "npm run db:seed --workspace=apps/api",
     "db:seed:platform": "npm run db:seed:platform --workspace=apps/api",
+    "platform:reset-password": "npm run platform:reset-password --workspace=apps/api --",
     "invoices:cleanup": "npm run invoices:cleanup --workspace=apps/api --",
     "csp:hash": "node scripts/csp-hash.mjs",
     "check:tenant-scope": "node scripts/check-tenant-scope.mjs",

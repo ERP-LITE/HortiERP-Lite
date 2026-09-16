@@ -10,6 +10,7 @@ import { stockMovements } from './stockMovements.js'
 import { systemLogs } from './systemLogs.js'
 import { activityLogs } from './activityLogs.js'
 import { companyBillings } from './companyBillings.js'
+import { passwordResetTokens } from './passwordResetTokens.js'
 
 export * from './enums.js'
 export * from './companies.js'
@@ -23,6 +24,7 @@ export * from './stockMovements.js'
 export * from './systemLogs.js'
 export * from './activityLogs.js'
 export * from './companyBillings.js'
+export * from './passwordResetTokens.js'
 
 export const companiesRelations = relations(companies, ({ many }) => ({
   users: many(users),
@@ -32,6 +34,7 @@ export const companiesRelations = relations(companies, ({ many }) => ({
   systemLogs: many(systemLogs),
   activityLogs: many(activityLogs),
   billings: many(companyBillings),
+  passwordResetTokens: many(passwordResetTokens),
 }))
 
 export const companyBillingsRelations = relations(companyBillings, ({ one }) => ({
@@ -50,8 +53,14 @@ export const activityLogsRelations = relations(activityLogs, ({ one }) => ({
   actor: one(users, { fields: [activityLogs.actorId], references: [users.id] }),
 }))
 
-export const usersRelations = relations(users, ({ one }) => ({
+export const usersRelations = relations(users, ({ one, many }) => ({
   company: one(companies, { fields: [users.companyId], references: [companies.id] }),
+  passwordResetTokens: many(passwordResetTokens),
+}))
+
+export const passwordResetTokensRelations = relations(passwordResetTokens, ({ one }) => ({
+  company: one(companies, { fields: [passwordResetTokens.companyId], references: [companies.id] }),
+  user: one(users, { fields: [passwordResetTokens.userId], references: [users.id] }),
 }))
 
 export const categoriesRelations = relations(categories, ({ one, many }) => ({

@@ -27,6 +27,7 @@ erDiagram
   COMPANIES ||--o{ STOCK_MOVEMENTS : ""
   COMPANIES ||--o{ SYSTEM_LOGS : ""
   COMPANIES ||--o{ COMPANY_BILLINGS : recebe
+  USERS ||--o{ PASSWORD_RESET_TOKENS : pede
   CATEGORIES ||--o{ PRODUCTS : classifica
   UNITS ||--o{ PRODUCTS : mede
   STOCK_ENTRIES ||--o{ STOCK_ENTRY_ITEMS : contem
@@ -96,6 +97,29 @@ A unicidade vem do índice parcial `users_email_active_unique`, sobre `lower(ema
 - **`deleted_at is null`** — sem o filtro, o e-mail de um usuário excluído ficava reservado para sempre, e recontratar a mesma pessoa respondia "já existe um usuário com esse e-mail" apontando para alguém invisível em toda tela. É o mesmo padrão parcial que produtos, categorias e unidades já usavam; `assertUniqueUserEmail` aplica a mesma regra na checagem amigável.
 
 O bloqueio de uma empresa suspensa vem de `companies.active`, verificado no login e em toda requisição autenticada — `users.active` não espelha esse valor, para que reativar a empresa não devolva acesso a quem foi desativado à mão.
+
+### `password_reset_tokens`
+| Coluna | Tipo | Observação |
+|---|---|---|
+| `id` | uuid | PK |
+| `companyId` | uuid | FK `companies.id`. Não é usado para achar o token; existe para a linha caber na política de RLS e sair no apagamento definitivo da empresa |
+| `userId` | uuid | FK `users.id`, **`on delete cascade`** |
+| `tokenHash` | varchar(64) | SHA-256 do token, em hexadecimal. Único |
+| `expiresAt` | timestamptz | 1 hora por padrão (`PASSWORD_RESET_TTL_MINUTES`) |
+| `usedAt` | timestamptz | nulável. Preenchido torna o link inútil |
+| `createdAt` | timestamptz | base da carência entre dois pedidos (`PASSWORD_RESET_COOLDOWN_MINUTES`) |
+
+**O token em claro nunca é gravado.** A coluna guarda o SHA-256 dele, então um dump ou um backup não
+dá a ninguém o poder de redefinir senha. Não é bcrypt porque a busca é por igualdade exata e bcrypt
+não indexa; com 256 bits de aleatoriedade no token, não existe dicionário que ataque o resumo.
+
+**`on delete cascade` é a única exceção ao padrão do schema**, que em todo o resto usa `restrict` ou
+`set null` para preservar histórico. Aqui é o contrário de propósito: o pedido é rastro de um
+processo, não registro de negócio, e não deve sobreviver à conta que o originou.
+
+Usar um link marca `usedAt` em **todos** os pedidos em aberto daquele usuário, não só no usado: quem
+clicou duas vezes em "esqueci minha senha" não pode ficar com um link vivo sobrando na caixa de
+entrada. A retenção apaga a linha 7 dias depois do vencimento (`PASSWORD_RESET_KEEP_DAYS`).
 
 ### `categories`
 Classificação de produtos (ex: Frutas, Verduras). `id`, `companyId`, `name`, `description?`, `active`, timestamps, auditBy.

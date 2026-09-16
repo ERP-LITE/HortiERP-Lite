@@ -1,13 +1,14 @@
 import assert from 'node:assert/strict'
 import { mkdir, writeFile, access } from 'node:fs/promises'
 import { join } from 'node:path'
-import { randomUUID } from 'node:crypto'
+import { randomBytes, randomUUID } from 'node:crypto'
 import { describe, test } from 'node:test'
 import { and, eq } from 'drizzle-orm'
 import { db } from './db.js'
 import {
   activityLogs,
   companies,
+  passwordResetTokens,
   products,
   stockEntries,
   stockEntryAttachments,
@@ -21,6 +22,7 @@ import {
   ANONYMIZED_USER_NAME,
   anonymizeDeletedUsers,
   daysAgo,
+  PASSWORD_RESET_KEEP_DAYS,
   purgeActivityLogs,
   purgeTechnicalLogs,
   runRetention,
@@ -177,16 +179,42 @@ describe('anonimização de usuário excluído', () => {
   })
 })
 
-describe('runRetention aplica os três prazos juntos', () => {
+/** Pedido de redefinição já vencido em `expiresAt`: é por essa data que a retenção corta. */
+async function inserirPedidoDeSenha(tenant: { companyId: string; admin: { id: string } }, venceuEm: Date) {
+  await db.insert(passwordResetTokens).values({
+    companyId: tenant.companyId,
+    userId: tenant.admin.id,
+    tokenHash: randomBytes(32).toString('hex'),
+    expiresAt: venceuEm,
+  })
+}
+
+describe('runRetention aplica os prazos juntos', () => {
   test('resumo bate com o que foi apagado', async () => {
     const tenant = await createTenant('retencao-conjunta')
     await insertTechnicalLog(tenant.companyId, tenant.admin.id, daysAgo(200))
     await insertActivityLog(tenant.companyId, tenant.admin.id, daysAgo(5 * 365 + 5))
     const saiu = await createUser(tenant.companyId, 'operador', 'conjunta')
     await db.update(users).set({ deletedAt: daysAgo(5 * 365 + 5) }).where(eq(users.id, saiu.id))
+    await inserirPedidoDeSenha(tenant, daysAgo(PASSWORD_RESET_KEEP_DAYS + 1))
 
     const resumo = await runRetention({ technicalLogRetentionDays: 180, auditRetentionDays: 5 * 365 })
-    assert.deepEqual(resumo, { technicalLogs: 1, activityLogs: 1, anonymizedUsers: 1 })
+    assert.deepEqual(resumo, {
+      technicalLogs: 1,
+      activityLogs: 1,
+      anonymizedUsers: 1,
+      passwordResetTokens: 1,
+    })
+  })
+
+  test('pedido de senha ainda dentro do prazo continua guardado', async () => {
+    const tenant = await createTenant('retencao-pedido-novo')
+    await inserirPedidoDeSenha(tenant, daysAgo(PASSWORD_RESET_KEEP_DAYS - 1))
+
+    const resumo = await runRetention({ technicalLogRetentionDays: 180, auditRetentionDays: 5 * 365 })
+
+    assert.equal(resumo.passwordResetTokens, 0)
+    assert.equal((await db.select().from(passwordResetTokens)).length, 1)
   })
 })
 

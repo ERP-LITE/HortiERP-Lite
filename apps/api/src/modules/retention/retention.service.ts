@@ -1,7 +1,7 @@
 import { and, count, eq, isNotNull, lt, notLike } from 'drizzle-orm'
 import { db } from '../../db/client.js'
 import { comEscopoDePlataforma } from '../../db/scope.js'
-import { activityLogs, systemLogs, users } from '../../db/schema/index.js'
+import { activityLogs, passwordResetTokens, systemLogs, users } from '../../db/schema/index.js'
 
 // Domínio reservado pela RFC 2606: nunca poderá ser registrado por ninguém.
 const ANONYMIZED_EMAIL_DOMAIN = 'anonimizado.invalid'
@@ -15,7 +15,15 @@ export interface RetentionSummary {
   technicalLogs: number
   activityLogs: number
   anonymizedUsers: number
+  passwordResetTokens: number
 }
+
+/**
+ * Token de redefinição vencido não serve para nada: já não abre a conta e continua ligando uma
+ * pessoa a um pedido. A carência depois do vencimento existe só para uma investigação conseguir
+ * olhar um pedido recente; passado isso, some.
+ */
+export const PASSWORD_RESET_KEEP_DAYS = 7
 
 export function daysAgo(days: number, reference = new Date()) {
   return new Date(reference.getTime() - days * 24 * 60 * 60 * 1000)
@@ -47,6 +55,20 @@ export async function purgeActivityLogs(cutoff: Date, dryRun = false) {
     }
 
     const result = await db.delete(activityLogs).where(where)
+    return result.rowCount ?? 0
+  })
+}
+
+export async function purgeExpiredPasswordResetTokens(cutoff: Date, dryRun = false) {
+  return comEscopoDePlataforma(async () => {
+    const where = lt(passwordResetTokens.expiresAt, cutoff)
+
+    if (dryRun) {
+      const [{ total }] = await db.select({ total: count() }).from(passwordResetTokens).where(where)
+      return total
+    }
+
+    const result = await db.delete(passwordResetTokens).where(where)
     return result.rowCount ?? 0
   })
 }
@@ -105,5 +127,9 @@ export async function runRetention(options: {
     technicalLogs: await purgeTechnicalLogs(technicalCutoff, dryRun),
     activityLogs: await purgeActivityLogs(auditCutoff, dryRun),
     anonymizedUsers: await anonymizeDeletedUsers(auditCutoff, dryRun),
+    passwordResetTokens: await purgeExpiredPasswordResetTokens(
+      daysAgo(PASSWORD_RESET_KEEP_DAYS, reference),
+      dryRun,
+    ),
   }
 }

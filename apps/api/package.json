@@ -16,7 +16,8 @@
     "alert:errors": "tsx src/scripts/errorRateAlert.ts",
     "data:erase-company": "tsx src/scripts/eraseCompany.ts",
     "test": "sh scripts/test-integration.sh",
-    "test:run": "tsx --test --test-concurrency=1 tests/**/*.test.ts"
+    "test:run": "tsx --test --test-concurrency=1 tests/**/*.test.ts",
+    "platform:reset-password": "tsx src/scripts/resetPlatformPassword.ts"
   },
   "dependencies": {
     "@fastify/cookie": "^11.1.2",
