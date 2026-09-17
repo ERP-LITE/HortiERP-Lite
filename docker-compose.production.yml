@@ -33,8 +33,9 @@ services:
       # chega direto nela. Ver apps/api/.env.example: `true` deixaria o IP nas mãos de quem chama e
       # contagem de saltos passou a valer o mesmo que `false`.
       TRUST_PROXY: "uniquelocal"
-      RESEND_API_KEY: ${RESEND_API_KEY:?Defina RESEND_API_KEY}
-      MAIL_FROM: ${MAIL_FROM:?Defina MAIL_FROM}
+      # Opcionais: sem elas o sistema sobe e só a redefinição de senha por e-mail fica indisponível.
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      MAIL_FROM: ${MAIL_FROM:-}
       # O link do e-mail aponta para o endereço público, o mesmo do CORS.
       APP_PUBLIC_URL: https://${APP_DOMAIN}
       PASSWORD_RESET_TTL_MINUTES: ${PASSWORD_RESET_TTL_MINUTES:-60}

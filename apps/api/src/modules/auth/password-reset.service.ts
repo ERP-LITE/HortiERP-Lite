@@ -73,6 +73,16 @@ function mensagem(nome: string, link: string) {
  * no login. Quem chama responde igual dos dois jeitos.
  */
 export async function requestPasswordReset(email: string, log?: Log) {
+  // Único ponto do fluxo **sem** a resposta única, e pode ser: a indisponibilidade é do sistema
+  // inteiro, igual para e-mail cadastrado e não cadastrado.
+  if (!env.RECUPERACAO_POR_EMAIL_DISPONIVEL) {
+    throw new AppError(
+      'A recuperação de senha por e-mail ainda não está disponível. Peça a redefinição ao administrador da sua empresa ou fale com o suporte.',
+      503,
+      'RECUPERACAO_POR_EMAIL_INDISPONIVEL',
+    )
+  }
+
   const user = await findUsableUserByEmail(email)
   if (!user) return
 

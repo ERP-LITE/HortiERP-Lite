@@ -179,10 +179,19 @@ describe('cadastro de empresas', () => {
       method: 'POST',
       url: '/api/companies',
       headers: { cookie: authCookie(ctx.app, superAdmin) },
-      payload: { ...companyPayload, adminEmail: 'outro-admin@test.local' },
+      // Só o CNPJ se repete: os demais campos únicos da empresa mudam, senão o erro seria de outro
+      // campo e este teste deixaria de falar sobre CNPJ.
+      payload: {
+        ...companyPayload,
+        name: 'Outra Empresa',
+        legalName: 'Outra Empresa LTDA',
+        stateRegistration: '999888777',
+        contactEmail: 'outro-contato@test.local',
+        adminEmail: 'outro-admin@test.local',
+      },
     })
     assert.equal(duplicate.statusCode, 409)
-    assert.match(duplicate.body, /CNPJ/)
+    assert.deepEqual(duplicate.json().error.issues.document, ['Já existe uma empresa com esse CNPJ'])
   })
 
   test('recusa UF que não existe', async () => {

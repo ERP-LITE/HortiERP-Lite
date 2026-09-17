@@ -14,7 +14,7 @@ import FilterModal from '@/components/ui/FilterModal.vue'
 import PrintButton from '@/components/ui/PrintButton.vue'
 import SearchInput from '@/components/ui/SearchInput.vue'
 import BulkSelectionBar from '@/components/ui/BulkSelectionBar.vue'
-import TableCheckbox from '@/components/ui/TableCheckbox.vue'
+import BaseCheckbox from '@/components/ui/BaseCheckbox.vue'
 import SortableTableHeader from '@/components/ui/SortableTableHeader.vue'
 import StatusBadge from '@/components/ui/StatusBadge.vue'
 import { statusFilterOptionsFor } from '@/lib/status'
@@ -158,7 +158,7 @@ onMounted(loadUsers)
         <thead class="bg-gray-50 dark:bg-gray-900/60">
           <tr>
             <th class="print:hidden w-12 px-4 py-3">
-              <TableCheckbox
+              <BaseCheckbox
                 :checked="allVisibleSelected"
                 label="Selecionar todos os usuários desta página"
                 @toggle="toggleAllVisible"
@@ -189,7 +189,7 @@ onMounted(loadUsers)
             @dblclick="openEditModal(user)"
           >
             <td class="print:hidden px-4 py-3" @dblclick.stop @click.stop>
-              <TableCheckbox
+              <BaseCheckbox
                 :checked="selectedIds.includes(user.id)"
                 :label="`Selecionar usuário ${user.name}`"
                 @toggle="toggleOne(user.id)"

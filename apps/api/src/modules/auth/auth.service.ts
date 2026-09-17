@@ -93,7 +93,11 @@ export async function changeOwnPassword(
   const currentPasswordMatches = await bcrypt.compare(currentPassword, user.passwordHash)
 
   if (!currentPasswordMatches) {
-    throw new AppError('Senha atual incorreta', 400, 'INVALID_CURRENT_PASSWORD')
+    // Com o campo declarado em `issues`, a tela mostra o aviso embaixo de "Senha atual" em vez de
+    // num parágrafo solto: é o erro mais comum desta tela, e é sobre um campo específico.
+    throw new AppError('Senha atual incorreta', 400, 'INVALID_CURRENT_PASSWORD', {
+      currentPassword: ['Senha atual incorreta'],
+    })
   }
 
   const passwordHash = await bcrypt.hash(newPassword, 10)

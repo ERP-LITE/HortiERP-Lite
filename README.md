@@ -2,7 +2,11 @@
 
 Sistema web modular para controle de estoque, entradas de mercadorias, notas fiscais vinculadas e perdas voltado para hortifrutis, frutarias, verdureiras, sacolões e pequenos mercados.
 
-Multiempresa: cada empresa-cliente tem seus dados totalmente isolados (produtos, estoque, entradas, perdas, usuários). Empresas-cliente são cadastradas por um usuário `super_admin` pela tela `/empresas`, com identificação fiscal, contato, endereço e criação do primeiro administrador em uma única operação. O `super_admin` também controla manualmente as mensalidades dos clientes pela tela `/cobrancas`, sem integração com meios de pagamento.
+Multiempresa: cada empresa-cliente tem seus dados totalmente isolados (produtos, estoque, entradas, perdas, usuários).
+
+Uma empresa entra no sistema por dois caminhos. Ela mesma se cadastra pela tela pública `/criar-conta`, escolhendo o plano e começando por um período de teste de 15 dias, ou o `super_admin` a cadastra pela tela `/empresas`. Os dois caminhos usam os mesmos campos e as mesmas regras, e criam empresa e primeiro administrador numa operação só. Terminado o teste sem assinatura, o acesso é bloqueado e os dados permanecem intactos.
+
+O pagamento ainda **não acontece dentro do sistema**: o `super_admin` controla as mensalidades manualmente pela tela `/cobrancas`, sem integração com meio de pagamento.
 
 Ver [claude.md](./claude.md) para a visão completa do projeto.
 

@@ -8,7 +8,8 @@ import { resolveFormError } from '@/services/api'
 import { resetPassword } from '@/services/authService'
 import { useFieldErrors } from '@/composables/useFieldErrors'
 import { toastSuccess } from '@/lib/alerts'
-import { LIMITES_TEXTO, SENHA_MIN } from '@/lib/limits'
+import { validateNewPassword } from '@/lib/passwordForm'
+import { SENHA_MIN } from '@/lib/limits'
 
 const route = useRoute()
 const router = useRouter()
@@ -23,32 +24,9 @@ const { fieldErrors } = useFieldErrors(() => ({
   confirmPassword: confirmPassword.value,
 }))
 
-/** Em bytes, e não em caracteres: o bcrypt corta no 72º byte e um acento ocupa dois. */
-function tamanhoEmBytes(valor: string) {
-  return new TextEncoder().encode(valor).length
-}
-
-/**
- * As frases de senha são cópia literal das que a API devolveria, de propósito. A tela adianta a
- * checagem para poupar a ida ao servidor, não para dizer a mesma regra com outras palavras: ver o
- * texto mudar conforme o erro veio daqui ou de lá faria parecerem dois problemas diferentes.
- */
 function validate(): boolean {
   fieldErrors.value = {}
-
-  if (!newPassword.value) {
-    fieldErrors.value.newPassword = 'Informe a nova senha'
-  } else if (newPassword.value.length < SENHA_MIN) {
-    fieldErrors.value.newPassword = `Senha deve ter ao menos ${SENHA_MIN} caracteres`
-  } else if (tamanhoEmBytes(newPassword.value) > LIMITES_TEXTO.senha) {
-    fieldErrors.value.newPassword = `Senha muito longa: use no máximo ${LIMITES_TEXTO.senha} caracteres`
-  }
-
-  if (!confirmPassword.value) {
-    fieldErrors.value.confirmPassword = 'Confirme a nova senha'
-  } else if (newPassword.value && newPassword.value !== confirmPassword.value) {
-    fieldErrors.value.confirmPassword = 'A confirmação não confere com a nova senha'
-  }
+  validateNewPassword(newPassword.value, confirmPassword.value, fieldErrors.value)
 
   return Object.keys(fieldErrors.value).length === 0
 }

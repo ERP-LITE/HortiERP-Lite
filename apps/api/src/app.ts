@@ -18,6 +18,8 @@ import { AppError } from './shared/errors/AppError.js'
 import { formatRetryDelay } from './shared/errors/frameworkMessages.js'
 import { authRoutes } from './modules/auth/auth.routes.js'
 import { companiesRoutes } from './modules/companies/companies.routes.js'
+import { cepRoutes } from './modules/companies/cep.routes.js'
+import { ownCompanyRoutes } from './modules/companies/own-company.routes.js'
 import { categoriesRoutes } from './modules/categories/categories.routes.js'
 import { unitsRoutes } from './modules/units/units.routes.js'
 import { productsRoutes } from './modules/products/products.routes.js'
@@ -31,6 +33,7 @@ import { reportsRoutes } from './modules/reports/reports.routes.js'
 import { logsRoutes } from './modules/logs/logs.routes.js'
 import { registerSystemLogsHook } from './modules/logs/logs.hook.js'
 import { billingsRoutes } from './modules/billings/billings.routes.js'
+import { subscriptionsRoutes } from './modules/subscriptions/subscriptions.routes.js'
 
 export function buildApp(options: { systemLogs?: boolean; rateLimit?: boolean } = {}) {
   const app = Fastify({
@@ -110,6 +113,8 @@ export function buildApp(options: { systemLogs?: boolean; rateLimit?: boolean } 
 
   app.register(authRoutes, { prefix: '/api' })
   app.register(companiesRoutes, { prefix: '/api' })
+  app.register(cepRoutes, { prefix: '/api' })
+  app.register(ownCompanyRoutes, { prefix: '/api' })
   app.register(categoriesRoutes, { prefix: '/api' })
   app.register(unitsRoutes, { prefix: '/api' })
   app.register(productsRoutes, { prefix: '/api' })
@@ -122,6 +127,7 @@ export function buildApp(options: { systemLogs?: boolean; rateLimit?: boolean } 
   app.register(reportsRoutes, { prefix: '/api' })
   app.register(logsRoutes, { prefix: '/api' })
   app.register(billingsRoutes, { prefix: '/api' })
+  app.register(subscriptionsRoutes, { prefix: '/api' })
 
   return app
 }

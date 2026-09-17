@@ -1,21 +1,11 @@
 import { ref, watch, type Ref } from 'vue'
 
 /**
- * Erros por campo que somem sozinhos quando a pessoa mexe naquele campo. Um erro que continua
- * vermelho enquanto a pessoa corrige ensina a ignorar o vermelho.
+ * Erros por campo que somem quando a pessoa mexe naquele campo.
  *
- * Só apaga o erro **do campo que mudou**: corrigir o e-mail não pode dar a impressão de que a senha
- * também foi resolvida.
- *
- * `valores` é uma função, e não um objeto reativo, por dois motivos. Ela monta um objeto novo a cada
- * avaliação, e é isso que dá ao `watch` um "antes" de verdade para comparar: com `deep: true` sobre
- * um objeto mutado no lugar, o Vue entrega o mesmo objeto nos dois argumentos e nada nunca parece
- * ter mudado. E ela deixa a tela juntar campos que moram em `ref` separados, como as de login, com
- * os que moram num formulário só.
- *
- * O caso que o desenho precisa acertar é o reenvio: apagar o campo, enviar de novo e receber a mesma
- * frase de erro. Como quem reexibe é a validação, e não este `watch`, o vermelho volta mesmo sendo a
- * mensagem idêntica à anterior.
+ * `valores` é **função**, não objeto reativo: ela monta um objeto novo a cada avaliação, e é isso que
+ * dá ao `watch` um "antes" de verdade. Com `deep: true` sobre um objeto mutado no lugar, o Vue
+ * entrega o mesmo objeto nos dois argumentos e nada nunca parece ter mudado.
  */
 export function useFieldErrors(valores: () => Record<string, unknown>) {
   const fieldErrors = ref<Record<string, string>>({})
@@ -39,16 +29,10 @@ export function useFieldErrors(valores: () => Record<string, unknown>) {
 }
 
 /**
- * A mesma ideia para formulário com lista de itens, onde o erro é de uma célula e não do formulário:
- * a entrada de mercadoria e o ajuste de estoque em lote têm um produto e uma quantidade por linha.
+ * O mesmo para lista de itens, comparando por índice **e** por campo: corrigir a linha 3 não pode
+ * apagar o erro da linha 1. A cópia de cada linha é o que dá um "antes" ao `watch`.
  *
- * Corrigir a linha 3 não pode apagar o erro da linha 1, então a comparação é por índice **e** por
- * campo. O instantâneo de cada linha é montado aqui dentro para o chamador passar só
- * `() => items.value`: sem a cópia, o Vue entrega o mesmo array nos dois argumentos e nada nunca
- * parece ter mudado.
- *
- * Linha adicionada ou removida embaralha os índices, e por isso as telas zeram a lista inteira de
- * erros nessas duas ações. Isto aqui não tenta adivinhar o remanejamento.
+ * Linha adicionada ou removida embaralha os índices; as telas zeram a lista de erros nessas ações.
  */
 export function useRowErrors<Campo extends string>(linhas: () => Array<Record<string, unknown>>) {
   type ErrosDaLinha = Partial<Record<Campo, string>>

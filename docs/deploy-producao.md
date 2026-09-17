@@ -58,11 +58,11 @@ Evite caracteres reservados de URL na senha do PostgreSQL porque o Compose monta
 
 ### Envio de e-mail (Resend)
 
-O único e-mail que o sistema manda é o de redefinição de senha, e sem ele a tela "esqueci minha senha" aceita o pedido
-e não entrega nada. Por isso a API **recusa subir em produção** sem `RESEND_API_KEY` e `MAIL_FROM`: falhar no deploy é
-melhor do que uma pessoa esperar por uma mensagem que nunca sai.
+O único e-mail que o sistema manda é o de redefinição de senha. `RESEND_API_KEY` e `MAIL_FROM` são **opcionais**:
+sem elas a instalação sobe e funciona inteira, e apenas "Esqueci minha senha" responde que está indisponível. Ver
+[Subir sem a Resend configurada](#subir-sem-a-resend-configurada-é-suportado).
 
-Configuração, uma vez só:
+Configuração, quando houver domínio próprio verificado:
 
 1. Crie a conta em [resend.com](https://resend.com). O plano gratuito dá 3.000 mensagens por mês e 100 por dia, o que é
    muito mais do que a redefinição de senha consome.
@@ -136,6 +136,46 @@ sh deploy/deploy.sh /caminho/seguro/erp-production.env
 Depois do primeiro deploy, preserve a migration `0000` e publique toda alteração de banco como uma nova migration
 incremental. Nunca regenere, renomeie ou remova uma migration que já tenha sido aplicada. O Compose mantém banco,
 anexos e backups em volumes persistentes; não remova esses volumes durante atualizações.
+
+### Subir sem a Resend configurada é suportado
+
+`RESEND_API_KEY` e `MAIL_FROM` são **opcionais**. Sem elas a API sobe normalmente, o sistema inteiro
+funciona, e apenas "Esqueci minha senha" responde que está indisponível, orientando a falar com o
+administrador da empresa ou com o suporte. A API grita um aviso no log ao iniciar:
+
+```
+[ATENÇÃO] RESEND_API_KEY e/ou MAIL_FROM não definidas: "Esqueci minha senha" responderá que está
+indisponível. O restante do sistema funciona normalmente.
+```
+
+Enquanto estiver assim, a redefinição de senha de um usuário é feita pelo administrador da empresa
+dele, na tela de Usuários, e a da conta de plataforma por `npm run platform:reset-password` no
+servidor. Nenhum dos dois caminhos depende de e-mail.
+
+Para ligar depois, basta preencher as duas variáveis e reiniciar a API: nada mais muda. O que
+**precisa** existir antes é um domínio próprio verificado na Resend, porque `onboarding@resend.dev`
+só entrega para o e-mail do dono da conta e não serve para cliente.
+
+### As migrations `0012` e `0013` abortam se houver dado repetido entre empresas
+
+Elas criam os índices únicos de nome fantasia (`0012`) e de razão social, inscrição estadual e e-mail
+de contato (`0013`). Antes de cada índice, um bloco verifica se já existem empresas ativas com o mesmo
+valor. Se existirem, a migração **para** e diz quais são, em vez de falhar com a mensagem crua do
+Postgres. A atualização inteira para junto, e é de propósito: o banco não pode ficar meio migrado.
+
+Confira antes de atualizar, para não descobrir isso com o sistema fora do ar:
+
+```bash
+docker compose --env-file .env.production -f docker-compose.production.yml exec postgres \
+  psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c \
+  "select 'nome fantasia' as campo, lower(trim(name)) as valor, count(*) from companies where deleted_at is null group by 2 having count(*)>1
+   union all select 'razao social', lower(trim(legal_name)), count(*) from companies where deleted_at is null and legal_name is not null group by 2 having count(*)>1
+   union all select 'inscricao estadual', lower(trim(state_registration)), count(*) from companies where deleted_at is null and state_registration ~ '[0-9]' group by 2 having count(*)>1
+   union all select 'email de contato', lower(trim(contact_email)), count(*) from companies where deleted_at is null and contact_email is not null group by 2 having count(*)>1;"
+```
+
+Voltando alguma linha, resolva antes pela tela de Empresas: renomeie uma delas, ou suspenda e exclua a
+que não for usada. Só então atualize.
 
 Não copie `.env.production.example` por cima do `.env.production` existente. Preserve os segredos atuais e acrescente
 somente variáveis novas explicitamente documentadas na versão que será instalada.

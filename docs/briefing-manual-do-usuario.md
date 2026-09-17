@@ -97,7 +97,8 @@ A equipe do cliente — dono/gerente da loja e os funcionários que mexem no est
 1. **Primeiros 30 minutos** — uma página só, o caminho mínimo para o sistema começar a servir:
    entrar, cadastrar categorias e unidades, cadastrar (ou importar) os produtos, lançar o estoque
    inicial, lançar a primeira entrada. É a página mais importante do manual.
-2. **Entrando no sistema** — login, **esqueci minha senha pelo próprio sistema**, o que fazer quando
+2. **Entrando no sistema** — **cadastrar a própria empresa**, o período de teste e o que acontece
+   quando ele acaba, login, **esqueci minha senha pelo próprio sistema**, o que fazer quando
    se perdeu também o acesso ao e-mail, trocar a própria senha, **baixar os próprios
    dados**, sair, e o encerramento automático por inatividade.
 3. **Conhecendo a tela** — menu lateral, o que cada item faz, o sino de alertas no canto superior
@@ -219,8 +220,47 @@ cliente**, não copie.
 
 ### 7.1 Entrar e sair
 
+- **A empresa pode se cadastrar sozinha.** No rodapé da tela de entrada existe **Cadastre sua
+  empresa**. Quem clica passa por quatro etapas, nesta ordem: **Plano**, **Dados gerais**,
+  **Endereço** e **Seu acesso**. Pontos que o manual precisa deixar claros:
+  - **O teste não pede cartão.** Diga isso na primeira linha do capítulo, porque é a primeira dúvida.
+  - O CNPJ é conferido pelo sistema e **não pode se repetir**: se a empresa já tem conta, o cadastro
+    não passa e o caminho é entrar com o login existente ou usar "Esqueci minha senha".
+  - Ao digitar o CEP, o endereço **se preenche sozinho**, e os campos continuam editáveis.
+  - O e-mail e a senha da última etapa são o **acesso de administrador da empresa**. É com eles que a
+    pessoa entra depois, pela tela normal de login.
+  - Na última etapa há uma **caixa para marcar** concordando com o aviso de privacidade, com link que
+    abre o aviso em outra aba. Sem marcar, o cadastro não é enviado. Diga que vale a pena ler antes de
+    marcar, e não como formalidade a despachar.
+  - **Não chega e-mail de confirmação.** Terminado o cadastro, é entrar direto. Precisa estar escrito,
+    senão a pessoa fica esperando uma mensagem que não existe.
+- **O contador do teste.** Durante o período de teste, uma faixa no alto do sistema diz quantos dias
+  faltam, e ela muda de cor nos últimos três. Explique três coisas:
+  - a contagem é **por dia**, não por hora: ela diminui uma vez por dia;
+  - no último dia a faixa diz **"Hoje é o último dia do seu teste"**, e o sistema funciona normalmente
+    até o fim daquele dia;
+  - passado o último dia, o sistema **para de abrir** e leva para a tela **Assinatura**.
+- **O que acontece quando o teste acaba.** Este é o ponto mais sensível do capítulo e precisa de uma
+  **Dica** tranquilizando: **nada do que foi cadastrado se perde.** Produtos, entradas, perdas e
+  histórico continuam guardados. O que para é o uso, até a assinatura ser liberada. Quem estiver
+  bloqueado ainda consegue entrar, ver a tela de Assinatura, trocar a própria senha, baixar os
+  próprios dados em **Perfil** e sair.
+- **Como assinar.** O pagamento **ainda não acontece dentro do sistema**. A tela de Assinatura orienta
+  a falar com o suporte pelo WhatsApp **(47) 99154-0607**, e a liberação é feita pelo fornecedor. Não
+  prometa cartão, boleto nem pix no sistema: hoje não existe.
 - O login é por **e-mail e senha**. O e-mail não diferencia maiúsculas de minúsculas: pode digitar
   como quiser.
+> **Antes de escrever esta parte, confirme se o envio de e-mail está ligado na instalação do
+> cliente.** A redefinição por e-mail depende de `RESEND_API_KEY` e `MAIL_FROM` configuradas no
+> servidor, o que por sua vez depende de domínio próprio verificado. **Sem elas o sistema funciona
+> igual em todo o resto**, e só o "Esqueci minha senha" responde que está indisponível, orientando a
+> falar com o administrador da empresa ou com o suporte.
+>
+> Se estiver desligado na entrega, **não escreva os itens abaixo sobre o link por e-mail**. Escreva no
+> lugar: quem esquece a senha pede ao administrador da empresa, que redefine pela tela de Usuários; e
+> o administrador que esquecer a própria fala com o suporte. Prometer no manual um recurso que a tela
+> recusa é o pior dos dois mundos.
+
 - **Esqueci minha senha funciona sozinho.** Na tela de entrada existe o link **Esqueci minha senha**:
   a pessoa informa o e-mail e recebe uma mensagem com um link para escolher uma senha nova. Não
   precisa falar com o administrador nem com o suporte. Três pontos que o manual precisa deixar claros,
@@ -590,6 +630,20 @@ Duas travas que parecem defeito e não são, e por isso entram no manual:
 - Excluir um usuário **libera o e-mail dele**. Se a pessoa for recontratada, usa-se o mesmo e-mail
   normalmente. O usuário excluído não consegue mais entrar.
 
+### 7.12.1 Dados da empresa em "Meu perfil"
+
+A tela **Perfil** é dividida em abas: **Minha conta**, **Empresa** e **Senha**. A aba Empresa só
+aparece para quem é **administrador**, e traz os dados cadastrais: nome fantasia, razão social, CNPJ,
+inscrição estadual, responsável, e-mail, telefone e endereço. Gerente e operador não veem essa aba.
+
+Dois pontos para o manual:
+
+- serve para **conferir** o que foi preenchido no cadastro, principalmente para quem se cadastrou
+  sozinho e quer checar se digitou o CNPJ certo;
+- **não dá para editar por ali, e isso é proposital.** Razão social e CNPJ constam do contrato, então
+  a correção é pelo suporte. Escreva como explicação, não como limitação do sistema: é o mesmo motivo
+  pelo qual ninguém muda sozinho o CNPJ na nota fiscal.
+
 ### 7.13 Logs de atividades
 
 Só o administrador. Mostra quem criou, alterou, excluiu, importou, ajustou ou cancelou o quê, e
@@ -648,33 +702,37 @@ consultar e tenta de novo sozinho, sem atrapalhar o que estiver sendo lançado.
 Transforme cada uma numa entrada da seção de Perguntas Frequentes, com resposta curta e um link para
 o capítulo correspondente:
 
-1. Cadastrei o produto e o estoque ficou zero. Por quê?
-2. Cadastrei tudo e o painel diz que **todos** os produtos estão com estoque baixo. Está errado?
-3. Como coloco o estoque que já tenho hoje na loja?
-4. Esqueci de lançar a entrada de ontem. Posso lançar com a data de ontem?
-5. Lancei a entrada com a quantidade errada. Como conserto?
-6. Lancei com a data errada. Como conserto?
-7. Lancei uma perda que não existiu. Como apago?
-8. Sumiu uma perda da lista. Para onde foi?
-9. Cancelei uma perda e apareceu um **ajuste** que eu não lancei. Que ajuste é esse?
-10. Por que o sistema não deixa eu registrar essa perda?
-11. Por que o valor em estoque está R$ 0,00 se tem mercadoria?
-12. Por que o gráfico de categoria mostra "8" e não os quilos?
-13. Esqueci minha senha.
-14. O administrador esqueceu a senha dele. E agora?
-15. O sistema me desconectou sozinho.
-16. O PDF da nota não abre no meu celular.
-17. Minha importação de planilha não passou e não entrou nada.
-18. Qual a diferença entre lançar uma perda e ajustar o estoque?
-19. Como mando o relatório do mês para o contador?
-20. O funcionário saiu. O que faço com o acesso dele?
-21. Quero ver quem alterou aquele produto.
-22. Troquei minha senha e fui desconectado no celular. É defeito?
-23. Errei a senha várias vezes e agora não deixa mais entrar. Bloqueou pra sempre?
-24. Dá pra usar leitor de código de barras?
-25. Parei de usar uma categoria. Apago ou tem outro jeito?
-26. O que é a bolinha vermelha no sininho lá em cima?
-27. Repus a mercadoria e o sino continua marcando. Está travado? (Resposta curta: o sino se corrige
+1. Preciso de cartão para testar o sistema?
+2. O teste acabou. Perdi o que eu tinha cadastrado?
+3. Quantos dias de teste eu ainda tenho?
+4. Como faço para assinar depois do teste?
+5. Cadastrei o produto e o estoque ficou zero. Por quê?
+6. Cadastrei tudo e o painel diz que **todos** os produtos estão com estoque baixo. Está errado?
+7. Como coloco o estoque que já tenho hoje na loja?
+8. Esqueci de lançar a entrada de ontem. Posso lançar com a data de ontem?
+9. Lancei a entrada com a quantidade errada. Como conserto?
+10. Lancei com a data errada. Como conserto?
+11. Lancei uma perda que não existiu. Como apago?
+12. Sumiu uma perda da lista. Para onde foi?
+13. Cancelei uma perda e apareceu um **ajuste** que eu não lancei. Que ajuste é esse?
+14. Por que o sistema não deixa eu registrar essa perda?
+15. Por que o valor em estoque está R$ 0,00 se tem mercadoria?
+16. Por que o gráfico de categoria mostra "8" e não os quilos?
+17. Esqueci minha senha.
+18. O administrador esqueceu a senha dele. E agora?
+19. O sistema me desconectou sozinho.
+20. O PDF da nota não abre no meu celular.
+21. Minha importação de planilha não passou e não entrou nada.
+22. Qual a diferença entre lançar uma perda e ajustar o estoque?
+23. Como mando o relatório do mês para o contador?
+24. O funcionário saiu. O que faço com o acesso dele?
+25. Quero ver quem alterou aquele produto.
+26. Troquei minha senha e fui desconectado no celular. É defeito?
+27. Errei a senha várias vezes e agora não deixa mais entrar. Bloqueou pra sempre?
+28. Dá pra usar leitor de código de barras?
+29. Parei de usar uma categoria. Apago ou tem outro jeito?
+30. O que é a bolinha vermelha no sininho lá em cima?
+31. Repus a mercadoria e o sino continua marcando. Está travado? (Resposta curta: o sino se corrige
     sozinho depois do lançamento. Se ainda marcar, é porque a entrada não foi lançada, ou o produto
     continua abaixo do mínimo cadastrado — que é diferente de estar zerado.)
 28. O sino só avisa quando o produto zera. Dá para avisar antes de acabar?

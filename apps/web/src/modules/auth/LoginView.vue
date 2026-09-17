@@ -102,6 +102,13 @@ async function handleSubmit() {
       >
         Esqueci minha senha
       </RouterLink>
+
+      <p class="border-t border-gray-200 pt-4 text-center text-sm text-gray-500 dark:border-gray-700 dark:text-gray-400">
+        Ainda não tem conta?
+        <RouterLink :to="{ name: 'criar-conta' }" class="font-medium text-primary-600 hover:underline dark:text-primary-400">
+          Cadastre sua empresa
+        </RouterLink>
+      </p>
     </form>
   </AuthLayout>
 </template>

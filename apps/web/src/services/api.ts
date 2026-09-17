@@ -2,6 +2,7 @@ import axios from 'axios'
 import { ref } from 'vue'
 import type { ApiErrorPayload } from '@/types'
 import { treguaDeSessao } from '@/lib/sessionRedirect'
+import { emCaminhoPublico } from '@/lib/publicRoutes'
 
 declare module 'axios' {
   export interface AxiosRequestConfig {
@@ -39,6 +40,7 @@ api.interceptors.request.use(
 )
 
 let redirectingToLogin = false
+let redirectingToSubscription = false
 
 api.interceptors.response.use(
   (response) => {
@@ -54,12 +56,24 @@ api.interceptors.response.use(
       error.response?.status === 401 &&
       !error.config?.suppressSessionEndedRedirect &&
       !treguaDeSessao.ativa() &&
-      window.location.pathname !== '/login'
+      // Em tela pública não havia sessão para encerrar, e o desvio jogaria fora o formulário.
+      !emCaminhoPublico(window.location.pathname)
     ) {
       if (!redirectingToLogin) {
         redirectingToLogin = true
         window.location.replace('/login?reason=session-ended')
       }
+    }
+
+    // 402 vale para qualquer chamada, por isso o desvio mora aqui e não em cada tela.
+    if (
+      error.response?.status === 402 &&
+      window.location.pathname !== '/assinatura' &&
+      !emCaminhoPublico(window.location.pathname) &&
+      !redirectingToSubscription
+    ) {
+      redirectingToSubscription = true
+      window.location.replace('/assinatura')
     }
 
     return Promise.reject(error)

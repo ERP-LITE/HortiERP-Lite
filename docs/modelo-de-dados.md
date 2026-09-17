@@ -44,16 +44,50 @@ Raiz do multiempresa — cada linha é um cliente (frutaria/hortifrúti) contrat
 | Coluna | Tipo | Observação |
 |---|---|---|
 | `id` | uuid | PK |
-| `name`, `legalName` | text | nome fantasia e razão social; os registros anteriores à migration podem ter `legalName` nulo |
+| `name`, `legalName` | text | nome fantasia e razão social; os registros anteriores à migration podem ter `legalName` nulo. Os dois são **únicos entre empresas não excluídas** |
 | `document` | text | CNPJ normalizado, sem pontuação e em maiúsculas (14 posições, as 12 primeiras podendo ser letra no modelo alfanumérico), validado na API e único entre empresas não excluídas |
-| `stateRegistration` | text | inscrição estadual opcional |
-| `contactName`, `contactEmail`, `phone` | text | responsável e canais de contato; telefone é persistido apenas com dígitos |
+| `stateRegistration` | text | inscrição estadual opcional; única entre empresas não excluídas **apenas quando contém algum dígito**, porque "Isento" é a ausência de inscrição e se repete |
+| `contactName`, `contactEmail`, `phone` | text | responsável e canais de contato; telefone é persistido apenas com dígitos. O e-mail é único entre empresas não excluídas; nome e telefone **podem repetir**, porque o mesmo dono com duas lojas usa o mesmo contato |
 | `postalCode`, `street`, `addressNumber` | text | CEP normalizado, logradouro e número |
 | `complement`, `district`, `city`, `state` | text | complemento opcional, bairro, cidade e UF (sigla de duas letras, validada contra a lista das 27) |
 | `active` | boolean | default `true` — `false` = empresa suspensa, bloqueia login e requisições de todos os usuários dela sem alterar `users.active` |
+| `planId` | uuid | FK para `plans`, nulo nas empresas cadastradas pelo `super_admin` antes da assinatura existir |
+| `subscriptionStatus` | subscription_status | default `ativa`; `teste` só em quem se cadastrou sozinho |
+| `trialEndsOn` | date | último dia do teste, inclusive. `date` e não timestamp: a contagem é de dias corridos |
+| `privacyAcceptedAt` | timestamp | quando a pessoa marcou o aceite do aviso de privacidade no cadastro público; nulo nas empresas cadastradas pela plataforma, onde o aceite acontece na assinatura do contrato |
+| `stripeCustomerId`, `stripeSubscriptionId` | text | reservados para a integração de pagamento, ainda não preenchidos |
 | `createdAt`/`updatedAt`/`deletedAt` | timestamp | |
 
+Os cinco índices únicos (`document`, `name`, `legalName`, `stateRegistration`, `contactEmail`) são
+parciais em `deleted_at is null` e comparam por `lower(trim(...))`: excluir uma empresa devolve os
+valores para uso. Endereço, telefone e nome do contato não têm índice único, por decisão registrada em
+[decisões arquiteturais](./decisoes-arquiteturais.md).
+
 Os campos cadastrais novos são nuláveis no banco para que empresas criadas antes da migration continuem legíveis. A API exige os dados essenciais ao criar uma empresa nova; editar um registro legado pela tela também solicita sua regularização. CNPJ, telefone e CEP são armazenados sem máscara, que é responsabilidade da interface.
+
+### `plans`
+
+Lista de preços da plataforma. **Não tem coluna de empresa**, e é a única tabela nessa situação junto com a linha
+especial da plataforma: ela é lida na tela de cadastro, por quem ainda não tem empresa nenhuma.
+
+| Coluna | Tipo | Observação |
+|---|---|---|
+| `id` | uuid | PK |
+| `name` | text | nome do plano exibido na escolha |
+| `description` | text | uma linha sobre o que está incluso, opcional |
+| `monthlyAmount` | numeric(12,2) | mensalidade cobrada depois do teste |
+| `trialDays` | integer | duração do teste grátis, contada em dias corridos |
+| `stripePriceId` | text | reservado para a integração de pagamento |
+| `active` | boolean | default `true`; plano inativo some da tela de cadastro |
+| `createdAt`/`updatedAt`/`deletedAt` | timestamp | |
+
+O preço mora no banco, e não em constante no código, para mudá-lo não exigir publicação de versão: trocar o valor é
+um `UPDATE` nesta tabela. A migration `0011` semeia um plano único.
+
+As políticas de RLS desta tabela são **duas**, e a divisão é o ponto: `plans_leitura` libera o `SELECT` em qualquer
+escopo, porque preço é público e a tabela não guarda dado de cliente; `plans_escrita_plataforma` mantém
+`INSERT`/`UPDATE`/`DELETE` presos ao escopo de plataforma. Numa política única, o `USING (true)` necessário para a
+leitura valeria também para o `UPDATE`, e qualquer empresa autenticada poderia reescrever o próprio preço.
 
 ### `company_billings`
 
@@ -218,3 +252,6 @@ As rotas de consulta de log e os caminhos de healthcheck (`/health` e `/api/heal
 - `user_role`: `admin`, `gerente`, `operador`, `super_admin`
 - `movement_type`: `entrada`, `perda`, `ajuste`
 - `loss_reason`: `vencido`, `avariado`, `roubo_furto`, `erro_operacional`, `outro`
+- `subscription_status`: `teste`, `ativa`, `atrasada`, `cancelada`. Em português como os demais, e não nos nomes que
+  a Stripe usa: o valor aparece em tela, e traduzir na borda impede que um estado criado lá dentro entre no banco sem
+  alguém decidir o que ele significa aqui

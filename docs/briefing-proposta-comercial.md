@@ -259,9 +259,14 @@ de entregar ao primeiro cliente, regere o manual a partir do briefing atualizado
 ## 7. O que este arquivo **não** define
 
 Valores, prazos e condições comerciais não saem do código e não estão aqui: taxa de implantação,
-mensalidade, duração do teste gratuito, horário e franquia de suporte, forma de pagamento, índice de
-reajuste, multa por atraso, prazo de aviso de cancelamento, garantia e foro. Isso é decisão do
-prestador e deve ser mantido como está na proposta vigente.
+horário e franquia de suporte, forma de pagamento, índice de reajuste, multa por atraso, prazo de
+aviso de cancelamento, garantia e foro. Isso é decisão do prestador e deve ser mantido como está na
+proposta vigente.
+
+Duas exceções desde 17/09/2026, porque passaram a aparecer na tela de cadastro e precisam bater com o
+que a proposta promete: **mensalidade** e **duração do teste gratuito** agora vivem na tabela `plans`
+do banco. A proposta não pode contradizer o que a pessoa leu antes de se cadastrar. Ao revisar,
+confira os dois valores no banco em vez de repetir os da proposta anterior.
 
 ---
 
@@ -328,6 +333,11 @@ antigas derrubadas ao redefinir.
 
 Duas coisas na proposta **precisam** ser revistas por causa disso, e nenhuma é opcional:
 
+0. **Antes de tudo isso, confirme se o envio de e-mail está ligado.** A redefinição por e-mail depende de
+   `RESEND_API_KEY` e `MAIL_FROM` no servidor. Desligadas, o sistema funciona inteiro, mas não existe
+   recuperação de senha por e-mail nem transferência internacional para a Resend: nesse caso **não**
+   escreva nada dos itens 1 e 5 sobre isso, e descreva a recuperação como feita pelo administrador da
+   empresa na tela de Usuários.
 1. A **segunda transferência internacional** (Resend), descrita na seção 5. Diferente do backup, aqui não há
    criptografia que proteja o dado do provedor.
 2. Qualquer frase da proposta em vigor que diga que o sistema **não envia e-mail**. Ver seção 6.

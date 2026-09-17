@@ -134,6 +134,12 @@ A mensagem é enviada a partir de servidor no Brasil, mas os **registros do envi
 qual assunto) ficam em servidores nos Estados Unidos por 30 dias. O corpo da mensagem não contém senha
 nem dado do negócio: apenas o nome da pessoa e um link de uso único e vida curta.
 
+> **Só declare esta transferência se o envio de e-mail estiver ligado na instalação do cliente.** Ela
+> depende de `RESEND_API_KEY` e `MAIL_FROM` configuradas no servidor. Desligadas, nenhum e-mail sai,
+> nenhum dado vai para a Resend e **não há transferência internacional a declarar por este motivo**. A
+> do backup (Backblaze) continua valendo de todo jeito. Declarar uma transferência que não acontece é
+> tão errado quanto omitir uma que acontece, e obriga a uma cláusula que o cliente não precisa aceitar.
+
 Suboperador: **Resend**.
 
 ### 6.3 Suboperadores a declarar
@@ -287,9 +293,9 @@ mesma lista do briefing da proposta comercial, para os dois documentos não dive
 | Item | A definir |
 |---|---|
 | Valor da implantação | «VALOR» |
-| Valor da mensalidade | «VALOR» |
+| Valor da mensalidade | **sai do sistema**: é o valor que a tela de cadastro mostrou antes de o cliente se cadastrar |
 | Vigência e renovação | «PRAZO E FORMA» |
-| Período de teste sem custo | «PRAZO» |
+| Período de teste sem custo | **sai do sistema, não do contrato**: hoje são 15 dias, e o valor vale o que estiver na tela de cadastro |
 | Forma e data de pagamento | «FORMA E DIA» |
 | Índice e periodicidade do reajuste | «ÍNDICE» |
 | Multa e juros por atraso | «PERCENTUAIS» |
@@ -306,6 +312,33 @@ atrasa.** O sistema permite suspender uma empresa, e a suspensão bloqueia o ace
 usuários dela. Se o contrato não disser a partir de quando isso ocorre e com quanto aviso, a
 suspensão vira conflito.
 
+### 13.1 O período de teste e o bloqueio automático
+
+Desde 17/09/2026 o cliente pode se cadastrar sozinho pelo sistema e começar por um **período de teste
+sem custo**, hoje de 15 dias contados **em dias corridos, com o dia do cadastro valendo como o
+primeiro**. Isso muda o contrato em três pontos:
+
+1. **O prazo e o valor não são mais só do contrato.** Eles aparecem na tela antes de a pessoa se
+   cadastrar. Se o contrato disser outro número, quem tem razão é a tela, porque foi ela que formou a
+   expectativa. Ao redigir, use os valores vigentes na tabela de planos do sistema.
+2. **O bloqueio ao fim do teste é automático**, e o contrato precisa dizer isso com todas as letras:
+   passado o último dia, o acesso é interrompido sem aviso prévio adicional além do contador exibido
+   na própria tela durante o teste. É diferente da suspensão por inadimplência, que é ato do
+   fornecedor e exige o aviso combinado na tabela acima. Não confunda as duas na redação.
+3. **O bloqueio não apaga nada.** Os dados do cliente continuam guardados e recuperáveis, e ele
+   mantém acesso para exportar os próprios dados pessoais mesmo bloqueado. Diga isso no contrato: é
+   uma garantia a favor do cliente e evita a leitura de que "acabou o teste, perdi tudo". A
+   eliminação continua regida pela seção 8, e só acontece no encerramento do contrato.
+
+**Evidência do aceite.** Quem se cadastra sozinho marca, antes de concluir, uma caixa concordando com
+o aviso de privacidade, e o sistema grava a data e a hora desse aceite. O contrato pode afirmar isso, e
+deve referenciar o aviso em vez de reproduzi-lo, como já diz a seção 14. Para os clientes cadastrados
+pela CONTRATADA não existe esse registro no sistema: ali o aceite é a própria assinatura do contrato.
+
+Uma advertência sobre o que **não** afirmar: o pagamento ainda **não acontece dentro do sistema**. Não
+existe cartão recorrente, boleto nem pix automatizado. A liberação depois do teste é manual, feita
+pelo fornecedor. Se o contrato prometer cobrança automática, promete o que o sistema não faz.
+
 ---
 
 ## 14. Anexos que o contrato deve referenciar
@@ -320,7 +353,8 @@ suspensão vira conflito.
 
 ## 15. O que este briefing **não** define
 
-- Valores, prazos e percentuais comerciais (seção 13).
+- Valores, prazos e percentuais comerciais (seção 13), **com a ressalva da seção 13.1**: mensalidade e
+  duração do teste passaram a sair do sistema, e o contrato precisa segui-los em vez de defini-los.
 - A redação jurídica final de responsabilidade, limitação, garantia e foro.
 - A escolha do instrumento de transferência internacional do art. 33.
 - Qualquer cláusula sobre a administração da plataforma (cadastro de empresas, cobranças, logs

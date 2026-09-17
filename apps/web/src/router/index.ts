@@ -26,6 +26,21 @@ const router = createRouter({
       meta: { public: true },
     },
     {
+      // Pública porque quem se cadastra ainda não tem empresa nem sessão. É a única tela do sistema
+      // que cria empresa sem alguém autenticado do outro lado.
+      path: '/criar-conta',
+      name: 'criar-conta',
+      component: () => import('@/modules/assinatura/SignupView.vue'),
+      meta: { public: true },
+    },
+    {
+      // Autenticada, mas de propósito fora do bloqueio: é para cá que quem teve o teste vencido é
+      // mandado, então bloqueá-la deixaria a pessoa sem nenhuma tela para onde ir.
+      path: '/assinatura',
+      name: 'assinatura',
+      component: () => import('@/modules/assinatura/SubscriptionView.vue'),
+    },
+    {
       // Pública de propósito: a pessoa precisa poder ler o aviso **antes** de entrar no sistema,
       // e quem não tem conta ainda também tem direito de saber o que é guardado.
       path: '/privacidade',

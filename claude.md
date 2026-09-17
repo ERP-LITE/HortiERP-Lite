@@ -31,7 +31,10 @@ Criar um MVP funcional com:
 - Dashboard inicial;
 - Relatórios básicos;
 - Controle manual das mensalidades das empresas-cliente pelo super administrador;
+- Cadastro público, em que a própria loja se cadastra e começa por um período de teste de 15 dias, com bloqueio de acesso ao fim dele e os dados preservados;
 - Estrutura modular para evolução futura.
+
+Acrescentado depois do escopo original, em 17/09/2026: o cadastro público e o período de teste. O pagamento da assinatura continua fora do sistema, feito pelo controle manual de mensalidades, e a integração com meio de pagamento (Stripe) é etapa seguinte, ainda não iniciada.
 
 ---
 

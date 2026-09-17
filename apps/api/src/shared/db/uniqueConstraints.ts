@@ -23,6 +23,22 @@ export const UNIQUE_CONSTRAINTS = {
     field: 'document',
     message: 'Já existe uma empresa com esse CNPJ',
   },
+  companies_name_active_unique: {
+    field: 'name',
+    message: 'Já existe uma empresa com esse nome fantasia',
+  },
+  companies_legal_name_active_unique: {
+    field: 'legalName',
+    message: 'Já existe uma empresa com essa razão social',
+  },
+  companies_state_registration_active_unique: {
+    field: 'stateRegistration',
+    message: 'Já existe uma empresa com essa inscrição estadual',
+  },
+  companies_contact_email_active_unique: {
+    field: 'contactEmail',
+    message: 'Já existe uma empresa com esse e-mail de contato',
+  },
   users_email_active_unique: {
     field: 'email',
     message: 'Já existe um usuário com esse e-mail',

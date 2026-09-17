@@ -59,6 +59,26 @@ fornecedor têm como recuperá-la — apenas substituí-la.
 Prazo: enquanto o contrato durar. Encerrado o contrato, a eliminação é feita pelo procedimento da
 seção 6.2.
 
+**Como esses dados entram, desde 17/09/2026.** Até então eles só chegavam pelo fornecedor, que
+cadastrava a empresa-cliente. Agora existe também o cadastro público (`POST /signup`), em que a
+própria pessoa informa os dados da empresa, o nome, o e-mail e o telefone do contato, e ainda o nome,
+o e-mail e a senha de quem vai administrar o sistema. Três consequências para este registro:
+
+- a coleta passa a ser **direta com o titular**, o que reforça a transparência mas exige que o aviso
+  de privacidade esteja acessível na própria tela de cadastro. Está: a última etapa traz um **aceite
+  explícito**, com link que abre o aviso em outra aba, e sem ele o cadastro não é aceito. O instante
+  do aceite fica gravado em `companies.privacy_accepted_at`, para haver evidência de quando foi dado
+  e não só uma caixa marcada que não deixa rastro;
+- a senha escolhida ali é guardada como **resumo criptográfico (bcrypt)**, nunca em texto, igual às
+  demais senhas do sistema;
+- é o único ponto do sistema em que dado pessoal é gravado **sem autenticação prévia**. O controle
+  compensatório é o freio de 5 tentativas por hora por origem, e a rota só grava: não lê nem devolve
+  registro de nenhuma outra empresa.
+
+Uma lacuna conhecida, já registrada na seção 9: **não há confirmação de e-mail** no cadastro, então
+alguém pode criar uma conta informando o e-mail de outra pessoa. O dado gravado é o que o titular
+digitou, e a correção depende de contato com o suporte até a confirmação por e-mail existir.
+
 ### 2.3 Terceiros citados nas operações
 
 | Dado | Onde fica | Observação |
@@ -155,6 +175,13 @@ traz senha nem dado do negócio, só o nome da pessoa e um link de uso único e 
 
 **Suboperadores** a declarar no contrato e no aviso de privacidade: Oracle Cloud (hospedagem),
 Backblaze (armazenamento da cópia cifrada) e Resend (envio do e-mail de redefinição de senha).
+
+**Situação da Resend em 17/09/2026: ainda não configurada.** O envio de e-mail depende de
+`RESEND_API_KEY` e `MAIL_FROM` no servidor, que por sua vez dependem de domínio próprio verificado.
+Enquanto estiverem ausentes nenhum e-mail sai, nenhum dado pessoal chega à Resend e **esta
+transferência internacional não está ocorrendo**. O registro a descreve para o momento em que for
+ligada, e quem revisar o contrato ou a proposta antes disso precisa conferir o estado real da
+instalação em vez de copiar esta seção.
 
 ---
 
@@ -256,7 +283,8 @@ Em ordem de importância. As três primeiras são jurídicas e não se resolvem 
 | 2 | **Aviso de privacidade** — a tela existe (rota pública `/privacidade`, link no rodapé de todas as telas e na de login) e o texto foi redigido a partir deste registro. **Falta a revisão jurídica do texto** | advogado |
 | 3 | **Procedimento de resposta a incidente** (seção 8) | fornecedor, com revisão jurídica |
 | 4 | **Cláusulas contratuais com a Backblaze** para a transferência internacional | advogado |
-| 5 | Autenticação em dois fatores | fornecedor |
+| 5 | **Confirmação de e-mail no cadastro público**, que hoje não existe: sem ela alguém cria conta com o e-mail de outra pessoa, e o CNPJ duplicado responde com mensagem específica, confirmando a quem testar que aquela empresa já é cliente. Depende do domínio próprio, igual à recuperação de senha | fornecedor |
+| 6 | Autenticação em dois fatores | fornecedor |
 
 Vale perguntar ao advogado sobre o **regime simplificado para agentes de tratamento de pequeno
 porte**, regulamentado pela ANPD: se aplicável, dispensa formalidades como a nomeação obrigatória de
@@ -268,6 +296,8 @@ encarregado, desde que exista canal de contato com o titular.
 
 | Data | O que mudou |
 |---|---|
+| 17/09/2026 | Aceite do aviso de privacidade passou a ser registrado com data e hora (`companies.privacy_accepted_at`) no cadastro público |
+| 17/09/2026 | Cadastro público de empresa (`POST /signup`) e período de teste. A coleta dos dados da empresa e do contato passou a poder ser **direta com o titular**, e não só pelo fornecedor. Nenhuma categoria de dado nova, nenhum prazo alterado. Lacuna aberta: cadastro sem confirmação de e-mail (seção 9) |
 | 25/08/2026 | Aviso de privacidade revisado **só na pontuação** (travessões trocados por ponto, dois-pontos ou parêntese). Nenhuma finalidade, prazo, base legal ou direito mudou. A data de "atualizado em" acompanhou o texto porque o verificador de integridade do aviso exige isso: ele compara o resumo do texto com a data, para o leitor nunca ver texto novo com data velha |
 | 24/08/2026 | Aviso de privacidade publicado dentro do sistema, em rota pública, redigido a partir deste registro. Pendência 2 passou de "não existe nada" para "falta revisão jurídica do texto" |
 | 24/08/2026 | Primeira versão. Inventário levantado a partir do código; retenção por prazo, anonimização, exclusão definitiva e exportação dos dados do titular implementados nesta mesma data |

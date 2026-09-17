@@ -11,6 +11,7 @@ import { systemLogs } from './systemLogs.js'
 import { activityLogs } from './activityLogs.js'
 import { companyBillings } from './companyBillings.js'
 import { passwordResetTokens } from './passwordResetTokens.js'
+import { plans } from './plans.js'
 
 export * from './enums.js'
 export * from './companies.js'
@@ -25,8 +26,9 @@ export * from './systemLogs.js'
 export * from './activityLogs.js'
 export * from './companyBillings.js'
 export * from './passwordResetTokens.js'
+export * from './plans.js'
 
-export const companiesRelations = relations(companies, ({ many }) => ({
+export const companiesRelations = relations(companies, ({ one, many }) => ({
   users: many(users),
   categories: many(categories),
   units: many(units),
@@ -35,6 +37,11 @@ export const companiesRelations = relations(companies, ({ many }) => ({
   activityLogs: many(activityLogs),
   billings: many(companyBillings),
   passwordResetTokens: many(passwordResetTokens),
+  plan: one(plans, { fields: [companies.planId], references: [plans.id] }),
+}))
+
+export const plansRelations = relations(plans, ({ many }) => ({
+  companies: many(companies),
 }))
 
 export const companyBillingsRelations = relations(companyBillings, ({ one }) => ({

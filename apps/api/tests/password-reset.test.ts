@@ -6,6 +6,7 @@ import { and, eq, isNull } from 'drizzle-orm'
 import { db } from './db.js'
 import { activityLogs, companies, passwordResetTokens, users } from '../src/db/schema/index.js'
 import { buildApp } from '../src/app.js'
+import { recuperacaoPorEmailDisponivel } from '../src/shared/config/env.js'
 import { authCookie, setupTestApp } from './helpers.js'
 
 // Sem o limitador: ele é por IP e `app.inject` faz o arquivo inteiro chegar do mesmo endereço, então
@@ -298,5 +299,30 @@ describe('freio de tentativas das rotas de senha', () => {
     } finally {
       await app.close()
     }
+  })
+})
+
+describe('produção sem Resend configurada', () => {
+  /**
+   * A API **sobe** sem as chaves da Resend: só a redefinição por e-mail fica indisponível, e o resto
+   * do sistema funciona. Exigir as chaves para iniciar derrubava a instalação inteira por causa de um
+   * recurso só, o que é pior do que o recurso faltar.
+   *
+   * O que não pode voltar é o desenho do meio: aceitar o pedido em silêncio e deixar a pessoa
+   * esperando para sempre um e-mail que nunca vai sair.
+   */
+  test('fora de produção continua disponível, para o link cair no log', () => {
+    assert.equal(recuperacaoPorEmailDisponivel({ nodeEnv: 'development' }), true)
+    assert.equal(recuperacaoPorEmailDisponivel({ nodeEnv: 'test' }), true)
+  })
+
+  test('em produção exige as duas variáveis, não uma', () => {
+    const emProducao = (resendApiKey?: string, mailFrom?: string) =>
+      recuperacaoPorEmailDisponivel({ nodeEnv: 'production', resendApiKey, mailFrom })
+
+    assert.equal(emProducao(undefined, undefined), false)
+    assert.equal(emProducao('re_chave', undefined), false, 'sem remetente o envio falha na Resend')
+    assert.equal(emProducao(undefined, 'contato@exemplo.com.br'), false)
+    assert.equal(emProducao('re_chave', 'contato@exemplo.com.br'), true)
   })
 })

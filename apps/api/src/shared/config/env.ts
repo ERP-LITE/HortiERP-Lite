@@ -170,30 +170,30 @@ const envSchema = z
       })
     }
 
-    // Sem as duas, "esqueci minha senha" aceita o pedido e não manda e-mail nenhum: a pessoa fica
-    // esperando uma mensagem que nunca sai, e nada na tela denuncia isso. Falhar ao subir é melhor.
-    if (!value.RESEND_API_KEY) {
-      context.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['RESEND_API_KEY'],
-        message: 'RESEND_API_KEY é obrigatório em produção: sem ele a redefinição de senha não envia e-mail',
-      })
-    }
-
-    if (!value.MAIL_FROM) {
-      context.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['MAIL_FROM'],
-        message:
-          'MAIL_FROM é obrigatório em produção e precisa ser de um domínio verificado na Resend (`onboarding@resend.dev` só entrega para o dono da conta)',
-      })
-    }
   })
+
+/**
+ * Fora de produção o log faz as vezes da caixa de entrada, e é assim que se testa a redefinição sem
+ * conta na Resend. Em produção não há log para a pessoa ler, então o pedido é recusado.
+ */
+export function recuperacaoPorEmailDisponivel(opcoes: {
+  nodeEnv: string
+  resendApiKey?: string
+  mailFrom?: string
+}) {
+  if (opcoes.nodeEnv !== 'production') return true
+  return Boolean(opcoes.resendApiKey && opcoes.mailFrom)
+}
 
 const parsedSchema = envSchema.transform((value) => ({
   ...value,
   APP_DATABASE_URL: value.APP_DATABASE_URL ?? value.DATABASE_URL,
   APP_PUBLIC_URL: value.APP_PUBLIC_URL ?? value.CORS_ORIGIN[0],
+  RECUPERACAO_POR_EMAIL_DISPONIVEL: recuperacaoPorEmailDisponivel({
+    nodeEnv: value.NODE_ENV,
+    resendApiKey: value.RESEND_API_KEY,
+    mailFrom: value.MAIL_FROM,
+  }),
 }))
 
 const parsed = parsedSchema.safeParse(process.env)
@@ -204,6 +204,14 @@ if (!parsed.success) {
 }
 
 export const env = parsed.data
+
+// Gritado no boot porque nada quebra até alguém precisar recuperar a senha, e aí é tarde.
+if (env.NODE_ENV === 'production' && !env.RECUPERACAO_POR_EMAIL_DISPONIVEL) {
+  console.warn(
+    '[ATENÇÃO] RESEND_API_KEY e/ou MAIL_FROM não definidas: "Esqueci minha senha" responderá que está indisponível. ' +
+      'O restante do sistema funciona normalmente. Para ligar, veja docs/deploy-producao.md.',
+  )
+}
 
 if (env.NODE_ENV !== 'production' && !process.env.APP_DATABASE_URL) {
   console.warn(
