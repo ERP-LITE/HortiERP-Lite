@@ -11,19 +11,26 @@ import { useAsyncState } from '@/composables/useAsyncState'
 import { oldestEventDateIso, todayIso } from '@/lib/period'
 import { getApiErrorMessage } from '@/services/api'
 import { useFieldErrors, useRowErrors } from '@/composables/useFieldErrors'
-import { toastError, toastSuccess } from '@/lib/alerts'
+import { confirmAction, toastError, toastSuccess } from '@/lib/alerts'
 import { listAllProducts } from '@/services/productsService'
 import { createStockEntry, uploadStockEntryAttachment } from '@/services/stockEntriesService'
 import type { Product } from '@/types'
 import { formatFileSize } from '@/lib/format'
+import InvoiceXmlImport from '@/components/entradas/InvoiceXmlImport.vue'
+import FilePickerArea from '@/components/ui/FilePickerArea.vue'
 import { invoiceKeyError, invoiceSelectionError } from '@/lib/invoiceAttachments'
+import {
+  dadosDaNota,
+  itemVazio,
+  juntarArquivos,
+  itensDaNota,
+  resumoDaLeitura,
+  temItemPreenchido,
+  textoDoResumo,
+  type ItemDaEntrada,
+} from '@/lib/invoiceXml'
+import type { NotaFiscalLida } from '@/types'
 import { LIMITES_NUMERO, LIMITES_TEXTO } from '@/lib/limits'
-
-interface ItemRow {
-  productId: string
-  quantity: string
-  unitCost: string
-}
 
 const router = useRouter()
 const products = ref<Product[]>([])
@@ -40,7 +47,9 @@ const invoiceIssuedAt = ref('')
 const invoiceTotal = ref('')
 const attachments = ref<File[]>([])
 const attachmentsError = computed(() => invoiceSelectionError(attachments.value))
-const items = ref<ItemRow[]>([{ productId: '', quantity: '', unitCost: '' }])
+const items = ref<ItemDaEntrada[]>([itemVazio()])
+const supplierDocument = ref('')
+const resumoDaNota = ref('')
 
 const { fieldErrors: invoiceErrors } = useFieldErrors(() => ({
   entryDate: entryDate.value,
@@ -51,8 +60,45 @@ const { rowErrors: itemErrors } = useRowErrors<'productId' | 'quantity'>(() => i
 const productOptions = computed(() => products.value.map((p) => ({ value: p.id, label: p.name })))
 
 function addItem() {
-  items.value.push({ productId: '', quantity: '', unitCost: '' })
+  items.value.push(itemVazio())
   itemErrors.value = []
+}
+
+/**
+ * Substitui o que estiver na tela pelo que veio da nota. A data da entrada não é tocada: a nota diz
+ * quando foi emitida, não quando a mercadoria chegou na loja.
+ *
+ * Uma entrada é uma nota só: número, série e chave são um valor cada. Por isso ler um segundo XML
+ * troca a lista em vez de somar, e por isso pergunta antes: quem já ligou os itens à mão perderia o
+ * trabalho sem entender o motivo.
+ */
+async function aplicarNota(nota: NotaFiscalLida, arquivo: File) {
+  if (temItemPreenchido(items.value)) {
+    const confirmado = await confirmAction({
+      title: 'Trocar pelos itens desta nota?',
+      text: 'Cada entrada guarda uma nota fiscal só. Os itens que estão na tela agora serão substituídos pelos desta nota.',
+      confirmButtonText: 'Trocar itens',
+    })
+    if (!confirmado) return
+  }
+
+  const dados = dadosDaNota(nota)
+  supplierName.value = dados.supplierName
+  supplierDocument.value = dados.supplierDocument
+  invoiceNumber.value = dados.invoiceNumber
+  invoiceSeries.value = dados.invoiceSeries
+  invoiceAccessKey.value = dados.invoiceAccessKey
+  invoiceIssuedAt.value = dados.invoiceIssuedAt
+  invoiceTotal.value = dados.invoiceTotal
+
+  items.value = itensDaNota(nota)
+  itemErrors.value = []
+  invoiceErrors.value = {}
+  errorMessage.value = ''
+  resumoDaNota.value = textoDoResumo(resumoDaLeitura(items.value))
+
+  // O mesmo arquivo vira anexo da entrada: quem já mandou o XML não precisa mandar de novo.
+  attachments.value = juntarArquivos(attachments.value, [arquivo])
 }
 
 function removeItem(index: number) {
@@ -87,10 +133,12 @@ function validate(): boolean {
     !attachmentsError.value
 }
 
-function handleFiles(event: Event) {
-  const input = event.target as HTMLInputElement
-  attachments.value = Array.from(input.files ?? [])
-  input.value = ''
+function removeAttachment(index: number) {
+  attachments.value = attachments.value.filter((_, atual) => atual !== index)
+}
+
+function handleFiles(escolhidos: File[]) {
+  attachments.value = juntarArquivos(attachments.value, escolhidos)
 }
 
 async function handleSubmit() {
@@ -109,10 +157,12 @@ async function handleSubmit() {
       invoiceAccessKey: invoiceAccessKey.value || undefined,
       invoiceIssuedAt: invoiceIssuedAt.value ? `${invoiceIssuedAt.value}T12:00:00` : undefined,
       invoiceTotal: invoiceTotal.value ? Number(invoiceTotal.value) : undefined,
+      supplierDocument: supplierDocument.value || undefined,
       items: items.value.map((item) => ({
         productId: item.productId,
         quantity: Number(item.quantity),
         unitCost: item.unitCost ? Number(item.unitCost) : undefined,
+        supplierCode: item.supplierCode,
       })),
     })
     try {
@@ -144,6 +194,15 @@ onMounted(loadProducts)
       class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6 space-y-6"
       @submit.prevent="handleSubmit"
     >
+      <InvoiceXmlImport :disabled="saving" @read="aplicarNota" />
+
+      <p
+        v-if="resumoDaNota"
+        class="rounded-lg bg-primary-50 px-3 py-2 text-sm text-primary-800 dark:bg-primary-900/30 dark:text-primary-200"
+      >
+        {{ resumoDaNota }}
+      </p>
+
       <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <DateInput
           v-model="entryDate"
@@ -161,7 +220,8 @@ onMounted(loadProducts)
         <div>
           <h2 class="text-sm font-semibold text-gray-800 dark:text-gray-200">Nota fiscal (opcional)</h2>
           <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
-            Identifique a NF-e e anexe até 3 arquivos XML, PDF ou imagem, com no máximo 10 MB cada.
+            Identifique a NF-e e anexe até 3 arquivos <strong>da mesma nota</strong>, em XML, PDF ou imagem, com
+            no máximo 10 MB cada. Duas notas viram duas entradas, uma para cada.
           </p>
         </div>
         <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -183,17 +243,26 @@ onMounted(loadProducts)
             />
           </div>
         </div>
-        <label
-          class="flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-gray-300 px-4 py-4 text-sm text-gray-600 transition-colors hover:border-primary-500 hover:text-primary-600 dark:border-gray-600 dark:text-gray-300"
-        >
-          <FileUp :size="18" />
-          <span>{{ attachments.length ? `${attachments.length} arquivo(s) selecionado(s)` : 'Selecionar anexos da nota' }}</span>
-          <input class="sr-only" type="file" multiple accept=".xml,.pdf,.jpg,.jpeg,.png,.webp" @change="handleFiles" />
-        </label>
+        <FilePickerArea accept=".xml,.pdf,.jpg,.jpeg,.png,.webp" multiple :icon="FileUp" @select="handleFiles">
+          {{ attachments.length ? `${attachments.length} arquivo(s) selecionado(s)` : 'Selecionar anexos da nota' }}
+        </FilePickerArea>
         <p v-if="attachmentsError" class="text-xs text-red-600 dark:text-red-400">{{ attachmentsError }}</p>
         <ul v-if="attachments.length" class="space-y-1 text-xs text-gray-500 dark:text-gray-400">
-          <li v-for="file in attachments" :key="`${file.name}-${file.size}`" class="break-all">
-            {{ file.name }} · {{ formatFileSize(file.size) }}
+          <li
+            v-for="(file, index) in attachments"
+            :key="`${file.name}-${file.size}`"
+            class="flex items-center justify-between gap-2"
+          >
+            <span class="break-all">{{ file.name }} · {{ formatFileSize(file.size) }}</span>
+            <button
+              type="button"
+              class="inline-flex shrink-0 items-center justify-center h-7 w-7 rounded-lg text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/30"
+              :title="`Remover ${file.name}`"
+              :aria-label="`Remover ${file.name}`"
+              @click="removeAttachment(index)"
+            >
+              <Trash2 :size="14" />
+            </button>
           </li>
         </ul>
       </section>
@@ -217,6 +286,14 @@ onMounted(loadProducts)
             :key="index"
             class="grid grid-cols-1 sm:grid-cols-[2fr_1fr_1fr_auto] gap-3 items-start border border-gray-100 dark:border-gray-700 rounded-lg p-3"
           >
+            <p
+              v-if="item.descricaoNaNota"
+              class="text-xs text-gray-500 dark:text-gray-400 sm:col-span-4 -mb-1 break-words"
+            >
+              Na nota: <span class="font-medium text-gray-700 dark:text-gray-300">{{ item.descricaoNaNota }}</span>
+              <span v-if="item.unidadeNaNota"> · {{ item.unidadeNaNota }}</span>
+              <span v-if="!item.productId" class="text-amber-600 dark:text-amber-400"> · escolha o produto</span>
+            </p>
             <BaseSelect
               v-model="item.productId"
               label="Produto"

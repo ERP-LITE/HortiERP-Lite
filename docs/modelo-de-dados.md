@@ -12,7 +12,7 @@ aplicadas nunca devem ser apagadas, renomeadas ou reescritas; toda mudança pass
 - **`companyId` obrigatório** (`uuid` com FK para `companies.id`) — é o que garante o isolamento entre empresas-cliente (ver [decisões arquiteturais](./decisoes-arquiteturais.md)). Toda query de toda tabela de negócio filtra por esse campo, e desde a migration `0006` o próprio banco recusa o que passa do escopo, por política de RLS.
 - **Soft delete** via `deletedAt` (timestamp nulável) — nada é apagado de fato, exceto os poucos casos explicitamente documentados. Helper `timestamps` em `columns.ts` (`createdAt`, `updatedAt`, `deletedAt`).
 - **Auditoria** via `createdBy`/`updatedBy` (`uuid`, sem FK — ver nota nas decisões arquiteturais sobre impersonação; a única exceção é `company_billings`, que declara a FK para `users`). Helper `auditBy` em `columns.ts`.
-- Exceções às duas convenções acima: `companies` (é a raiz, não tem `companyId`), `stock_entry_items` e `stock_movements` (não têm `auditBy` completo — `stock_movements` só tem `createdBy`).
+- Exceções às duas convenções acima: `companies` (é a raiz, não tem `companyId`), `stock_entry_items`, `stock_count_items` e `stock_movements` (não têm `auditBy` completo: `stock_movements` só tem `createdBy`, e `stock_count_items` só `countedBy`).
 
 ## Diagrama
 
@@ -34,6 +34,12 @@ erDiagram
   PRODUCTS ||--o{ STOCK_ENTRY_ITEMS : ""
   PRODUCTS ||--o{ LOSSES : ""
   PRODUCTS ||--o{ STOCK_MOVEMENTS : ""
+  PRODUCTS ||--o{ SUPPLIER_PRODUCT_CODES : ""
+  COMPANIES ||--o{ SUPPLIER_PRODUCT_CODES : ""
+  COMPANIES ||--o{ STOCK_COUNTS : ""
+  CATEGORIES ||--o{ STOCK_COUNTS : delimita
+  STOCK_COUNTS ||--o{ STOCK_COUNT_ITEMS : contem
+  PRODUCTS ||--o{ STOCK_COUNT_ITEMS : ""
 ```
 
 ## Tabelas
@@ -156,7 +162,9 @@ clicou duas vezes em "esqueci minha senha" não pode ficar com um link vivo sobr
 entrada. A retenção apaga a linha 7 dias depois do vencimento (`PASSWORD_RESET_KEEP_DAYS`).
 
 ### `categories`
-Classificação de produtos (ex: Frutas, Verduras). `id`, `companyId`, `name`, `description?`, `active`, timestamps, auditBy.
+Classificação de produtos (ex: Frutas, Verduras). `id`, `companyId`, `name`, `description?`, `targetMargin?`, `active`, timestamps, auditBy.
+
+`targetMargin` é numeric(5,2), com o mesmo `CHECK` de `products`, e serve de padrão do grupo: todo produto da categoria sem margem própria usa a dela. Ver [decisoes-arquiteturais.md](./decisoes-arquiteturais.md#margem-alvo-em-dois-níveis-e-sempre-sobre-a-venda).
 
 ### `units`
 Unidade de medida (ex: kg, un, dz). `id`, `companyId`, `name`, `abbreviation`, `active`, timestamps, auditBy.
@@ -175,10 +183,13 @@ ou unidade em uso é recusada com `409` (`assertNotUsedByProducts`).
 | `name` | text | único por empresa |
 | `sku`, `barcode` | text | opcionais, `sku` único por empresa quando informado; campo em branco é gravado como `null`, nunca `''` (o índice único parcial só ignora nulos) |
 | `costPrice`, `salePrice` | numeric(12,2) | opcionais, podem ser limpos de volta para `null` pela edição |
+| `targetMargin` | numeric(5,2) | opcional, percentual **sobre o preço de venda**. `CHECK` entre 0 e 99,99: 100 zeraria o divisor do preço sugerido. Nulo significa herdar a margem da categoria, não "sem margem" |
 | `minStock` | numeric(12,3) | default `0`, validado como não negativo — limite do alerta de "estoque baixo", usado pelo filtro da tela de estoque, pelo painel e pelo sino do cabeçalho. Com o default, `currentStock <= minStock` equivale a "zerado": o alerta só avisa **antes** de acabar depois que o cliente preenche o mínimo |
 | `currentStock` | numeric(12,3) | default `0` — atualizado pelos fluxos de entrada, perda e ajuste manual; nunca editado direto no cadastro do produto |
 | `active` | boolean | default `true` |
 | timestamps, auditBy | | |
+
+`currentMargin`, `effectiveTargetMargin`, `targetMarginInherited` e `suggestedPrice` **não são colunas**: a API calcula os quatro a cada consulta de produto, a partir do custo, do preço de venda e da margem alvo que valer. Guardá-los deixaria o preço sugerido velho no instante em que alguém mexesse no custo.
 
 Os alertas do sino não têm tabela: eles são derivados de `products` e `losses` a cada consulta, sem estado de "lido". Ver [decisoes-arquiteturais.md](./decisoes-arquiteturais.md#o-sino-de-alertas-é-estado-atual-não-caixa-de-entrada).
 
@@ -193,6 +204,42 @@ Entrada de mercadoria (cabeçalho + itens), ver [fluxo de entrada](./fluxos-de-n
 ### `stock_entry_attachments`
 
 Metadados dos arquivos privados associados à nota fiscal. Cada registro contém `id`, `companyId`, `stockEntryId`, `originalName`, `storedName` único e aleatório, `mimeType`, `size`, `createdAt` e `createdBy`. O arquivo binário não fica no PostgreSQL: é armazenado no volume persistente da API, e `storedName` faz a ligação com o disco. `companyId` é duplicado intencionalmente para permitir que download, pré-visualização e exclusão validem isolamento multiempresa sem depender apenas da rota pai. Campos internos como `storedName` e `companyId` não são expostos nas respostas públicas de anexos.
+
+### `supplier_product_codes`
+De para entre o código que o fornecedor usa na nota e o produto da loja.
+
+| Coluna | Tipo | Observação |
+|---|---|---|
+| `id` | uuid | PK |
+| `companyId` | uuid | FK, obrigatório |
+| `supplierDocument` | text | CNPJ (ou CPF) de quem emitiu, só dígitos |
+| `supplierCode` | text | o `cProd` da nota, gravado sem espaços e em maiúsculas |
+| `productId` | uuid | FK `products.id` |
+| `createdAt`, `updatedAt`, auditBy | | |
+
+Único por `(companyId, supplierDocument, supplierCode)`, e a gravação usa `ON CONFLICT DO UPDATE`: confirmar a entrada de novo com outro produto **corrige** o vínculo em vez de duplicar. A normalização do código acontece no serviço, não no índice, justamente para o `ON CONFLICT` poder apontar para colunas simples.
+
+**Sem exclusão lógica**, diferente do resto: `deletedAt` numa tabela com índice único assim impediria criar o vínculo novo depois de "apagar" o antigo. Vínculo errado se corrige por cima.
+
+O apagamento de empresa (`erase-company.service.ts`) remove esta tabela **antes** de `products`, porque a chave estrangeira aponta para lá.
+
+### `stock_counts` + `stock_count_items`
+Contagem de estoque (balanço), ver [fluxo de contagem](./fluxos-de-negocio.md#contagem-de-estoque).
+
+- `stock_counts`: `id`, `companyId`, `categoryId?` (nulo significa loja toda), `status` (enum `stock_count_status`), `notes?`, `cancelReason?`, `startedAt`, `finishedAt?`, `createdAt`, `updatedAt`, auditBy.
+- `stock_count_items`: `id`, `stockCountId` (FK), `productId` (FK), `countedQuantity?` numeric(12,3), `countedAt?`, `countedBy?`, `previousQuantity?` numeric(12,3), `unitCost?` numeric(12,2). Sem `companyId` próprio: o escopo por empresa vem do join com `stockCounts.companyId`, igual a `stock_entry_items`.
+
+`countedQuantity` nulo é a diferença entre **não contado** e contado como zero, e a distinção é o que impede a contagem de zerar o que ninguém conferiu: só item com valor gera ajuste.
+
+`previousQuantity` e `unitCost` nascem vazios e são gravados no encerramento (ou no cancelamento), com o saldo e o custo do instante em que o ajuste foi aplicado. É por isso que o relatório de uma contagem antiga continua mostrando os mesmos números depois de o estoque e o custo do produto terem mudado.
+
+O `coalesce` para `products.currentStock`/`costPrice` só vale **em conferência**, quando a referência ainda não existe e o saldo de agora é exatamente o que o ajuste vai corrigir. Numa contagem encerrada a API lê só a coluna congelada: cair no estoque atual faria a coluna "Sistema tinha" mostrar o saldo de hoje num relatório de meses atrás, e faria o produto que ninguém contou parecer conferido.
+
+**Uma contagem aberta por empresa**, garantido por índice único parcial sobre `companyId` filtrando `status in ('em_andamento','em_conferencia')`. Duas contagens simultâneas alcançariam o mesmo produto e a segunda a encerrar desfaria o ajuste da primeira.
+
+**Sem exclusão lógica**: desistir é cancelar, o que preserva o que já foi contado e ainda libera o índice acima.
+
+O apagamento de empresa remove `stock_count_items` e `stock_counts` **antes** de `products` e `categories`, porque as chaves estrangeiras apontam para lá.
 
 ### `losses`
 Registro de perda de estoque. `id`, `companyId`, `productId` (FK), `quantity` numeric(12,3), `unitCost?` numeric(12,2), `reason` (enum `loss_reason`: `vencido` \| `avariado` \| `roubo_furto` \| `erro_operacional` \| `outro`), `notes?`, `lossDate`, `cancelledAt?`, `cancelledBy?`, `cancelReason?`, timestamps, auditBy.
@@ -252,6 +299,8 @@ As rotas de consulta de log e os caminhos de healthcheck (`/health` e `/api/heal
 - `user_role`: `admin`, `gerente`, `operador`, `super_admin`
 - `movement_type`: `entrada`, `perda`, `ajuste`
 - `loss_reason`: `vencido`, `avariado`, `roubo_furto`, `erro_operacional`, `outro`
+- `stock_count_status`: `em_andamento`, `em_conferencia`, `concluida`, `cancelada`. A etapa intermediária existe para
+  separar contar de aplicar: é só ao entrar em `em_conferencia` que a API passa a devolver o saldo que o sistema tinha
 - `subscription_status`: `teste`, `ativa`, `atrasada`, `cancelada`. Em português como os demais, e não nos nomes que
   a Stripe usa: o valor aparece em tela, e traduzir na borda impede que um estado criado lá dentro entre no banco sem
   alguém decidir o que ele significa aqui

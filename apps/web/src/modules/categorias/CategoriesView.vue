@@ -72,18 +72,35 @@ async function loadCategories() {
   })
 }
 
+interface CategoryForm {
+  name: string
+  description: string
+  targetMargin: string
+  active: boolean
+}
+
+function toPayload(values: CategoryForm): CategoryInput {
+  return {
+    name: values.name,
+    description: values.description,
+    targetMargin: values.targetMargin ? Number(values.targetMargin) : null,
+    active: values.active,
+  }
+}
+
 const { modalOpen, editingId, saving, form, fieldErrors, openCreateModal, openEditModal, handleSubmit } = useCrudModal<
-  Required<CategoryInput>,
+  CategoryForm,
   Category
 >({
-  emptyForm: () => ({ name: '', description: '', active: true }),
+  emptyForm: () => ({ name: '', description: '', targetMargin: '', active: true }),
   toForm: (category) => ({
     name: category.name,
     description: category.description ?? '',
+    targetMargin: category.targetMargin ?? '',
     active: category.active,
   }),
-  create: (values) => createCategory(values),
-  update: (id, values) => updateCategory(id, values),
+  create: (values) => createCategory(toPayload(values)),
+  update: (id, values) => updateCategory(id, toPayload(values)),
   reload: loadCategories,
   createdMessage: 'Categoria criada com sucesso',
   updatedMessage: 'Categoria atualizada com sucesso',
@@ -232,6 +249,17 @@ onMounted(loadCategories)
           :maxlength="LIMITES_TEXTO.descricao"
           :error="fieldErrors.description"
         />
+        <BaseInput
+          v-model="form.targetMargin"
+          :decimal-places="2"
+          :max="99.99"
+          label="Margem alvo (%)"
+          :error="fieldErrors.targetMargin"
+        />
+        <p class="text-xs text-gray-500 dark:text-gray-400">
+          Percentual sobre o preço de venda, aplicado a todo produto da categoria que não tiver margem
+          própria. É o jeito de definir de uma vez que folhagem vende com uma margem e fruta com outra.
+        </p>
         <BaseToggle v-model="form.active" label="Categoria ativa" />
         <p class="text-xs text-gray-500 dark:text-gray-400">
           Categoria inativa continua valendo para os produtos que já usam ela, e deixa de aparecer na hora de

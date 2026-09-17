@@ -4,6 +4,17 @@ export const userRoleEnum = pgEnum('user_role', ['admin', 'gerente', 'operador',
 
 export const movementTypeEnum = pgEnum('movement_type', ['entrada', 'perda', 'ajuste'])
 
+/**
+ * Etapas da contagem de estoque. `em_conferencia` existe para separar contar de aplicar: é só ao
+ * entrar nela que o sistema revela o saldo que ele achava que tinha. Ver docs/fluxos-de-negocio.md.
+ */
+export const stockCountStatusEnum = pgEnum('stock_count_status', [
+  'em_andamento',
+  'em_conferencia',
+  'concluida',
+  'cancelada',
+])
+
 export const lossReasonEnum = pgEnum('loss_reason', [
   'vencido',
   'avariado',

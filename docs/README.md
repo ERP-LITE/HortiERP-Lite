@@ -3,8 +3,8 @@
 Documentação técnica do projeto:
 
 - [Modelo de dados](./modelo-de-dados.md) — tabelas, relacionamentos, enums, empresas e cobranças manuais.
-- [Decisões arquiteturais](./decisoes-arquiteturais.md) — multiempresa e as duas camadas de isolamento (filtro na aplicação e RLS no banco), autenticação, papéis, super_admin/impersonação, consulta redundante de CEP, soft delete, planilhas, data do fato x data do lançamento, limites de tamanho dos campos, o sino de alertas como estado atual, mensagens de erro em português, o padrão de campo com erro (vermelho único, que some quando a pessoa corrige) e o cadastro público com período de teste.
-- [Fluxos de negócio](./fluxos-de-negocio.md) — estoque, importação por planilha, correção de lançamentos, dashboard, alertas no cabeçalho, empresas-cliente e controle manual de cobranças.
+- [Decisões arquiteturais](./decisoes-arquiteturais.md) — multiempresa e as duas camadas de isolamento (filtro na aplicação e RLS no banco), autenticação, papéis, super_admin/impersonação, consulta redundante de CEP, soft delete, planilhas, data do fato x data do lançamento, limites de tamanho dos campos, o sino de alertas como estado atual, mensagens de erro em português, o padrão de campo com erro (vermelho único, que some quando a pessoa corrige), o cadastro público com período de teste, a quebra em percentual e sua meta, a margem alvo em dois níveis, a leitura do XML da nota fiscal e a contagem de estoque cega.
+- [Fluxos de negócio](./fluxos-de-negocio.md) — estoque, importação por planilha, entrada a partir do XML da nota, margem e preço sugerido, contagem de estoque, correção de lançamentos, dashboard, alertas no cabeçalho, empresas-cliente e controle manual de cobranças.
 - [Deploy de produção](./deploy-producao.md) — imagens, HTTPS, variáveis, migrations, primeiro acesso e rollback.
 
 Mantenha estes documentos atualizados conforme o sistema evolui — decisões e fluxos que mudarem aqui tendem a ficar desatualizados rápido se não forem revisados junto com o código.

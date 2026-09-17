@@ -156,6 +156,17 @@ Para ligar depois, basta preencher as duas variáveis e reiniciar a API: nada ma
 **precisa** existir antes é um domínio próprio verificado na Resend, porque `onboarding@resend.dev`
 só entrega para o e-mail do dono da conta e não serve para cliente.
 
+### As migrations `0014` e `0015` são seguras para aplicar
+
+Diferente das duas abaixo, elas só **acrescentam**: `0014` cria as colunas de margem alvo em
+`categories` e `products` com um `CHECK` de faixa, e `0015` cria a tabela `supplier_product_codes`
+com a política de isolamento por empresa. Nenhuma toca em dado existente e nenhuma pode abortar por
+causa do que já está no banco. Não há conferência a fazer antes.
+
+Uma observação de dependência: a `0015` acompanha a entrada do pacote `fast-xml-parser` na API. Quem
+faz deploy pelo script padrão não precisa fazer nada, porque a imagem é reconstruída com o
+`package-lock.json` do repositório.
+
 ### As migrations `0012` e `0013` abortam se houver dado repetido entre empresas
 
 Elas criam os índices únicos de nome fantasia (`0012`) e de razão social, inscrição estadual e e-mail

@@ -51,6 +51,7 @@ const entityOptions = [
   { value: 'entrada', label: 'Entradas' },
   { value: 'perda', label: 'Perdas' },
   { value: 'estoque', label: 'Estoque' },
+  { value: 'contagem', label: 'Contagem' },
 ]
 
 const actionLabels: Record<ActivityAction, string> = {
@@ -69,6 +70,7 @@ const entityLabels: Record<ActivityEntity, string> = {
   entrada: 'entrada',
   perda: 'perda',
   estoque: 'estoque',
+  contagem: 'contagem de estoque',
 }
 const actionVariant: Record<ActivityAction, 'success' | 'warning' | 'danger' | 'neutral'> = {
   criou: 'success',

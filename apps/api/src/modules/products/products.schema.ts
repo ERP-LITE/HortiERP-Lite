@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { LIMITES_NUMERO, LIMITES_TEXTO } from '../../shared/schemas/limits.js'
 import { booleanQueryParam, paginationQuerySchema } from '../../shared/schemas/pagination.schema.js'
+import { targetMarginField } from '../../shared/schemas/margin.schema.js'
 
 export const listProductsQuerySchema = paginationQuerySchema.extend({
   search: z.string().trim().min(1).max(LIMITES_TEXTO.busca).optional(),
@@ -34,6 +35,7 @@ export const createProductSchema = z.object({
   barcode: clearableText(LIMITES_TEXTO.codigoBarras),
   costPrice: clearableMoney,
   salePrice: clearableMoney,
+  targetMargin: targetMarginField,
   minStock: z.coerce.number().nonnegative().max(LIMITES_NUMERO.quantidade).default(0),
   active: z.boolean().default(true),
 })

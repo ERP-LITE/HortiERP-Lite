@@ -5,12 +5,13 @@ import type { LossReason } from '@/types'
 import ChartTooltip from './ChartTooltip.vue'
 import type { DashboardProductQuantity, DashboardQuantityByUnit } from '@/types'
 import { reasonLabels } from '@/lib/losses'
-import { formatChartNumber } from '@/lib/format'
+import { formatChartNumber, formatCurrency } from '@/lib/format'
 
 const props = defineProps<{
   data: {
     reason: LossReason
     lossesCount: number
+    lossValue: number
     totalsByUnit: DashboardQuantityByUnit[]
     products: DashboardProductQuantity[]
     otherProductsCount: number
@@ -40,7 +41,10 @@ function showTooltip(event: MouseEvent | FocusEvent, item: (typeof sorted.value)
     label: 'Quantidade perdida',
     value: `${item.lossesCount} ${item.lossesCount === 1 ? 'registro' : 'registros'}`,
     color,
-    details: buildDetails(item.totalsByUnit, item.products, item.otherProductsCount),
+    details: [
+      `Custo: ${formatCurrency(item.lossValue)}`,
+      ...buildDetails(item.totalsByUnit, item.products, item.otherProductsCount),
+    ],
   }
 }
 

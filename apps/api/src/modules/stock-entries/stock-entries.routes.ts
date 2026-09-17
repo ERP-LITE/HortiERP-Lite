@@ -14,6 +14,8 @@ import {
   updateStockEntryDetails,
 } from './stock-entries.service.js'
 import { deleteInvoiceFile, isPreviewableInvoiceFile, openInvoiceFile, storeInvoiceAttachment } from './invoice-storage.js'
+import { conferirNotaFiscal } from './nfe.service.js'
+import { lerXmlEnviado } from './nfe-upload.js'
 import { AppError } from '../../shared/errors/AppError.js'
 
 export async function stockEntriesRoutes(app: FastifyInstance) {
@@ -27,6 +29,18 @@ export async function stockEntriesRoutes(app: FastifyInstance) {
   app.get<{ Params: { id: string } }>('/stock-entries/:id', async (request) => {
     return getStockEntry(request.user.companyId, request.params.id)
   })
+
+  // Só lê o arquivo e devolve o que achou: nada é gravado aqui. A entrada nasce depois, quando a
+  // pessoa confere a tela e confirma, pelo mesmo POST de sempre.
+  app.post(
+    '/stock-entries/nfe',
+    // Sem papel exigido, igual ao POST que cria a entrada: quem pode lançar pode ler o XML.
+    { config: { rateLimit: { max: 20, timeWindow: '1 minute' } } },
+    async (request) => {
+      const xml = await lerXmlEnviado(await request.file())
+      return conferirNotaFiscal(request.user.companyId, xml)
+    },
+  )
 
   app.post('/stock-entries', async (request, reply) => {
     const data = createStockEntrySchema.parse(request.body)

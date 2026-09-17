@@ -1,4 +1,4 @@
-import { and, asc, count, eq, ilike, isNull, or } from 'drizzle-orm'
+import { and, asc, count, eq, getTableColumns, ilike, isNull, or } from 'drizzle-orm'
 import { orderByColumn } from '../../shared/db/sorting.js'
 import { db } from '../../db/client.js'
 import { categories, products, stockMovements, units } from '../../db/schema/index.js'
@@ -8,12 +8,19 @@ import { buildPaginatedResult } from '../../shared/db/paginate.js'
 import { softDeleteById, softDeleteManyWithActivity } from '../../shared/db/softDelete.js'
 import { recordActivity, recordActivitySafe } from '../../shared/db/recordActivity.js'
 import { LIMITES_NUMERO, LIMITES_TEXTO } from '../../shared/schemas/limits.js'
+import { pricing } from '../../shared/utils/margin.js'
 import type {
   CreateProductInput,
   ImportProductsInput,
   ListProductsQuery,
   UpdateProductInput,
 } from './products.schema.js'
+
+type ProdutoComCategoria = typeof products.$inferSelect & { categoryTargetMargin: string | null }
+
+function comPrecificacao({ categoryTargetMargin, ...produto }: ProdutoComCategoria) {
+  return { ...produto, ...pricing({ ...produto, categoryTargetMargin }) }
+}
 
 function assertUniqueName(companyId: string, name: string, excludeId?: string) {
   return assertUniqueField({
@@ -97,8 +104,9 @@ export async function listProducts(companyId: string, query: ListProductsQuery) 
 
   const [data, [{ total }]] = await Promise.all([
     db
-      .select()
+      .select({ ...getTableColumns(products), categoryTargetMargin: categories.targetMargin })
       .from(products)
+      .innerJoin(categories, eq(categories.id, products.categoryId))
       .where(where)
       .orderBy(orderBy, asc(products.name))
       .limit(query.pageSize)
@@ -106,18 +114,19 @@ export async function listProducts(companyId: string, query: ListProductsQuery) 
     db.select({ total: count() }).from(products).where(where),
   ])
 
-  return buildPaginatedResult(data, total, query.page, query.pageSize)
+  return buildPaginatedResult(data.map(comPrecificacao), total, query.page, query.pageSize)
 }
 
 export async function getProduct(companyId: string, id: string) {
   const [product] = await db
-    .select()
+    .select({ ...getTableColumns(products), categoryTargetMargin: categories.targetMargin })
     .from(products)
+    .innerJoin(categories, eq(categories.id, products.categoryId))
     .where(and(eq(products.id, id), eq(products.companyId, companyId), isNull(products.deletedAt)))
 
   if (!product) throw AppError.notFound('Produto não encontrado')
 
-  return product
+  return comPrecificacao(product)
 }
 
 export async function createProduct(companyId: string, userId: string, data: CreateProductInput) {
@@ -136,6 +145,7 @@ export async function createProduct(companyId: string, userId: string, data: Cre
       barcode: data.barcode,
       costPrice: data.costPrice?.toString(),
       salePrice: data.salePrice?.toString(),
+      targetMargin: data.targetMargin?.toString(),
       minStock: data.minStock.toString(),
       active: data.active,
       createdBy: userId,
@@ -171,6 +181,9 @@ export async function updateProduct(companyId: string, userId: string, id: strin
       // `null` limpa o campo; `?.toString()` viraria `undefined` e o Drizzle ignoraria a coluna.
       ...(data.costPrice !== undefined && { costPrice: data.costPrice === null ? null : data.costPrice.toString() }),
       ...(data.salePrice !== undefined && { salePrice: data.salePrice === null ? null : data.salePrice.toString() }),
+      ...(data.targetMargin !== undefined && {
+        targetMargin: data.targetMargin === null ? null : data.targetMargin.toString(),
+      }),
       ...(data.minStock !== undefined && { minStock: data.minStock.toString() }),
       ...(data.active !== undefined && { active: data.active }),
       updatedBy: userId,

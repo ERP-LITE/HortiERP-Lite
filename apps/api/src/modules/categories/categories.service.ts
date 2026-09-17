@@ -62,9 +62,10 @@ export async function getCategory(companyId: string, id: string) {
 export async function createCategory(companyId: string, userId: string, data: CreateCategoryInput) {
   await assertUniqueName(companyId, data.name)
 
+  const { targetMargin, ...resto } = data
   const [category] = await db
     .insert(categories)
-    .values({ ...data, companyId, createdBy: userId })
+    .values({ ...resto, targetMargin: targetMargin?.toString() ?? null, companyId, createdBy: userId })
     .returning()
 
   await recordActivitySafe({
@@ -83,9 +84,15 @@ export async function updateCategory(companyId: string, userId: string, id: stri
   await getCategory(companyId, id)
   if (data.name) await assertUniqueName(companyId, data.name, id)
 
+  const { targetMargin, ...resto } = data
   const [category] = await db
     .update(categories)
-    .set({ ...data, updatedBy: userId, updatedAt: new Date() })
+    .set({
+      ...resto,
+      ...(targetMargin !== undefined && { targetMargin: targetMargin === null ? null : targetMargin.toString() }),
+      updatedBy: userId,
+      updatedAt: new Date(),
+    })
     .where(and(eq(categories.id, id), eq(categories.companyId, companyId)))
     .returning()
 

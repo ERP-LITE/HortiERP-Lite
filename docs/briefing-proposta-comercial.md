@@ -56,6 +56,22 @@ atualizado na hora. Anexo do arquivo da nota (XML, PDF ou foto). Correção post
 fiscais (número, série, chave de acesso, data de emissão, valor, fornecedor) sem mexer no estoque já
 lançado.
 
+**Entrada pelo XML da nota.** Em vez de digitar item por item, a pessoa escolhe o XML da NF-e e o
+sistema preenche os dados da nota e a lista de itens, ligando cada item ao produto do cadastro. O que
+não reconhece fica em branco para ela escolher, e a escolha é aprendida: na nota seguinte daquele
+fornecedor aquele item entra sozinho. Quatro ressalvas obrigatórias:
+
+- **É o XML, não o DANFE em PDF nem foto da nota.** É o arquivo que o fornecedor manda por e-mail.
+  Essa confusão é a mais provável de todas e precisa estar escrita com todas as letras.
+- **Nada é gravado até a pessoa conferir e confirmar.** Ler o arquivo não cria entrada.
+- **O reconhecimento melhora com o uso.** Na primeira nota de um fornecedor novo, só casa o que tiver
+  código de barras batendo com o cadastro; o resto é escolhido uma vez e nunca mais.
+- **A data da entrada continua sendo a de hoje**, não a de emissão da nota. São coisas diferentes e o
+  sistema não sobrescreve a data do recebimento.
+- **Uma entrada é uma nota.** Os 3 anexos são arquivos da mesma nota, não três notas juntas. Se a
+  proposta citar "até 3 anexos", precisa vir com essa frase junto, senão o cliente entende que lança
+  a semana inteira numa entrada só.
+
 **Perdas.** Registro com motivo (vencido, avariado, roubo/furto, erro operacional, outro). Sai do
 estoque na hora e guarda o valor do momento. Motivo e observação podem ser corrigidos; quantidade ou
 produto errados exigem cancelar a perda — a quantidade volta ao estoque sozinha, a perda sai dos
@@ -77,6 +93,50 @@ de confirmar (o que vai entrar, o que vai ser criado, o que está sem custo) e
 recusa total se qualquer linha tiver problema (não importa metade). Produto sem custo preenchido
 aparece valendo R$ 0,00 nos relatórios até o valor ser informado, e o sistema avisa antes de
 confirmar.
+
+**Quebra em percentual.** O painel mostra quanto do que entrou na loja virou perda no período, em
+percentual, com uma meta de 5% desenhada ao lado. É o indicador que responde "estou perdendo mais do
+que deveria?", que nenhum valor em reais responde sozinho. Três ressalvas que precisam ser ditas:
+
+- **A conta é sobre o custo do que entrou, não sobre faturamento.** O sistema não registra venda.
+  Quem estiver acostumado com o índice de quebra sobre venda vai ver um número maior aqui, e a
+  proposta precisa explicar isso antes de o cliente estranhar.
+- **A meta de 5% é a mesma recomendação de 3% sobre faturamento do setor, convertida para custo.**
+  Não é meta que a loja configura. Se o cliente pedir meta própria, é desenvolvimento, não ajuste.
+- **Sem entrada lançada no período o indicador não calcula** e mostra um traço. Depende de a loja
+  lançar as entradas, o que é argumento de implantação e não ressalva escondida.
+
+**Margem e preço sugerido.** A categoria recebe uma margem alvo e todo produto dela herda, com o
+produto podendo ter a sua. A tela de Produtos passa a mostrar a margem que cada item entrega hoje,
+destacando quem está vendendo com prejuízo ou abaixo do alvo, e sugere por quanto vender para chegar
+na margem pretendida. Quatro ressalvas:
+
+- **A margem é sobre o preço de venda, não sobre o custo.** É a conta que o setor usa. Quem espera
+  markup vai achar o preço sugerido alto, e a diferença é grande: custo de R$ 10 com 40% vira
+  R$ 16,67, não R$ 14,00.
+- **Depende de o custo estar preenchido.** Sem custo não há preço sugerido, do mesmo jeito que não há
+  valor de estoque. É argumento de implantação.
+- **O sistema sugere, não remarca.** Não existe aplicar o preço sugerido em massa nem histórico de
+  preço. Quem muda o preço de venda é a pessoa, produto por produto.
+- **A importação por planilha não traz margem alvo.** Produto importado herda a da categoria.
+
+**Contagem de estoque pelo celular.** A loja abre uma contagem (loja toda ou uma categoria), sai
+conferindo a mercadoria com o celular na mão e no fim recebe o relatório do que sobrou, do que faltou
+e de quanto isso vale em reais. É o que revela a quebra que ninguém registrou, aquela que não passa
+pela tela de Perdas. Cinco pontos que precisam estar na proposta:
+
+- **A contagem é cega.** O sistema não mostra o saldo que ele tem enquanto a pessoa conta. É de
+  propósito, e é o que faz a contagem encontrar alguma coisa: quem vê o número na tela acaba
+  confirmando ele. O saldo e a diferença aparecem depois, no relatório. Diga isso antes de o cliente
+  achar que é falta de informação.
+- **Nada muda no estoque antes de alguém confirmar.** O caminho é contar, conferir a diferença e só
+  então aplicar. Dá para voltar a contar ou cancelar sem tocar no estoque.
+- **Produto não contado não é zerado.** Quem contou só uma banca não corre risco de zerar o resto.
+- **Uma contagem aberta por vez, por loja.** Não é limite de plano, é para duas contagens não
+  desfazerem o ajuste uma da outra. Duas pessoas podem contar seções diferentes na mesma contagem, ao
+  mesmo tempo.
+- **Qualquer usuário conta; encerrar é de administrador ou gerente.** Aplicar a contagem mexe no
+  saldo, então segue a mesma regra do ajuste.
 
 **Painel e relatórios.** Painel com produtos em estoque baixo, valor parado em estoque, valor perdido
 no período e maiores perdas — os mesmos produtos em estoque baixo que o sino resume no alto da tela. Relatórios de entradas, de perdas e de estoque por categoria, por
@@ -130,8 +190,8 @@ histórico das ações dele sem depender de pedir para ninguém.
 
 | Papel | Pode |
 |---|---|
-| Operador | lançar entrada de mercadoria e perda |
-| Gerente | o do operador, mais cadastrar produto, categoria e unidade, corrigir e cancelar perda, corrigir dados da nota e ajustar estoque |
+| Operador | lançar entrada de mercadoria e perda, e contar na contagem de estoque |
+| Gerente | o do operador, mais cadastrar produto, categoria e unidade, corrigir e cancelar perda, corrigir dados da nota, ajustar estoque e abrir/encerrar contagem |
 | Administrador | tudo do gerente, mais gerenciar usuários e ver o histórico de atividades |
 
 Os três **veem as mesmas informações do negócio** — painel, estoque, relatórios e o sino de aviso de
@@ -225,8 +285,6 @@ Não existe hoje, nem como "em breve":
 - Autenticação em dois fatores ou código por SMS
 - Plano documentado de resposta a incidente de segurança
 - Integração com balança ou maquininha de cartão
-- Leitura automática da nota fiscal (o arquivo é guardado; os produtos não entram sozinhos a partir
-  dele)
 - Caixa (PDV), cupom fiscal, nota fiscal eletrônica de venda
 - Controle de vendas, contas a pagar ou a receber
 - Aplicativo instalável — é um site, aberto pelo navegador do celular ou do computador
@@ -287,6 +345,13 @@ Falta o que entrou depois. Para revisar a proposta atual, é isto:
    redação, que precisa citar a ressalva da tela de Estoque.
 3. O sino de aviso de estoque baixo em todas as telas, com as duas ressalvas da seção 2 (é aviso
    dentro do sistema, e depende do estoque mínimo estar cadastrado).
+10. A margem e o preço sugerido, com as quatro ressalvas da seção 2. Junto com a quebra, fecha o par
+    que a proposta pode usar: um diz quanto a loja perde, o outro quanto ela ganha.
+11. A quebra em percentual no painel, com as três ressalvas da seção 2. Este é o item que mais muda a
+    proposta: ele dá um argumento de retorno que os outros não davam. Numa loja que fatura R$ 100 mil
+    por mês, um ponto percentual de quebra vale R$ 1.000, então a mensalidade se paga com um décimo
+    de ponto evitado. A conta pode entrar na proposta, desde que apresentada como ordem de grandeza e
+    não como promessa de economia.
 
 **Acrescentar na lista de segurança:**
 
@@ -341,3 +406,60 @@ Duas coisas na proposta **precisam** ser revistas por causa disso, e nenhuma é 
 1. A **segunda transferência internacional** (Resend), descrita na seção 5. Diferente do backup, aqui não há
    criptografia que proteja o dado do provedor.
 2. Qualquer frase da proposta em vigor que diga que o sistema **não envia e-mail**. Ver seção 6.
+
+## 12. Verificação de 17/09/2026
+
+Entrou a quebra em percentual no painel, conferida no código nesta data. O divisor é o custo das
+entradas do período, a meta é fixa em 5% e período sem entrada mostra traço em vez de zero. A conta e
+o porquê da meta estão em
+[decisoes-arquiteturais.md](./decisoes-arquiteturais.md#quebra-em-percentual-o-divisor-é-o-que-entrou-não-a-venda).
+
+Nenhum número da seção 3 mudou, nenhuma coluna nova foi criada no banco e nada saiu da seção 6.
+Continua valendo que o sistema **não guarda data de validade nem lote**, e a palavra "quebra" não pode
+ser usada como se o sistema soubesse a causa: ele sabe o motivo que o operador escolheu ao lançar a
+perda, que é coisa diferente.
+
+## 13. Verificação de 17/09/2026 (margem)
+
+Entrou a margem alvo em dois níveis, com preço sugerido, conferida no código nesta data. Margem é
+sobre o preço de venda; o teto é 99,99%; produto sem margem própria herda a da categoria; e nada é
+guardado, tudo é calculado na consulta. Ver
+[decisoes-arquiteturais.md](./decisoes-arquiteturais.md#margem-alvo-em-dois-níveis-e-sempre-sobre-a-venda).
+
+Duas linhas da seção 3 mudaram de contexto, mas nenhum número: margem alvo aceita de 0 a 99,99 e usa
+duas casas decimais. Nada saiu da seção 6, e uma coisa precisa **entrar** na conversa de venda com
+cuidado: o sistema continua sem registrar venda. Margem sugerida não é controle de preço de venda, e
+prometer "gestão de preços" seria vender o que não existe.
+
+## 14. Verificação de 17/09/2026 (leitura do XML)
+
+Entrou a leitura do XML da NF-e na entrada de mercadoria, conferida no código nesta data. A rota de
+leitura não grava nada, o casamento é por código de barras e depois pelo de para aprendido, e o
+vínculo é gravado ao confirmar a entrada. Ver
+[decisoes-arquiteturais.md](./decisoes-arquiteturais.md#leitura-do-xml-da-nota-duas-camadas-para-casar-o-produto).
+
+**A seção 6 encolheu.** "Leitura automática da nota fiscal" saiu da lista do que não prometer, porque
+agora existe. Ao revisar a proposta, confira se a versão em vigor tem alguma frase dizendo que o
+arquivo é só guardado: essa frase virou mentira e precisa sair.
+
+Nenhum número da seção 3 mudou. Continua valendo que o sistema **não emite** nota fiscal: ele lê a
+nota que o fornecedor emitiu. A diferença entre ler e emitir precisa estar clara na proposta, senão o
+cliente entende que ganhou emissão de NF-e.
+
+## 15. Verificação de 17/09/2026 (contagem de estoque)
+
+Entrou a contagem de estoque, conferida no código nesta data. Contagem cega enquanto está em
+andamento, etapa de conferência antes de aplicar, uma contagem aberta por empresa, produto não
+contado sem ajuste e relatório congelado no encerramento. Ver
+[decisoes-arquiteturais.md](./decisoes-arquiteturais.md#contagem-de-estoque-por-que-ela-é-cega-e-por-que-só-uma-por-vez).
+
+**A seção 4 mudou:** o operador agora tem uma atribuição a mais, contar. O que ele não pode continua
+sendo encerrar.
+
+A seção 3 não ganhou número novo: a contagem não tem limite de produtos nem de vezes por mês. Se
+alguém perguntar, a resposta é que não existe limite, e não um número inventado.
+
+**Cuidado com o encadeamento na conversa de venda.** A contagem torna o percentual de quebra do
+painel mais verdadeiro, porque expõe a perda que ninguém registra. Isso é argumento forte e honesto.
+O que **não** pode ser dito é que o sistema reduz a quebra: ele mede, e quem reduz é a operação da
+loja.

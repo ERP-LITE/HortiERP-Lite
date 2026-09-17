@@ -6,6 +6,8 @@
       <div v-for="item in 4" :key="item" class="h-28 rounded-xl bg-gray-200 dark:bg-gray-700" />
     </div>
 
+    <div class="mb-6 h-40 rounded-xl bg-gray-200 dark:bg-gray-700 sm:h-32" />
+
     <div class="mb-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
       <div class="h-80 rounded-xl bg-gray-200 dark:bg-gray-700 lg:col-span-2" />
       <div class="h-80 rounded-xl bg-gray-200 dark:bg-gray-700" />

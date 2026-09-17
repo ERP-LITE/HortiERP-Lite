@@ -89,6 +89,16 @@ const router = createRouter({
       component: () => import('@/modules/estoque/StockView.vue'),
     },
     {
+      path: '/contagem',
+      name: 'contagem',
+      component: () => import('@/modules/contagem/StockCountsView.vue'),
+    },
+    {
+      path: '/contagem/:id',
+      name: 'contagem-sessao',
+      component: () => import('@/modules/contagem/StockCountSessionView.vue'),
+    },
+    {
       path: '/estoque/movimentacoes',
       name: 'movimentacoes',
       component: () => import('@/modules/estoque/StockMovementsView.vue'),

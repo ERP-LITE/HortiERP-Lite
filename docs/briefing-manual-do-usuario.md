@@ -161,8 +161,8 @@ cliente comparar a tela do estoquista com a do gerente e notar a diferença, é 
 Itens do menu lateral, na ordem em que aparecem:
 
 **Dashboard** · **Produtos** · **Categorias** · **Unidades** · **Entradas** · **Estoque** ·
-**Perdas** · **Relatórios** · **Usuários** (só administrador) · **Logs de atividades** (só
-administrador).
+**Contagem** · **Perdas** · **Relatórios** · **Usuários** (só administrador) · **Logs de atividades**
+(só administrador).
 
 Dentro de **Estoque** existe também a tela de **Movimentações**, o histórico completo.
 
@@ -202,6 +202,13 @@ Use estes nomes, em negrito, exatamente como estão. Não invente variação nem
 | Registrar perda | **Registrar perda** (não "Nova perda") |
 | Cancelar uma perda | **Cancelar perda** |
 | Conferência de estoque em lote | **Ajuste em lote** |
+| Abrir uma contagem de estoque | **Iniciar contagem** |
+| Voltar a uma contagem já começada | **Continuar contagem** |
+| Ver a diferença da contagem | **Conferir contagem** |
+| Aplicar a contagem no estoque | **Ajustar estoque** |
+| Desfazer a conferência e contar de novo | **Voltar a contar** |
+| Desistir da contagem | **Cancelar contagem** |
+| Abrir uma contagem do histórico | ícone de **olho** na coluna de ações |
 | Criar usuário | **Novo usuário** |
 | Filtro de estoque baixo | **Somente estoque baixo** |
 | Sino de alertas: dica do botão | **Alertas: nada pendente** / **N alertas** |
@@ -364,8 +371,20 @@ cliente**, não copie.
   quem segue o capítulo 1 e cadastra os produtos antes de lançar o estoque vai ver **o catálogo
   inteiro** acusado como estoque baixo. Isso é normal e se resolve no passo do estoque inicial. O
   manual precisa avisar antes, senão o cliente liga achando que o sistema está errado.
-- **Custo** é o que alimenta o "valor em estoque" do painel e o valor das perdas. Produto sem custo
-  entra nas contas valendo zero — outro **Atenção** importante.
+- **Custo** é o que alimenta o "valor em estoque" do painel, o valor das perdas e o preço sugerido.
+  Produto sem custo entra nas contas valendo zero, outro **Atenção** importante.
+- **Margem alvo e coluna Margem.** A coluna mostra a margem que o preço de venda atual entrega, em
+  vermelho quando o produto está sendo vendido abaixo do custo e em âmbar quando está abaixo do alvo.
+  Embaixo dela aparece "sugerido R$ X" quando o preço praticado difere do que entregaria a margem
+  pretendida. Quatro coisas precisam estar escritas no manual, porque são exatamente as que geram
+  ligação para o suporte:
+    - **A margem é sobre o preço de venda, não sobre o custo.** Custo de R$ 10 com margem alvo de 40%
+      sugere vender a R$ 16,67. Quem esperava R$ 14,00 estava pensando em markup, que é outra conta.
+    - **Margem alvo em branco no produto significa herdar a da categoria**, não "sem margem". É assim
+      de propósito: define-se uma vez por grupo e só se preenche o produto que foge da regra.
+    - **O sistema sugere, não muda preço.** Nada é remarcado sozinho, e não existe botão de aplicar a
+      sugestão em todos os produtos.
+    - **Sem custo preenchido não há sugestão**, e a coluna mostra um traço.
 - O filtro da tela de produtos tem **categoria, unidade e situação**. Vale citar a unidade: é como
   responder "quais produtos eu vendo por quilo?" sem olhar linha por linha.
 - **A busca da tela de Produtos procura por nome, por SKU e por código de barras**, e o próprio campo
@@ -376,6 +395,9 @@ cliente**, não copie.
   produto tiver o código de barras preenchido, o que também pode vir pela importação de planilha.
 - **Produto também pode ser inativado**, com a mesma lógica de categoria e unidade da seção 7.2: sai
   das listas de escolha e dos números do painel, e o histórico dele continua intacto.
+
+A margem alvo da categoria fica na própria tela de **Categorias**, no cadastro. É o lugar de dizer,
+de uma vez, que folhagem trabalha com uma margem e fruta com outra.
 
 ### 7.4 Importar produtos por planilha
 
@@ -389,6 +411,9 @@ carregamento do cadastro. Limite de **2000 linhas** por vez.
   `unidade`, `codigo`, `codigo de barras`, `custo`, `preco de venda`, `estoque minimo`,
   `estoque atual`, `ativo`. Só **nome, categoria e unidade** são obrigatórias; as outras podem ficar
   em branco.
+- **A planilha não tem coluna de margem alvo.** Produto importado fica sem margem própria e herda a
+  da categoria, que é o comportamento desejado na carga inicial. Quem quiser margem diferente ajusta
+  depois, produto por produto.
 - Um cuidado de vocabulário: a coluna `codigo` é o mesmo campo que o cadastro do produto chama de
   **SKU** (código interno). No modelo a palavra "SKU" não aparece, então explique a equivalência em
   vez de trocar o nome da coluna.
@@ -424,6 +449,30 @@ carregamento do cadastro. Limite de **2000 linhas** por vez.
 
 Tela **Entradas** → botão **Nova entrada**. Qualquer perfil pode lançar.
 
+**O caminho curto é começar pelo XML da nota**, e ele merece vir primeiro no capítulo, antes da
+digitação manual. No alto da tela tem **Selecionar XML da NF-e**: o sistema lê o arquivo, preenche os
+dados da nota e monta a lista de itens já ligando cada um ao produto do cadastro. Cinco coisas
+precisam estar escritas, porque são as que geram dúvida:
+
+- **É o arquivo XML, não o PDF do DANFE nem foto da nota.** É o anexo que o fornecedor manda por
+  e-mail. Essa é a confusão mais provável do recurso inteiro e precisa aparecer em negrito.
+- **Nada é salvo ao ler o arquivo.** A entrada só existe depois de conferir e clicar em registrar.
+- **O que o sistema não reconhecer fica em branco**, com a descrição da nota logo acima
+  (`Na nota: TOMATE ITALIANO · KG`) para a pessoa saber o que está escolhendo. Escolher uma vez
+  basta: na próxima nota daquele fornecedor aquele item entra sozinho. Vale dizer isso com essas
+  palavras, porque é o que convence a pessoa a não desistir na primeira nota.
+- **Na primeira nota de um fornecedor novo, muita coisa vem em branco.** Só casa sozinho o que tiver
+  código de barras igual ao do cadastro do produto. Isso é o esperado, não é defeito.
+- **A data da entrada continua sendo hoje.** O sistema preenche a data de *emissão* da nota, que é
+  outro campo. Se a mercadoria chegou ontem, a data da entrada é trocada à mão como sempre.
+
+O XML escolhido já entra como anexo da entrada, então não precisa selecionar o mesmo arquivo de novo
+lá embaixo.
+
+**Uma entrada é uma nota só.** Duas notas viram duas entradas. Se a pessoa ler um segundo XML na
+mesma tela, o sistema pergunta antes de trocar os itens, porque a lista é substituída, não somada.
+Vale explicar no manual, porque a pergunta na tela assusta quem esperava que os itens se juntassem.
+
 Uma entrada tem:
 
 - **Cabeçalho:** **data da entrada**, fornecedor (texto livre) e observações. A data vem preenchida
@@ -438,11 +487,17 @@ Uma entrada tem:
   itens na mesma entrada. Na listagem, a coluna **Itens** mostra quantos produtos a entrada tem
   (`12 itens`) e o clique abre uma janelinha com a relação, produto e quantidade, para uma nota
   grande não esticar a tabela. Impresso, sai a relação inteira.
-- **Anexos:** até **3 arquivos** por entrada, em XML, PDF, JPG, PNG ou WEBP, até 10 MB cada. Arquivo
+- **Anexos:** até **3 arquivos** por entrada, em XML, PDF, JPG, PNG ou WEBP, até 10 MB cada. **São
+  três arquivos da mesma nota**, não três notas: o XML, o PDF do DANFE e uma foto do canhoto, por
+  exemplo. Esse é o ponto que mais confunde, porque "3 arquivos" é lido como "3 notas". Recebeu três
+  notas no mesmo dia? São três entradas, uma para cada, porque número, série e chave de acesso são um
+  valor só por entrada. A própria tela diz isso agora, e o manual precisa repetir. Arquivo
   acima do limite é recusado na hora, com o nome do arquivo e o tamanho dele na mensagem, e **a
   entrada não é salva enquanto o arquivo recusado estiver selecionado**. Isso é de propósito: antes
   dava para salvar a entrada e o anexo ficava para trás sem ninguém perceber. Quem precisa lançar
-  logo pode tirar o arquivo da seleção, salvar, e anexar depois pela tela de detalhes.
+  logo pode tirar o arquivo da seleção pela **lixeirinha ao lado do nome**, salvar, e anexar depois
+  pela tela de detalhes. Vale dizer também que **escolher arquivo de novo soma à lista** em vez de
+  trocar: é assim para o XML lido lá em cima não sumir quando a pessoa anexa o PDF da nota depois.
 - **Situação da nota na listagem:** a coluna **Nota fiscal** tem três respostas. **Anexada** (o
   arquivo está guardado), **Sem arquivo** (os dados da nota foram digitados, mas o arquivo não subiu)
   e **Sem nota**. Vale explicar as três, porque "Sem arquivo" é exatamente a lista do que o pessoal
@@ -552,6 +607,73 @@ Deixe claro no manual que **ajuste não substitui entrada nem perda**: é para c
 contagem. Mercadoria que chegou se lança em Entradas; mercadoria que estragou, em Perdas. Se o ajuste
 virar o atalho para tudo, o cliente perde o histórico de por que o estoque mudou.
 
+### 7.9-A Contagem de estoque (balanço)
+
+Menu **Contagem**. Esta é a novidade que mais muda a rotina da loja, e ela merece **capítulo próprio
+e generoso**, não um parágrafo. A maior parte do trabalho do manual aqui é explicar *por que* ela é
+diferente do ajuste, senão o cliente vai continuar usando o ajuste em lote e não vai entender para
+que serve a tela nova.
+
+**A diferença, em uma frase:** o ajuste conserta o produto que a pessoa já sabe que está errado; a
+contagem descobre o que está errado sem ninguém saber. Escreva isso cedo no capítulo.
+
+**Por que isso importa para o dono da loja:** a tela de Perdas mede só o que alguém digitou. A parte
+da quebra que ninguém registra (caiu no chão, o cliente estragou, a balança pesou errado, sumiu) não
+aparece em lugar nenhum do sistema. Ela só aparece contando. Vale dizer com todas as letras: sem
+contagem, o percentual de quebra do painel mostra menos perda do que a loja realmente tem.
+
+Como funciona, na ordem:
+
+1. Administrador ou gerente clica em **Iniciar contagem** e escolhe entre **Loja toda** ou uma
+   categoria só. Dá para escrever uma observação (ex.: "balanço do primeiro semestre").
+2. **Só existe uma contagem aberta por vez** em cada loja. Enquanto ela não for encerrada ou
+   cancelada, o botão de iniciar fica desligado, e aparece um aviso no topo com o botão **Continuar
+   contagem**. Explique isso: é a dúvida número um.
+3. A lista já vem pronta, produto por produto, agrupada por categoria. **Não** é preciso procurar
+   cada item numa lista, como no ajuste em lote.
+4. **Qualquer usuário conta**, inclusive o operador. Só quem é administrador ou gerente encerra.
+5. Cada quantidade digitada é **salva sozinha**, na hora. Dá para bloquear a tela, perder o sinal no
+   fundo da loja, atender um fornecedor e voltar depois de onde parou. Duas pessoas podem contar
+   seções diferentes ao mesmo tempo, na mesma contagem.
+6. Terminado, **Conferir contagem**. Aí, e só aí, o sistema mostra a diferença. O estoque **ainda não
+   muda** nesse passo, e vale repetir isso no manual.
+7. Com o relatório na tela, três saídas: **Ajustar estoque** (aplica), **Voltar a contar** (para
+   recontar o que ficou estranho) ou **Cancelar contagem** (não mexe em nada).
+
+**O ponto que mais precisa de explicação: a tela não mostra quanto o sistema acha que tem.** O campo
+vem vazio de propósito. Não é falta de informação nem defeito, é o que faz a contagem valer alguma
+coisa: quem vê "18" escrito na tela olha a banca, acha que parece uns 18 e digita 18, e aí a
+contagem não descobriu nada. Escreva isso de forma simpática, porque a primeira reação de todo mundo
+é achar que é um erro do sistema.
+
+**Produto que ninguém contou não é zerado.** Ele fica de fora do ajuste e aparece no relatório como
+não contado. Diga isso com clareza: é o medo que impede o cliente de experimentar a tela.
+
+O relatório mostra, por produto: o que o sistema tinha, o que foi contado, a diferença e quanto isso
+vale em reais. No topo, quatro números: produtos contados, produtos com divergência, quanto faltou em
+reais e o saldo final. **Falta aparece em vermelho e sobra em amarelo**, não em verde: achar mais do
+que o sistema tinha também é sinal de lançamento errado, não de lucro. Esse é um detalhe que vale
+explicar, senão o amarelo confunde.
+
+Produto que ninguém contou aparece com **"Não contado"** e um traço nas outras colunas. Vale uma
+linha: o traço não é erro de tela, é a forma de dizer que aquele produto não foi conferido, então não
+existe diferença para mostrar.
+
+Use o filtro **Só divergências** para ir direto ao que não bateu. Numa contagem da loja toda, a
+lista completa é longa e a maior parte dela bateu ou nem foi contada. Esse é o atalho que faz a
+conferência caber em poucos minutos, e o manual deveria ensiná-lo junto com o relatório.
+
+Contagens antigas ficam no histórico do menu **Contagem** e abrem pelo **ícone de olho**. O relatório
+de uma contagem encerrada **não muda mais**: mesmo que o preço de custo ou o estoque do produto mude
+depois, os números daquele dia continuam os mesmos. Diga isso, porque é o que permite comparar uma
+contagem com a do mês anterior.
+
+O ajuste gerado pela contagem entra no histórico de **Movimentações** como ajuste normal, junto com o
+usuário que encerrou.
+
+Sugira no manual uma rotina: contagem da loja toda uma vez por mês, e das categorias que mais somem
+(folhas, frutas de caroço) toda semana. Não invente número diferente desse sem conferir.
+
 ### 7.10 Painel (Dashboard)
 
 Mostra, para o período escolhido:
@@ -559,6 +681,7 @@ Mostra, para o período escolhido:
 - Total de produtos ativos e quantos estão com estoque baixo.
 - **Valor em estoque**: soma de quantidade × custo de cada produto.
 - **Valor perdido no período**.
+- **Quebra no período em percentual**, explicada logo abaixo.
 - Gráfico diário de entradas, perdas e ajustes.
 - **Produtos por categoria** e **perdas por motivo**.
 - As 10 movimentações mais recentes do período.
@@ -569,6 +692,8 @@ Duas coisas que geram dúvida e precisam de explicação:
   nada, então cada total aparece **separado por unidade**. É por isso que o gráfico de categorias
   mostra *quantos produtos* a categoria tem, e não "quanto tem em estoque" — e as quantidades por
   unidade aparecem ao passar o mouse.
+- Em **perdas por motivo**, passar o mouse mostra também o **custo** de cada motivo, em reais. É o
+  detalhe que diz qual motivo dói no bolso, que nem sempre é o que tem mais registros.
 - Nos detalhamentos, o sistema mostra os **5 maiores** de cada grupo e informa quantos ficaram de
   fora. Não é limite de cadastro, é para o gráfico continuar legível.
 - Produto sem saldo **conta** na quantidade de produtos da categoria, mas não aparece nas quantidades.
@@ -576,6 +701,21 @@ Duas coisas que geram dúvida e precisam de explicação:
 
 - A **contagem** de produtos com estoque baixo é completa, mas a **lista** que aparece embaixo mostra
   no máximo **10 produtos**. Vale uma frase, no mesmo espírito da observação sobre os "5 maiores".
+
+**A quebra em percentual** é o indicador que o manual mais precisa explicar, porque o número tem uma
+regra que não é óbvia:
+
+- A conta é **valor perdido dividido pelo custo do que entrou** no período. Não é percentual de
+  faturamento: o sistema não registra venda, então não teria como calcular sobre ela.
+- A **meta de 5%** desenhada na barra equivale aos 3% sobre faturamento que se lê no setor,
+  convertidos para custo. A tela diz isso em uma linha, e o manual precisa repetir, senão o dono
+  compara com o 3% que ouviu do contador e acha que o sistema está errado.
+- **Sem entrada de mercadoria no período, aparece `--` e não 0%.** Zero por cento diria que não houve
+  quebra; o traço diz que não há sobre o que calcular. Acontece no mês em que a loja lançou perda mas
+  não lançou nenhuma entrada.
+- O percentual muda quando a **nota é lançada**, não quando a mercadoria chega. Loja que acumula
+  lançamento para o fim da semana vai ver o indicador oscilar por causa disso, e não por causa da
+  quebra.
 
 **Período:** o padrão são os últimos 30 dias e o máximo é **90 dias** por consulta. Um detalhe que
 precisa estar no manual: o painel **corta em silêncio** — pedir seis meses devolve os últimos 90 dias

@@ -1,11 +1,13 @@
 import { api } from './api'
 import { fetchAllPages } from './paginatedOptions'
-import type { PaginatedResult, StockEntry, StockEntryAttachment, StockEntrySummary } from '@/types'
+import type { NotaFiscalLida, PaginatedResult, StockEntry, StockEntryAttachment, StockEntrySummary } from '@/types'
 
 export interface StockEntryItemInput {
   productId: string
   quantity: number
   unitCost?: number
+  /** Só quando a entrada nasceu de um XML: ensina o "de para" daquele fornecedor. */
+  supplierCode?: string
 }
 
 export interface StockEntryInput {
@@ -17,6 +19,7 @@ export interface StockEntryInput {
   invoiceAccessKey?: string
   invoiceIssuedAt?: string
   invoiceTotal?: number
+  supplierDocument?: string
   items: StockEntryItemInput[]
 }
 
@@ -51,6 +54,14 @@ export function listAllStockEntries(params: Omit<ListStockEntriesParams, 'page' 
 
 export async function createStockEntry(payload: StockEntryInput) {
   const { data } = await api.post<StockEntry>('/stock-entries', payload)
+  return data
+}
+
+/** Só lê o arquivo e devolve o que achou; nada é gravado antes de a pessoa confirmar a entrada. */
+export async function readInvoiceXml(file: File) {
+  const formData = new FormData()
+  formData.append('file', file)
+  const { data } = await api.post<NotaFiscalLida>('/stock-entries/nfe', formData)
   return data
 }
 

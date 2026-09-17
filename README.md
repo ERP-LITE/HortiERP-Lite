@@ -2,6 +2,10 @@
 
 Sistema web modular para controle de estoque, entradas de mercadorias, notas fiscais vinculadas e perdas voltado para hortifrutis, frutarias, verdureiras, sacolões e pequenos mercados.
 
+A entrada de mercadoria pode começar pelo **XML da NF-e**: o sistema lê o arquivo, preenche os dados da nota e liga cada item ao produto do cadastro, pelo código de barras ou pelo vínculo aprendido com aquele fornecedor. O painel mostra a **quebra em percentual** sobre o custo que entrou, e a tela de produtos mostra a **margem praticada** e o preço que entregaria a margem alvo da categoria.
+
+A **contagem de estoque** fecha o ciclo: a loja confere a mercadoria pelo celular, produto a produto, sem ver o saldo que o sistema tem, e no fim recebe o relatório do que sobrou, do que faltou e de quanto isso vale. É o que revela a quebra que ninguém registrou.
+
 Multiempresa: cada empresa-cliente tem seus dados totalmente isolados (produtos, estoque, entradas, perdas, usuários).
 
 Uma empresa entra no sistema por dois caminhos. Ela mesma se cadastra pela tela pública `/criar-conta`, escolhendo o plano e começando por um período de teste de 15 dias, ou o `super_admin` a cadastra pela tela `/empresas`. Os dois caminhos usam os mesmos campos e as mesmas regras, e criam empresa e primeiro administrador numa operação só. Terminado o teste sem assinatura, o acesso é bloqueado e os dados permanecem intactos.

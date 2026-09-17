@@ -5,6 +5,7 @@ import { fetchAllPages } from './paginatedOptions'
 export interface CategoryInput {
   name: string
   description?: string
+  targetMargin?: number | null
   active?: boolean
 }
 

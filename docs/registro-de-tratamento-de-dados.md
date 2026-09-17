@@ -85,6 +85,7 @@ digitou, e a correção depende de contato com o suporte até a confirmação po
 |---|---|---|
 | Nome do fornecedor (texto livre) | `stock_entries.supplier_name` | digitado pelo operador da loja; **pode ser nome de pessoa física**, como produtor rural |
 | Nota fiscal anexada (XML ou PDF) | disco do servidor + `stock_entry_attachments` | o XML de NF-e traz CNPJ ou CPF, endereço e às vezes nome do emitente |
+| Documento do emitente da nota | `supplier_product_codes.supplier_document` | **desde 17/09/2026.** É o CNPJ ou CPF de quem emitiu a nota, lido do XML e guardado em coluna própria para reconhecer o fornecedor na próxima nota. Antes existia só dentro do arquivo anexado; agora é dado estruturado e consultável. **Pode ser CPF** quando o fornecedor é pessoa física, como produtor rural. A entrada em si não guarda o documento: ele chega no pedido, serve para gravar o vínculo e não vira coluna de `stock_entries` |
 
 São dados que o **controlador** coletou de terceiros no curso normal da atividade comercial, e que
 compõem documento fiscal. Ficam sujeitos ao prazo de guarda fiscal, não ao critério do sistema.
@@ -105,9 +106,11 @@ Declarar isto é tão importante quanto o inventário, porque muda o enquadramen
 - **Nenhum corpo de requisição vai para o log.** Verificado no código: o registro guarda método,
   rota, situação, duração, IP e navegador — nunca o conteúdo enviado. É por isso que **senha nunca
   aparece em log**, que é um dos vazamentos mais comuns em auditoria.
-- **Nenhum envio de e-mail.** Não existe biblioteca de envio no projeto. Não há e-mail de
-  boas-vindas, de recuperação de senha nem de notificação — logo, nenhum dado pessoal trafega por
-  esse caminho.
+- **Um único e-mail, e só ele.** O sistema manda o e-mail de **redefinição de senha** e mais nada:
+  não há boas-vindas, aviso de estoque, cobrança nem notificação. O que trafega está declarado na
+  seção 4 (nome e endereço do destinatário, via Resend). Esta linha dizia "nenhum envio de e-mail" e
+  ficou falsa quando a recuperação de senha entrou; a seção 4 já estava certa, e as duas agora
+  dizem a mesma coisa.
 - **A consulta de CEP não envia dado pessoal.** O frontend chama BrasilAPI, ViaCEP ou OpenCEP com
   **apenas os oito dígitos do CEP**, sem nome, sem identificador e sem credencial.
 
@@ -296,6 +299,9 @@ encarregado, desde que exista canal de contato com o titular.
 
 | Data | O que mudou |
 |---|---|
+| 17/09/2026 | Contagem de estoque. As duas tabelas novas (`stock_counts`, `stock_count_items`) guardam apenas identificador de usuário na auditoria já prevista (`created_by`, `updated_by`, `counted_by`), que é a mesma categoria da seção 2.1. **Nenhuma categoria de dado nova, nenhum prazo alterado, nenhum dado de terceiro.** O motivo do cancelamento é texto livre digitado pelo operador da loja, com a mesma ressalva dos demais campos livres do sistema |
+| 17/09/2026 | Leitura do XML da nota fiscal. O **documento do emitente** (CNPJ ou CPF) passou a ser guardado em coluna própria (`supplier_product_codes.supplier_document`), para reconhecer o fornecedor na nota seguinte. Não é categoria nova: o mesmo dado já vinha dentro do XML anexado desde o início, e continua sob prazo de guarda fiscal. O que mudou é que virou dado estruturado, então entrou no inventário da seção 2.3 |
+| 17/09/2026 | Corrigida uma contradição da seção 2.4, que negava envio de e-mail enquanto a seção 4 declarava a Resend. A seção 4 estava certa; a negação vinha de antes da recuperação de senha existir |
 | 17/09/2026 | Aceite do aviso de privacidade passou a ser registrado com data e hora (`companies.privacy_accepted_at`) no cadastro público |
 | 17/09/2026 | Cadastro público de empresa (`POST /signup`) e período de teste. A coleta dos dados da empresa e do contato passou a poder ser **direta com o titular**, e não só pelo fornecedor. Nenhuma categoria de dado nova, nenhum prazo alterado. Lacuna aberta: cadastro sem confirmação de e-mail (seção 9) |
 | 25/08/2026 | Aviso de privacidade revisado **só na pontuação** (travessões trocados por ponto, dois-pontos ou parêntese). Nenhuma finalidade, prazo, base legal ou direito mudou. A data de "atualizado em" acompanhou o texto porque o verificador de integridade do aviso exige isso: ele compara o resumo do texto com a data, para o leitor nunca ver texto novo com data velha |

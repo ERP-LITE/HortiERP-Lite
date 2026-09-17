@@ -16,6 +16,8 @@ import { useFilterModal } from '@/composables/useFilterModal'
 import DonutChart from '@/components/charts/DonutChart.vue'
 import MovementsTrendChart from '@/components/charts/MovementsTrendChart.vue'
 import LossesByReasonChart from '@/components/charts/LossesByReasonChart.vue'
+import DashboardPanel from '@/components/dashboard/DashboardPanel.vue'
+import ShrinkageCard from '@/components/dashboard/ShrinkageCard.vue'
 import DashboardSkeleton from './DashboardSkeleton.vue'
 import { fetchDashboardSummary } from '@/services/dashboardService'
 import type { DashboardSummary, MovementType } from '@/types'
@@ -97,24 +99,18 @@ onMounted(loadSummary)
         />
       </div>
 
+      <div class="mb-6">
+        <ShrinkageCard :data="summary.shrinkage" />
+      </div>
+
       <div class="print:hidden grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-        <div
-          class="lg:col-span-2 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden"
-        >
-          <div class="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
-            <h2 class="text-sm font-semibold text-gray-700 dark:text-gray-300">
-              Movimentações no período
-            </h2>
-          </div>
+        <DashboardPanel title="Movimentações no período" class="lg:col-span-2">
           <div class="p-4">
             <MovementsTrendChart :data="summary.movementsTimeline" />
           </div>
-        </div>
+        </DashboardPanel>
 
-        <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
-          <div class="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
-            <h2 class="text-sm font-semibold text-gray-700 dark:text-gray-300">Produtos por categoria</h2>
-          </div>
+        <DashboardPanel title="Produtos por categoria">
           <div class="p-4">
             <DonutChart
               :data="summary.stockByCategory.map((c) => ({
@@ -126,25 +122,17 @@ onMounted(loadSummary)
               }))"
             />
           </div>
-        </div>
+        </DashboardPanel>
       </div>
 
       <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
-        <div class="print:hidden bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
-          <div class="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
-            <h2 class="text-sm font-semibold text-gray-700 dark:text-gray-300">
-              Perdas por motivo no período
-            </h2>
-          </div>
+        <DashboardPanel title="Perdas por motivo no período" class="print:hidden">
           <div class="p-4">
             <LossesByReasonChart :data="summary.lossesByReason" />
           </div>
-        </div>
+        </DashboardPanel>
 
-        <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
-          <div class="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
-            <h2 class="text-sm font-semibold text-gray-700 dark:text-gray-300">Produtos com estoque baixo</h2>
-          </div>
+        <DashboardPanel title="Produtos com estoque baixo">
           <table v-mobile-accordion class="mobile-accordion-table min-w-full divide-y divide-gray-100 dark:divide-gray-700">
             <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
               <tr v-if="summary.lowStockProducts.length === 0">
@@ -162,15 +150,12 @@ onMounted(loadSummary)
               </tr>
             </tbody>
           </table>
-        </div>
+        </DashboardPanel>
 
-        <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
-          <div class="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
-            <h2 class="text-sm font-semibold text-gray-700 dark:text-gray-300">Movimentações no período</h2>
-            <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
-              {{ formatDateOnly(summary.periodFrom) }} até {{ formatDateOnly(summary.periodTo) }}
-            </p>
-          </div>
+        <DashboardPanel
+          title="Movimentações no período"
+          :subtitle="`${formatDateOnly(summary.periodFrom)} até ${formatDateOnly(summary.periodTo)}`"
+        >
           <p
             v-if="summary.recentMovements.length === 0"
             class="px-4 py-4 text-center text-sm text-gray-500 dark:text-gray-400"
@@ -200,7 +185,7 @@ onMounted(loadSummary)
               </time>
             </li>
           </ul>
-        </div>
+        </DashboardPanel>
       </div>
     </template>
 

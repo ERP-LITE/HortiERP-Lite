@@ -24,6 +24,8 @@ import { listAllCategories } from '@/services/categoriesService'
 import { listAllUnits } from '@/services/unitsService'
 import { createProduct, deleteProduct, deleteProducts, listAllProducts, listProducts, updateProduct } from '@/services/productsService'
 import { csvNumber } from '@/lib/csv'
+import { formatCurrency, formatPercent, formatQuantity } from '@/lib/format'
+import { marginTone, marginToneClasses, shouldSuggestPrice } from '@/lib/margin'
 import { useAsyncState } from '@/composables/useAsyncState'
 import { useBulkSelection } from '@/composables/useBulkSelection'
 import { useCrudModal } from '@/composables/useCrudModal'
@@ -34,7 +36,6 @@ import { useRecordDeletion } from '@/composables/useRecordDeletion'
 import { useTableSort } from '@/composables/useTableSort'
 import { LIMITES_NUMERO, LIMITES_TEXTO } from '@/lib/limits'
 import type { Category, Product, Unit } from '@/types'
-import { formatQuantity } from '@/lib/format'
 import { statusFilterOptionsFor, statusLabel } from '@/lib/status'
 
 const { canManage } = usePermissions()
@@ -103,7 +104,7 @@ async function exportCsv() {
   const unitById = new Map(units.value.map((item) => [item.id, item.name]))
 
   return {
-    headers: ['Nome', 'Categoria', 'Unidade', 'Codigo', 'Codigo de barras', 'Custo', 'Preco de venda', 'Estoque atual', 'Estoque minimo', 'Situacao'],
+    headers: ['Nome', 'Categoria', 'Unidade', 'Codigo', 'Codigo de barras', 'Custo', 'Preco de venda', 'Margem (%)', 'Margem alvo (%)', 'Preco sugerido', 'Estoque atual', 'Estoque minimo', 'Situacao'],
     rows: all.map((item) => [
       item.name,
       categoryById.get(item.categoryId) ?? '',
@@ -112,6 +113,9 @@ async function exportCsv() {
       item.barcode ?? '',
       csvNumber(item.costPrice),
       csvNumber(item.salePrice),
+      csvNumber(item.currentMargin),
+      csvNumber(item.effectiveTargetMargin),
+      csvNumber(item.suggestedPrice),
       csvNumber(item.currentStock, 3),
       csvNumber(item.minStock, 3),
       statusLabel(item.active),
@@ -131,6 +135,7 @@ interface ProductForm {
   barcode: string
   costPrice: string
   salePrice: string
+  targetMargin: string
   minStock: string
   active: boolean
 }
@@ -144,6 +149,7 @@ function toPayload(values: ProductForm) {
     barcode: values.barcode || null,
     costPrice: values.costPrice ? Number(values.costPrice) : null,
     salePrice: values.salePrice ? Number(values.salePrice) : null,
+    targetMargin: values.targetMargin ? Number(values.targetMargin) : null,
     minStock: Number(values.minStock),
     active: values.active,
   }
@@ -161,6 +167,7 @@ const { modalOpen, editingId, saving, form, fieldErrors, openCreateModal, openEd
     barcode: '',
     costPrice: '',
     salePrice: '',
+    targetMargin: '',
     minStock: '0',
     active: true,
   }),
@@ -172,6 +179,7 @@ const { modalOpen, editingId, saving, form, fieldErrors, openCreateModal, openEd
     barcode: product.barcode ?? '',
     costPrice: product.costPrice ?? '',
     salePrice: product.salePrice ?? '',
+    targetMargin: product.targetMargin ?? '',
     minStock: product.minStock,
     active: product.active,
   }),
@@ -285,6 +293,9 @@ onMounted(loadAll)
             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
               Categoria
             </th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+              Margem
+            </th>
             <SortableTableHeader field="currentStock" :active-field="sortBy" :order="sortOrder" @sort="toggleSort">Estoque</SortableTableHeader>
             <SortableTableHeader field="active" :active-field="sortBy" :order="sortOrder" @sort="toggleSort">Situação</SortableTableHeader>
             <th v-if="canManage" data-actions class="print:hidden px-4 py-3 text-right text-xs font-medium uppercase text-gray-500 dark:text-gray-400">Ações</th>
@@ -292,10 +303,10 @@ onMounted(loadAll)
         </thead>
         <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
           <tr v-if="loading">
-            <td :colspan="canManage ? 6 : 4" class="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">Carregando...</td>
+            <td :colspan="canManage ? 7 : 5" class="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">Carregando...</td>
           </tr>
           <tr v-else-if="products.length === 0">
-            <td :colspan="canManage ? 6 : 4" class="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">
+            <td :colspan="canManage ? 7 : 5" class="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">
               Nenhum produto cadastrado.
             </td>
           </tr>
@@ -320,6 +331,21 @@ onMounted(loadAll)
             </td>
             <td class="max-w-64 px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
               <ExpandableText :text="categoryName(product.categoryId)" :max-length="40" />
+            </td>
+            <td class="px-4 py-3 text-sm whitespace-nowrap">
+              <!-- Um filho só: no acordeão do celular a célula vira flex, e dois filhos soltos ficariam
+                   espalhados pela linha em vez de empilhados. -->
+              <div>
+                <span :class="marginToneClasses[marginTone(product.currentMargin, product.effectiveTargetMargin)]">
+                  {{ product.currentMargin === null ? '--' : formatPercent(product.currentMargin) }}
+                </span>
+                <span
+                  v-if="shouldSuggestPrice(product.salePrice, product.suggestedPrice)"
+                  class="block text-xs text-gray-500 dark:text-gray-400"
+                >
+                  sugerido {{ formatCurrency(product.suggestedPrice) }}
+                </span>
+              </div>
             </td>
             <td class="px-4 py-3 text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap">
               {{ formatQuantity(product.currentStock) }} {{ unitAbbreviation(product.unitId) }}
@@ -417,6 +443,20 @@ onMounted(loadAll)
             :error="fieldErrors.minStock"
             required
           />
+        </div>
+
+        <div>
+          <BaseInput
+            v-model="form.targetMargin"
+            :decimal-places="2"
+            :max="99.99"
+            label="Margem alvo (%)"
+            :error="fieldErrors.targetMargin"
+          />
+          <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+            Percentual sobre o preço de venda. Em branco, vale a margem da categoria. Com o custo
+            preenchido, a lista mostra por quanto vender para chegar nessa margem.
+          </p>
         </div>
 
         <BaseToggle v-model="form.active" label="Produto ativo" />

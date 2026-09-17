@@ -11,6 +11,7 @@ export type ActivityEntity =
   | 'entrada'
   | 'perda'
   | 'estoque'
+  | 'contagem'
 
 export interface ActivityInput {
   companyId: string

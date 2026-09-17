@@ -13,8 +13,11 @@ import {
   products,
   stockEntries,
   stockEntryAttachments,
+  stockCountItems,
+  stockCounts,
   stockEntryItems,
   stockMovements,
+  supplierProductCodes,
   systemLogs,
   units,
   users,
@@ -30,6 +33,7 @@ async function countBy(table: PgTable, column: PgColumn, value: string) {
 export interface CompanyFootprint {
   company: { id: string; name: string; document: string | null }
   entryIds: string[]
+  countIds: string[]
   storedNames: string[]
   volumes: Record<string, number>
 }
@@ -51,6 +55,10 @@ async function coletar(companyId: string): Promise<CompanyFootprint | null> {
     await db.select({ id: stockEntries.id }).from(stockEntries).where(eq(stockEntries.companyId, companyId))
   ).map((row) => row.id)
 
+  const countIds = (
+    await db.select({ id: stockCounts.id }).from(stockCounts).where(eq(stockCounts.companyId, companyId))
+  ).map((row) => row.id)
+
   const storedNames = (
     await db
       .select({ storedName: stockEntryAttachments.storedName })
@@ -61,6 +69,7 @@ async function coletar(companyId: string): Promise<CompanyFootprint | null> {
   return {
     company,
     entryIds,
+    countIds,
     storedNames,
     volumes: {
       usuarios: await countBy(users, users.companyId, companyId),
@@ -69,6 +78,7 @@ async function coletar(companyId: string): Promise<CompanyFootprint | null> {
       unidades: await countBy(units, units.companyId, companyId),
       entradas: entryIds.length,
       anexos: storedNames.length,
+      contagens: countIds.length,
       perdas: await countBy(losses, losses.companyId, companyId),
       movimentacoes: await countBy(stockMovements, stockMovements.companyId, companyId),
       logsAtividade: await countBy(activityLogs, activityLogs.companyId, companyId),
@@ -84,18 +94,23 @@ export async function eraseCompanyData(footprint: CompanyFootprint) {
 }
 
 async function apagar(footprint: CompanyFootprint) {
-  const { company, entryIds, storedNames } = footprint
+  const { company, entryIds, countIds, storedNames } = footprint
 
   await db.transaction(async (tx) => {
-    // Sem ON DELETE CASCADE: cada filha sai antes da que ela referencia. `stock_entry_items` não
-    // tem `companyId` e só é alcançada pela entrada.
+    // Sem ON DELETE CASCADE: cada filha sai antes da que ela referencia. `stock_entry_items` e
+    // `stock_count_items` não têm `companyId` e só são alcançadas pela entrada e pela contagem.
     if (entryIds.length > 0) {
       await tx.delete(stockEntryItems).where(inArray(stockEntryItems.stockEntryId, entryIds))
     }
+    if (countIds.length > 0) {
+      await tx.delete(stockCountItems).where(inArray(stockCountItems.stockCountId, countIds))
+    }
+    await tx.delete(stockCounts).where(eq(stockCounts.companyId, company.id))
     await tx.delete(stockEntryAttachments).where(eq(stockEntryAttachments.companyId, company.id))
     await tx.delete(stockEntries).where(eq(stockEntries.companyId, company.id))
     await tx.delete(losses).where(eq(losses.companyId, company.id))
     await tx.delete(stockMovements).where(eq(stockMovements.companyId, company.id))
+    await tx.delete(supplierProductCodes).where(eq(supplierProductCodes.companyId, company.id))
     await tx.delete(products).where(eq(products.companyId, company.id))
     await tx.delete(categories).where(eq(categories.companyId, company.id))
     await tx.delete(units).where(eq(units.companyId, company.id))

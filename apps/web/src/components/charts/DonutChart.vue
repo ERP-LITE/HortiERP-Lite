@@ -3,7 +3,7 @@ import { computed, ref } from 'vue'
 import { useCategoricalPalette, useChartInk } from './palette'
 import ChartTooltip from './ChartTooltip.vue'
 import type { DashboardProductQuantity, DashboardQuantityByUnit } from '@/types'
-import { formatChartNumber } from '@/lib/format'
+import { formatChartNumber, formatPercent } from '@/lib/format'
 
 const props = defineProps<{
   data: {
@@ -65,7 +65,7 @@ function showTooltip(event: MouseEvent | FocusEvent, segment: (typeof segments.v
     label: 'Em estoque',
     value: `${segment.value} ${segment.value === 1 ? 'produto' : 'produtos'}`,
     color: segment.color,
-    detail: `${(segment.fraction * 100).toFixed(1)}% dos produtos em estoque`,
+    detail: `${formatPercent(segment.fraction * 100)} dos produtos em estoque`,
     details: buildDetails(segment.totalsByUnit, segment.products, segment.otherProductsCount),
   }
 }
@@ -113,7 +113,7 @@ function hideTooltip() {
         class="cursor-pointer transition-opacity hover:opacity-80 focus:opacity-80 focus:outline-none"
         tabindex="0"
         role="img"
-        :aria-label="`${segment.label}: ${segment.value} produtos, ${(segment.fraction * 100).toFixed(1)}% dos produtos em estoque`"
+        :aria-label="`${segment.label}: ${segment.value} produtos, ${formatPercent(segment.fraction * 100)} dos produtos em estoque`"
         @mouseenter="showTooltip($event, segment)"
         @mousemove="showTooltip($event, segment)"
         @mouseleave="hideTooltip"

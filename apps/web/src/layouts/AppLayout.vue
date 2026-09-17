@@ -5,6 +5,7 @@ import {
   AlertTriangle,
   BarChart3,
   Building2,
+  ClipboardList,
   LayoutDashboard,
   FileClock,
   Bug,
@@ -69,6 +70,7 @@ const navItems = computed(() => {
     { name: 'unidades', label: 'Unidades', icon: Ruler },
     { name: 'entradas', label: 'Entradas', icon: PackagePlus },
     { name: 'estoque', label: 'Estoque', icon: Warehouse },
+    { name: 'contagem', label: 'Contagem', icon: ClipboardList },
     { name: 'perdas', label: 'Perdas', icon: AlertTriangle },
     { name: 'relatorios', label: 'Relatórios', icon: BarChart3 },
   ]

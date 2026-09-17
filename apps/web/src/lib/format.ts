@@ -93,6 +93,10 @@ export function formatChartNumber(value: number) {
   return value.toLocaleString('pt-BR', { maximumFractionDigits: 1 })
 }
 
+export function formatPercent(value: number, casas = 1) {
+  return `${value.toLocaleString('pt-BR', { minimumFractionDigits: casas, maximumFractionDigits: casas })}%`
+}
+
 export function formatFileSize(bytes: number) {
   if (bytes < 1024 * 1024) return `${Math.ceil(bytes / 1024)} KB`
   // Arredonda para cima: 10 MB e um byte não pode aparecer como "10,00 MB" numa mensagem de limite

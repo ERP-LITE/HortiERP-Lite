@@ -21,6 +21,8 @@ export const stockEntryItemSchema = z.object({
   productId: z.string().uuid('Produto inválido'),
   quantity: z.coerce.number().positive('Quantidade deve ser maior que zero').max(LIMITES_NUMERO.quantidade),
   unitCost: z.coerce.number().nonnegative().max(LIMITES_NUMERO.valorUnitario).optional(),
+  // Só vem quando a entrada nasceu de um XML: é o que ensina o "de para" daquele fornecedor.
+  supplierCode: z.string().trim().max(LIMITES_TEXTO.codigoDoFornecedor).optional(),
 })
 
 export const createStockEntrySchema = z.object({
@@ -30,6 +32,7 @@ export const createStockEntrySchema = z.object({
   invoiceNumber: z.string().trim().max(LIMITES_TEXTO.numeroNota).optional(),
   invoiceSeries: z.string().trim().max(LIMITES_TEXTO.serieNota).optional(),
   invoiceAccessKey: z.string().trim().regex(CHAVE_NFE, CHAVE_NFE_INVALIDA).optional(),
+  supplierDocument: z.string().trim().max(LIMITES_TEXTO.documentoDoFornecedor).optional(),
   invoiceIssuedAt: z.coerce.date().optional(),
   invoiceTotal: z.coerce.number().nonnegative('O valor total não pode ser negativo').max(LIMITES_NUMERO.valorNota).optional(),
   items: z.array(stockEntryItemSchema).min(1, 'Informe ao menos um item').max(MAX_ITENS_POR_ENTRADA),

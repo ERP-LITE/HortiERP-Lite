@@ -6,6 +6,7 @@ import { AppError } from '../../shared/errors/AppError.js'
 import { applyStockMovement } from '../../shared/db/applyStockMovement.js'
 import { buildPaginatedResult } from '../../shared/db/paginate.js'
 import { matchingProductIds } from '../../shared/db/matchingProductIds.js'
+import { aprenderVinculos } from './nfe.service.js'
 import type {
   CreateStockEntryInput,
   ListStockEntriesQuery,
@@ -140,6 +141,8 @@ export async function createStockEntry(companyId: string, userId: string, data: 
         unitCost: item.unitCost?.toString(),
       })),
     )
+
+    await aprenderVinculos(tx, companyId, userId, data.supplierDocument, data.items)
 
     return entry
   })

@@ -21,6 +21,7 @@ export const products = pgTable('products', {
   barcode: text('barcode'),
   costPrice: numeric('cost_price', { precision: 12, scale: 2 }),
   salePrice: numeric('sale_price', { precision: 12, scale: 2 }),
+  targetMargin: numeric('target_margin', { precision: 5, scale: 2 }),
   minStock: numeric('min_stock', { precision: 12, scale: 3 }).notNull().default('0'),
   currentStock: numeric('current_stock', { precision: 12, scale: 3 }).notNull().default('0'),
   active: boolean('active').notNull().default(true),

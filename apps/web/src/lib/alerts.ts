@@ -8,21 +8,30 @@ function themeOptions() {
   return isDarkMode() ? { background: '#1f2937', color: '#f3f4f6' } : {}
 }
 
-export async function confirmDelete(options: { title: string; text?: string }) {
+export async function confirmAction(options: {
+  title: string
+  text?: string
+  confirmButtonText: string
+  confirmButtonColor?: string
+}) {
   const result = await Swal.fire({
     title: options.title,
     text: options.text,
     icon: 'warning',
     showCancelButton: true,
-    confirmButtonText: 'Excluir',
+    confirmButtonText: options.confirmButtonText,
     cancelButtonText: 'Cancelar',
-    confirmButtonColor: '#dc2626',
+    confirmButtonColor: options.confirmButtonColor ?? '#2563eb',
     cancelButtonColor: '#6b7280',
     reverseButtons: true,
     ...themeOptions(),
   })
 
   return result.isConfirmed
+}
+
+export function confirmDelete(options: { title: string; text?: string }) {
+  return confirmAction({ ...options, confirmButtonText: 'Excluir', confirmButtonColor: '#dc2626' })
 }
 
 export function toastSuccess(message: string) {

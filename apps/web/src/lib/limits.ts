@@ -13,6 +13,8 @@ export const LIMITES_TEXTO = {
   numeroNota: 60,
   serieNota: 20,
   chaveNfe: 44,
+  codigoDoFornecedor: 60,
+  documentoDoFornecedor: 20,
   email: 160,
   endereco: 160,
   complemento: 120,

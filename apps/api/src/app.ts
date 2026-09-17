@@ -26,6 +26,7 @@ import { productsRoutes } from './modules/products/products.routes.js'
 import { usersRoutes } from './modules/users/users.routes.js'
 import { stockEntriesRoutes } from './modules/stock-entries/stock-entries.routes.js'
 import { stockRoutes } from './modules/stock/stock.routes.js'
+import { stockCountsRoutes } from './modules/stock-counts/stock-counts.routes.js'
 import { lossesRoutes } from './modules/losses/losses.routes.js'
 import { dashboardRoutes } from './modules/dashboard/dashboard.routes.js'
 import { notificationsRoutes } from './modules/notifications/notifications.routes.js'
@@ -121,6 +122,7 @@ export function buildApp(options: { systemLogs?: boolean; rateLimit?: boolean } 
   app.register(usersRoutes, { prefix: '/api' })
   app.register(stockEntriesRoutes, { prefix: '/api' })
   app.register(stockRoutes, { prefix: '/api' })
+  app.register(stockCountsRoutes, { prefix: '/api' })
   app.register(lossesRoutes, { prefix: '/api' })
   app.register(dashboardRoutes, { prefix: '/api' })
   app.register(notificationsRoutes, { prefix: '/api' })

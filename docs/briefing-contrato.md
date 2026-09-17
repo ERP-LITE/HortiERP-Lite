@@ -239,7 +239,11 @@ Tudo abaixo foi verificado no sistema. Nada aqui é aspiração.
 - Permissão verificada no servidor em cada operação, não apenas na tela.
 - Banco de dados sem porta exposta à internet.
 - Anexos de nota fiscal privados, entregues apenas a quem tem acesso à empresa, com validação de tipo
-  e de conteúdo do arquivo.
+  e de conteúdo do arquivo. Desde 17/09/2026 o sistema também **lê** o XML da nota para preencher a
+  entrada, e guarda o documento do emitente (CNPJ ou CPF) ligado ao produto, para reconhecer o
+  fornecedor na nota seguinte. Não é categoria de dado nova, porque o mesmo dado já vinha dentro do
+  arquivo anexado, mas virou dado estruturado e está no inventário da seção 2.3 do registro de
+  tratamento.
 - Cópia de segurança diária, criptografada, com teste de restauração.
 - Vigilância externa automática: disponibilidade verificada a cada 5 minutos e erro de sistema
   reportado a cada 15 minutos.
@@ -264,9 +268,17 @@ Tão importante quanto a lista anterior. Nada disto existe:
 - **Certificação, selo ou auditoria de segurança de terceiros.** Não existe nenhuma.
 - **Recuperação de dado apagado pelo próprio cliente** além do que a cópia de segurança de 30 dias
   alcança.
-- Qualquer função da lista de exclusões da seção 6 do briefing da proposta comercial: PDV, nota
-  fiscal, integração com balança, leitura automática de XML, controle de vendas ou financeiro, alerta
-  de validade, aplicativo instalável.
+- Qualquer função da lista de exclusões da seção 6 do briefing da proposta comercial: PDV, emissão de
+  nota fiscal, integração com balança, controle de vendas ou financeiro, alerta de validade,
+  aplicativo instalável. **A leitura automática do XML saiu desta lista em 17/09/2026**, porque passou
+  a existir. Cuidado com a redação: o sistema **lê** a nota que o fornecedor emitiu e **não emite**
+  nota nenhuma. Se o contrato juntar as duas num item só, promete emissão fiscal.
+- **Redução de perda ou de quebra.** A contagem de estoque, que existe desde 17/09/2026, **mede** a
+  divergência entre o que o sistema tinha e o que existe na loja, inclusive a perda que ninguém
+  registrou. Medir não é reduzir, e quem reduz é a operação da loja. Contrato que prometa queda de
+  quebra cria obrigação de resultado sobre algo que não está nas mãos da CONTRATADA.
+- **Leitura de código de barras pela câmera do celular.** A contagem é feita digitando a quantidade,
+  com busca por nome. Não existe leitor pela câmera nem integração com coletor de dados.
 
 ---
 

@@ -26,3 +26,6 @@ export const LOSS_REASON_LABEL_ORDER = ['avariado', 'erro_operacional', 'outro',
 
 /** Ordem alfabética dos rótulos de `movement_type` mostrados no histórico de estoque. */
 export const MOVEMENT_TYPE_LABEL_ORDER = ['ajuste', 'entrada', 'perda'] as const
+
+/** Ordem alfabética dos rótulos de `stock_count_status`: Cancelada, Concluída, Contando, Em conferência. */
+export const STOCK_COUNT_STATUS_LABEL_ORDER = ['cancelada', 'concluida', 'em_andamento', 'em_conferencia'] as const

@@ -6,6 +6,7 @@ import { units } from './units.js'
 import { products } from './products.js'
 import { stockEntries, stockEntryAttachments, stockEntryItems } from './stockEntries.js'
 import { losses } from './losses.js'
+import { stockCounts, stockCountItems } from './stockCounts.js'
 import { stockMovements } from './stockMovements.js'
 import { systemLogs } from './systemLogs.js'
 import { activityLogs } from './activityLogs.js'
@@ -27,6 +28,8 @@ export * from './activityLogs.js'
 export * from './companyBillings.js'
 export * from './passwordResetTokens.js'
 export * from './plans.js'
+export * from './supplierProductCodes.js'
+export * from './stockCounts.js'
 
 export const companiesRelations = relations(companies, ({ one, many }) => ({
   users: many(users),
@@ -87,6 +90,7 @@ export const productsRelations = relations(products, ({ one, many }) => ({
   stockEntryItems: many(stockEntryItems),
   losses: many(losses),
   movements: many(stockMovements),
+  stockCountItems: many(stockCountItems),
 }))
 
 export const stockEntriesRelations = relations(stockEntries, ({ one, many }) => ({
@@ -111,6 +115,18 @@ export const lossesRelations = relations(losses, ({ one }) => ({
   company: one(companies, { fields: [losses.companyId], references: [companies.id] }),
   product: one(products, { fields: [losses.productId], references: [products.id] }),
   createdByUser: one(users, { fields: [losses.createdBy], references: [users.id] }),
+}))
+
+export const stockCountsRelations = relations(stockCounts, ({ one, many }) => ({
+  company: one(companies, { fields: [stockCounts.companyId], references: [companies.id] }),
+  category: one(categories, { fields: [stockCounts.categoryId], references: [categories.id] }),
+  createdByUser: one(users, { fields: [stockCounts.createdBy], references: [users.id] }),
+  items: many(stockCountItems),
+}))
+
+export const stockCountItemsRelations = relations(stockCountItems, ({ one }) => ({
+  stockCount: one(stockCounts, { fields: [stockCountItems.stockCountId], references: [stockCounts.id] }),
+  product: one(products, { fields: [stockCountItems.productId], references: [products.id] }),
 }))
 
 export const stockMovementsRelations = relations(stockMovements, ({ one }) => ({

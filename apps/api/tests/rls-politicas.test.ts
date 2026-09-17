@@ -3,7 +3,7 @@ import { describe, it } from 'node:test'
 import { eq } from 'drizzle-orm'
 import { db as dbDaAplicacao } from '../src/db/client.js'
 import { comEscopoDaEmpresa } from '../src/db/scope.js'
-import { companies, products, stockEntries, stockEntryItems } from '../src/db/schema/index.js'
+import { companies, products, stockEntries, stockEntryItems, supplierProductCodes } from '../src/db/schema/index.js'
 import { db } from './db.js'
 import { authCookie, createTenant, createUser, setupTestApp } from './helpers.js'
 import { createLoss, createStockEntry } from './servicos.js'
@@ -118,6 +118,38 @@ describe('políticas de RLS por empresa', () => {
     assert.ok(perda, 'a perda deveria aparecer na lista da empresa')
     assert.ok(perda.createdByUser, 'o autor do registro desapareceu')
     assert.equal(perda.createdByUser.name, suporte.name)
+  })
+
+  it('o de para do fornecedor não atravessa empresa', async () => {
+    const minha = await createTenant('rls-de-para-a')
+    const vizinha = await createTenant('rls-de-para-b')
+
+    await comEscopoDaEmpresa(vizinha.companyId, () =>
+      dbDaAplicacao.insert(supplierProductCodes).values({
+        companyId: vizinha.companyId,
+        supplierDocument: '14200166000187',
+        supplierCode: 'A1',
+        productId: vizinha.productId,
+      }),
+    )
+
+    const visiveis = await comEscopoDaEmpresa(minha.companyId, () =>
+      dbDaAplicacao.select({ id: supplierProductCodes.id }).from(supplierProductCodes),
+    )
+    assert.equal(visiveis.length, 0, 'o vínculo da vizinha apareceu para outra empresa')
+
+    await assert.rejects(
+      () =>
+        comEscopoDaEmpresa(minha.companyId, () =>
+          dbDaAplicacao.insert(supplierProductCodes).values({
+            companyId: vizinha.companyId,
+            supplierDocument: '14200166000187',
+            supplierCode: 'B2',
+            productId: vizinha.productId,
+          }),
+        ),
+      recusadoPeloRls,
+    )
   })
 
   it('duas requisições simultâneas de empresas diferentes não trocam de escopo', async () => {

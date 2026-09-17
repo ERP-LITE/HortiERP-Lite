@@ -1,6 +1,14 @@
 import { and, asc, count, countDistinct, desc, eq, gt, gte, isNull, lte, sql } from 'drizzle-orm'
 import { db } from '../../db/client.js'
-import { categories, losses, products, stockMovements, units } from '../../db/schema/index.js'
+import {
+  categories,
+  losses,
+  products,
+  stockEntries,
+  stockEntryItems,
+  stockMovements,
+  units,
+} from '../../db/schema/index.js'
 import {
   APP_TIME_ZONE,
   addDaysToIsoDate,
@@ -17,6 +25,10 @@ const MAX_SPAN_DAYS = 90
 const BUSINESS_TIME_ZONE_SQL = sql.raw(`'${APP_TIME_ZONE}'`)
 
 const TOP_PRODUCTS_PER_GROUP = 5
+
+// Percentual sobre o custo do que entrou, não sobre faturamento: o sistema não conhece venda.
+// A conversão da meta de 3% do SEBRAE está em docs/decisoes-arquiteturais.md.
+const META_DE_QUEBRA = 5
 
 function resolvePeriod(range: { from?: Date; to?: Date }) {
   const endDate = range.to ? businessDate(range.to) : todayIsoDate()
@@ -79,6 +91,12 @@ export async function getDashboardSummary(companyId: string, range: { from?: Dat
     eq(stockMovements.companyId, companyId),
     gte(stockMovements.movementDate, periodStart),
     lte(stockMovements.movementDate, periodEnd),
+  )
+  const entryPeriodConditions = and(
+    eq(stockEntries.companyId, companyId),
+    isNull(stockEntries.deletedAt),
+    gte(stockEntries.entryDate, periodStart),
+    lte(stockEntries.entryDate, periodEnd),
   )
 
   const movementDay = sql`date_trunc('day', ${stockMovements.movementDate} at time zone ${BUSINESS_TIME_ZONE_SQL})`
@@ -159,6 +177,7 @@ export async function getDashboardSummary(companyId: string, range: { from?: Dat
     categoryTotals,
     categoryTopProducts,
     recentMovements,
+    [entriesSummary],
   ] = await Promise.all([
     db
       .select({
@@ -186,6 +205,7 @@ export async function getDashboardSummary(companyId: string, range: { from?: Dat
         lossesCount: count(),
         productsCount: countDistinct(products.id),
         quantity: lossQuantity.mapWith(Number),
+        lossValue: sql<number>`coalesce(sum(${losses.quantity} * coalesce(${losses.unitCost}, ${products.costPrice}, 0)), 0)`.mapWith(Number),
       })
       .from(losses)
       .innerJoin(products, eq(products.id, losses.productId))
@@ -249,6 +269,14 @@ export async function getDashboardSummary(companyId: string, range: { from?: Dat
       orderBy: [desc(stockMovements.movementDate), desc(stockMovements.createdAt)],
       limit: 10,
     }),
+    db
+      .select({
+        entriesValue: sql<number>`coalesce(sum(${stockEntryItems.quantity} * coalesce(${stockEntryItems.unitCost}, ${products.costPrice}, 0)), 0)`.mapWith(Number),
+      })
+      .from(stockEntryItems)
+      .innerJoin(stockEntries, eq(stockEntries.id, stockEntryItems.stockEntryId))
+      .innerJoin(products, eq(products.id, stockEntryItems.productId))
+      .where(entryPeriodConditions),
   ])
 
   type TimelineBucket = {
@@ -411,6 +439,7 @@ export async function getDashboardSummary(companyId: string, range: { from?: Dat
     {
       reason: (typeof lossTotals)[number]['reason']
       lossesCount: number
+      lossValue: number
       totalsByUnit: QuantityByUnit[]
       products: ProductQuantity[]
       productsTotal: number
@@ -421,11 +450,13 @@ export async function getDashboardSummary(companyId: string, range: { from?: Dat
     const reason = lossReasonMap.get(row.reason) ?? {
       reason: row.reason,
       lossesCount: 0,
+      lossValue: 0,
       totalsByUnit: [],
       products: [],
       productsTotal: 0,
     }
     reason.lossesCount += row.lossesCount
+    reason.lossValue += row.lossValue
     reason.productsTotal += row.productsCount
     addQuantityByUnit(reason.totalsByUnit, {
       unitId: row.unitId,
@@ -459,10 +490,21 @@ export async function getDashboardSummary(companyId: string, range: { from?: Dat
   const lossesByReason = [...lossReasonMap.values()].map((reason) => ({
     reason: reason.reason,
     lossesCount: reason.lossesCount,
+    lossValue: reason.lossValue,
     totalsByUnit: reason.totalsByUnit,
     products: reason.products,
     otherProductsCount: otherProductsCount(reason.productsTotal),
   }))
+
+  const entriesValue = entriesSummary.entriesValue
+  const shrinkage = {
+    lossValue: lossSummary.lossValue,
+    entriesValue,
+    // Sem entrada no período não existe divisor, e devolver 0% mentiria: `null` deixa a tela dizer
+    // que ainda não dá para calcular.
+    percent: entriesValue > 0 ? Math.round((lossSummary.lossValue / entriesValue) * 10000) / 100 : null,
+    targetPercent: META_DE_QUEBRA,
+  }
 
   return {
     totalProducts: productSummary.totalProducts,
@@ -476,6 +518,7 @@ export async function getDashboardSummary(companyId: string, range: { from?: Dat
       lossValue: lossSummary.lossValue,
       totalsByUnit: [...lossesByUnitMap.values()],
     },
+    shrinkage,
     recentMovements,
     movementsTimeline,
     stockByCategory,

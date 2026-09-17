@@ -1524,3 +1524,226 @@ A segunda mudança é a que importa mais no longo prazo. A primeira corrige esta
 garante que qualquer outra causa futura apareça como deploy vermelho em vez de silêncio. A lição não
 é sobre inode: é que passo de deploy sem verificação de efeito pode estar mentindo desde o primeiro
 dia sem ninguém notar.
+
+## Quebra em percentual: o divisor é o que entrou, não a venda
+
+O painel mostra a quebra como percentual, e não só em reais, porque valor absoluto não responde a
+pergunta do dono. R$ 1.200 perdidos é muito numa loja pequena e pouco numa grande. A decisão difícil
+não foi mostrar o percentual: foi escolher por que dividir.
+
+O setor mede quebra como **percentual do faturamento**. O sistema não registra venda, e não vai
+registrar tão cedo (ver "O que não perseguir" na análise de concorrência). Então o divisor disponível
+é o **custo do que entrou no período**: soma de `stock_entry_items.quantity * unit_cost`, caindo em
+`products.cost_price` quando a nota não trouxe custo no item.
+
+As duas alternativas foram descartadas por medir coisa pior:
+
+- **Dividir pelo valor em estoque.** O estoque é uma foto do instante, e a quebra é um acúmulo do
+  período. Um mesmo mês daria percentuais diferentes só porque a contagem foi feita antes ou depois
+  da entrega do fornecedor.
+- **Dividir pelo total movimentado (entradas mais perdas).** A perda apareceria nos dois lados da
+  divisão, o que achata o indicador justamente quando ele deveria gritar: quanto pior a quebra, menor
+  o percentual calculado em relação ao real.
+
+### Por que a meta é 5% e não 3%
+
+A meta prática que o SEBRAE cita para o setor é **3% do faturamento**. Ela não pode ser desenhada
+direto numa conta feita sobre custo, porque faturamento é maior que custo. Com a margem bruta de
+hortifrúti entre 30% e 45%, o custo representa de 55% a 70% da venda, e os mesmos 3% sobre venda
+equivalem a algo entre **4,3% e 5,5% sobre o custo que entrou**. A constante `META_DE_QUEBRA` fica em
+5, dentro dessa faixa, e a tela explica a conversão em uma linha para ninguém comparar com o número
+de 3% que vai ler em qualquer lugar do setor.
+
+A meta é constante no código de propósito. Meta por empresa exigiria coluna, formulário e tela de
+edição, e não existe cliente ainda para dizer se alguém mexeria nela. Quando existir, o lugar natural
+é uma coluna em `companies` com 5 como padrão, e a constante vira o valor de referência.
+
+### Sem entrada no período, o percentual é nulo
+
+Quando não houve entrada de mercadoria, o divisor é zero e a resposta traz `percent: null`, não `0`.
+Zero por cento afirmaria que não houve quebra, que é o oposto do que aconteceu quando existe perda
+lançada e nenhuma entrada. A tela usa o nulo para dizer que ainda não dá para calcular.
+
+### A faixa de atenção começa em 80% da meta
+
+`shrinkageStatus` classifica em quatro situações, e a intermediária existe porque avisar só depois de
+estourar transforma o painel em relatório de estrago. Encostar na meta (exatamente 5%) ainda conta
+como atenção, não como estouro: o limite é o último valor aceitável, não o primeiro recusado.
+
+## Margem alvo em dois níveis, e sempre sobre a venda
+
+O preço sugerido depende de uma margem alvo, e a primeira decisão foi onde ela mora. Ficou nos dois
+níveis: `categories.target_margin` dá o padrão do grupo e `products.target_margin` sobrescreve quando
+o produto foge da regra. Só no produto obrigaria a loja a preencher item por item, que é o jeito
+garantido de o campo ficar vazio para sempre. Só na categoria não atenderia o caso real de um item
+caro dentro de um grupo barato. A herança é uma linha (`effectiveTargetMargin`), e nulo no produto
+significa **herdar**, não "sem margem".
+
+### Margem, não markup
+
+A conta é `preço = custo / (1 - margem / 100)`. Margem aqui é sobre o **preço de venda**, que é a
+convenção do varejo brasileiro e a base dos 30% a 45% que se cita para hortifrúti. Markup seria sobre
+o custo, e a diferença não é sutil: custo de R$ 10 com 40% de margem vende a **R$ 16,67**; com 40% de
+markup venderia a **R$ 14,00**. Errar isso entrega um preço 16% abaixo do pretendido em todo produto
+da loja, sem nenhum sintoma visível. Por isso a fórmula mora num só lugar
+(`shared/utils/margin.ts`), o teste que a protege diz o número errado no comentário, e nenhuma cópia
+dela foi feita no front.
+
+### O teto de 99,99
+
+Margem de 100% sobre a venda zeraria o divisor, e acima disso não existe. O limite aparece três
+vezes de propósito: no `CHECK` da migração `0014`, no `targetMarginField` do Zod e em
+`suggestedPrice`, que devolve nulo em vez de infinito. Validação de banco protege contra o `UPDATE`
+manual, a do Zod dá mensagem em português, e a da função protege o cálculo de dado antigo que tenha
+entrado antes do `CHECK`.
+
+### Quatro campos calculados, nenhum guardado
+
+`currentMargin`, `effectiveTargetMargin`, `targetMarginInherited` e `suggestedPrice` são calculados a
+cada consulta. Guardar qualquer um deles criaria a pior categoria de erro neste domínio: um preço
+sugerido correto na data em que foi gravado e errado no dia seguinte, quando o custo da entrada
+mudou. O custo do cálculo é uma divisão por linha da página.
+
+### O que isso deliberadamente não faz
+
+Sugerir preço termina na coluna "podia vender por X". Não existe aplicar a sugestão em massa, nem
+histórico de preço, nem registro de venda. A fronteira importa porque o passo seguinte natural
+("remarcar todos os produtos desta categoria") é um `UPDATE` em massa sem desfazer, e o passo depois
+dele é PDV, que está recusado na análise de concorrência.
+
+## Leitura do XML da nota: duas camadas para casar o produto
+
+O `cProd` da NF-e é o código de quem vendeu, não o de quem compra. Não existe como adivinhar a
+correspondência, então o casamento acontece em duas camadas, nesta ordem:
+
+1. **Código de barras.** O `cEAN` da nota contra `products.barcode`. Funciona sozinho, sem ninguém
+   ensinar nada, e é por isso que vem primeiro. Item com `SEM GTIN` (o texto que a própria NF-e usa)
+   ou com código fora do formato de 8 a 14 dígitos é tratado como se não tivesse código.
+2. **De para aprendido.** `supplier_product_codes`, casando o `cProd` daquele CNPJ emitente.
+
+O que não casa volta sem produto e a pessoa escolhe na tela. **A escolha é o aprendizado**: ao
+confirmar a entrada, o vínculo é gravado e a próxima nota daquele fornecedor já entra ligada.
+
+### Por que não existe tela de "de para"
+
+Foi a alternativa considerada e recusada. A confirmação da entrada já é a resposta à pergunta "que
+produto é este?"; uma tela separada pediria a mesma informação duas vezes, e ainda criaria a
+possibilidade de o cadastro do de para divergir do que foi lançado. O custo dessa escolha é que não
+há como revisar a lista de vínculos hoje, e a correção acontece pela entrada seguinte, que sobrescreve.
+
+### A rota de leitura não grava nada
+
+`POST /stock-entries/nfe` lê o arquivo e devolve o que achou. A entrada continua nascendo pelo
+`POST /stock-entries` de sempre, depois da conferência. Duas razões: um XML lido por engano não deixa
+resíduo, e o caminho de gravação continua único, com uma transação só, em vez de um rascunho que
+precisaria ser limpo depois.
+
+### Três armadilhas do XML que os testes fixam
+
+- **`parseTagValue: false` é obrigatório.** Com a conversão automática de números, o código de produto
+  `007` viraria `7` e a chave de acesso perderia os zeros da frente.
+- **Um `<det>` vem como objeto, dois ou mais como lista.** Sem normalizar, a nota de um item só
+  chegaria vazia. É o erro clássico de quem lê XML, e tem teste para os dois casos.
+- **A data de emissão não é convertida para UTC.** Os dez primeiros caracteres de `dhEmi` já são a
+  data no fuso de quem emitiu, que é a data fiscal. Converter moveria de dia toda nota emitida à noite.
+
+### Arredondamento do valor unitário
+
+A NF-e traz até dez casas decimais em `vUnCom` e a coluna guarda duas. O valor é arredondado, o que
+pode fazer quantidade × unitário não bater com o total da nota. Por isso o total da nota (`vNF`) é
+preenchido separado, direto do arquivo: a diferença fica visível em vez de escondida numa conta.
+
+### Código de barras repetido não casa com ninguém
+
+`products.barcode` **não** é único por empresa, ao contrário do SKU. Dois produtos com o mesmo código
+tornam a pergunta "qual deles?" sem resposta, e o casamento automático escolheria um em silêncio. Na
+dúvida o item volta em branco, para a pessoa decidir. Preferir o não casamento ao palpite é a mesma
+regra do resto do sistema: errar em silêncio é pior do que pedir ajuda.
+
+### DOCTYPE é recusado antes da leitura
+
+Nota fiscal eletrônica não declara DOCTYPE. Recusar o arquivo que tem um corta, antes de qualquer
+interpretação, a classe de ataque em que entidades declaradas dentro do próprio XML se expandem uma
+na outra até consumir a memória do servidor. É uma linha de verificação, não depende do comportamento
+da biblioteca, e continua valendo se a biblioteca mudar.
+
+### Data da entrada e data da nota são coisas diferentes
+
+A leitura preenche a data de emissão, e **não** toca na data da entrada, que continua sendo hoje.
+Lançar a mercadoria na data de emissão moveria o estoque para um dia em que ela ainda não estava na
+loja, e o painel passaria a mostrar entrada em período que o operador não trabalhou.
+
+## Contagem de estoque: por que ela é cega, e por que só uma por vez
+
+A contagem foi construída como fluxo próprio em vez de virar mais um botão no ajuste em lote. As duas
+coisas parecem a mesma, e não são: o ajuste conserta o produto que alguém **já sabe** estar errado, e
+a contagem descobre o que ninguém sabe. Isso muda a tela, o modelo de dados e a permissão.
+
+### O saldo não sai do servidor enquanto a contagem está em andamento
+
+Esta é a decisão que dá sentido ao resto. Enquanto o status é `em_andamento`, `previousQuantity`,
+`unitCost`, `difference` e `differenceValue` vêm nulos, e o resumo vem com divergência e valores
+zerados. Não é a tela que esconde.
+
+Esconder no cliente não resolveria o problema, porque o problema não é técnico: é que quem enxerga o
+número que o sistema espera acaba digitando ele de volta. A pessoa olha "18" na tela, bate o olho na
+banca, acha que parece uns 18 e confirma. A contagem então não achou nada, só carimbou o erro que ela
+existia para encontrar. Com o campo vazio não há o que copiar.
+
+O filtro `situacao=divergentes` é recusado com `422` enquanto a contagem está cega pela mesma razão:
+ele entregaria, produto a produto, exatamente a informação que esconder o saldo evita entregar. Foi o
+único lugar em que a regra vazaria por um caminho lateral, e ele está coberto por teste.
+
+### Quatro status, porque contar e aplicar não podem ser o mesmo botão
+
+`em_andamento` → `em_conferencia` → `concluida`. A etapa do meio existe para que alguém **veja a
+diferença antes de o estoque mudar**: um encerramento que revelasse e aplicasse no mesmo clique
+tiraria da pessoa a chance de olhar uma linha absurda e recontar. Reabrir é permitido, e é justamente
+o caminho da recontagem.
+
+`cancelada` alcança as duas primeiras. Desistir de uma contagem não podia significar apagá-la: o que
+já foi contado continua valendo como registro do que aconteceu naquele dia.
+
+### Uma contagem aberta por empresa, garantida pelo banco
+
+Índice único parcial sobre `companyId` filtrando os dois status abertos. Duas contagens simultâneas
+alcançariam o mesmo produto, e a segunda a encerrar sobrescreveria o ajuste da primeira sem que
+nenhuma das duas soubesse. A aplicação também verifica antes, para dar mensagem decente; o índice é o
+que sobra quando duas pessoas clicam no mesmo segundo, e esse caso vira `409` com texto próprio.
+
+Uma contagem compartilhada, em vez de uma por pessoa, também é o que permite duas pessoas contarem
+seções diferentes ao mesmo tempo sem combinarem nada.
+
+### A referência é congelada no encerramento, não no início
+
+A primeira versão guardava o saldo esperado na abertura. Ela estava errada de um jeito silencioso: o
+ajuste leva o estoque para a quantidade contada a partir do saldo **de agora**, então o relatório
+mostraria uma diferença e o estoque receberia outra sempre que qualquer coisa se movesse durante a
+contagem.
+
+Hoje `previousQuantity` e `unitCost` nascem vazios e são gravados no encerramento, com o saldo e o
+custo do instante do ajuste. E a trava das linhas de `products` vem **antes** do congelamento, senão
+uma entrada lançada entre os dois passos reabriria a mesma divergência que o congelamento fecha.
+
+O `coalesce` para o estoque de agora vale **só em conferência**, e essa ressalva custou um defeito
+achado no teste de tela: com ele valendo sempre, uma contagem já encerrada mostrava na coluna
+"Sistema tinha" o saldo de hoje, não o do dia da contagem, e pior, o produto que ninguém contou
+aparecia com saldo preenchido, como se tivesse sido conferido. Encerrada a contagem, só a coluna
+congelada responde.
+
+O efeito prático é que o relatório de uma contagem antiga continua mostrando os mesmos números meses
+depois, mesmo com o custo e o estoque do produto já mudados.
+
+### Não contado não é zero
+
+`countedQuantity` nulo e `0` são coisas diferentes, e é essa distinção que impede a contagem de zerar
+a loja inteira quando alguém confere só uma banca e encerra. Produto sem lançamento não gera ajuste e
+aparece no relatório como não conferido. Há teste fixando isso, porque é o erro de maior estrago
+possível neste fluxo.
+
+### Contar não exige papel, encerrar exige
+
+Lançar quantidade é a rotina de quem anda pela loja, então o `PATCH` do item segue o mesmo padrão do
+`POST` de entrada e de perda: sem papel exigido. Abrir, conferir, reabrir, encerrar e cancelar pedem
+`admin` ou `gerente`, pelo mesmo motivo que o ajuste manual pede: é aí que o saldo calculado pelo
+sistema é sobrescrito.

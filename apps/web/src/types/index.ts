@@ -57,6 +57,7 @@ export interface Category {
   id: string
   name: string
   description: string | null
+  targetMargin: string | null
   active: boolean
   createdAt: string
   updatedAt: string
@@ -80,9 +81,16 @@ export interface Product {
   barcode: string | null
   costPrice: string | null
   salePrice: string | null
+  targetMargin: string | null
   minStock: string
   currentStock: string
   active: boolean
+  // Calculados pela API a partir do custo, da venda e da margem alvo (a do produto ou a herdada da
+  // categoria). Ver docs/decisoes-arquiteturais.md.
+  currentMargin: number | null
+  effectiveTargetMargin: number | null
+  targetMarginInherited: boolean
+  suggestedPrice: number | null
   createdAt: string
   updatedAt: string
 }
@@ -90,6 +98,30 @@ export interface Product {
 export interface ProductWithRelations extends Product {
   category: Category
   unit: Unit
+}
+
+export interface NotaFiscalItemLido {
+  codigoDoFornecedor: string | null
+  codigoDeBarras: string | null
+  descricao: string
+  unidade: string | null
+  quantidade: number
+  valorUnitario: number | null
+  valorTotal: number | null
+  productId: string | null
+  productName: string | null
+  vinculadoPor: 'codigo-de-barras' | 'de-para' | null
+}
+
+export interface NotaFiscalLida {
+  emitenteDocumento: string | null
+  emitenteNome: string | null
+  numero: string | null
+  serie: string | null
+  chaveDeAcesso: string | null
+  emitidaEm: string | null
+  valorTotal: number | null
+  itens: NotaFiscalItemLido[]
 }
 
 export interface StockEntryItem {
@@ -147,6 +179,62 @@ export interface Loss {
   product: Product
 }
 
+export type StockCountStatus = 'em_andamento' | 'em_conferencia' | 'concluida' | 'cancelada'
+
+export interface StockCountTotals {
+  itemsCount: number
+  countedCount: number
+  pendingCount: number
+  divergentCount: number
+  /** Sobra e falta em reais; a falta já vem positiva. Ambas ficam zeradas na contagem cega. */
+  positiveValue: number
+  negativeValue: number
+  netValue: number
+}
+
+export interface StockCountSummary {
+  id: string
+  status: StockCountStatus
+  categoryId: string | null
+  categoryName: string | null
+  notes: string | null
+  startedAt: string
+  finishedAt: string | null
+  createdByUser: { id: string; name: string } | null
+  itemsCount: number
+  countedCount: number
+}
+
+export interface StockCount {
+  id: string
+  status: StockCountStatus
+  categoryId: string | null
+  categoryName: string | null
+  notes: string | null
+  cancelReason: string | null
+  startedAt: string
+  finishedAt: string | null
+  createdByUser: { id: string; name: string } | null
+  /** Falso enquanto a contagem está cega: aí saldo, custo e divergência vêm nulos ou zerados. */
+  revelada: boolean
+  resumo: StockCountTotals
+}
+
+export interface StockCountItem {
+  productId: string
+  productName: string
+  sku: string | null
+  barcode: string | null
+  categoryName: string
+  unitAbbreviation: string
+  countedQuantity: string | null
+  countedAt: string | null
+  previousQuantity: string | null
+  unitCost: string | null
+  difference: number | null
+  differenceValue: number | null
+}
+
 export type MovementType = 'entrada' | 'perda' | 'ajuste'
 
 export interface StockMovement {
@@ -176,6 +264,7 @@ export interface DashboardSummary {
     lossValue: number
     totalsByUnit: DashboardQuantityByUnit[]
   }
+  shrinkage: ShrinkageSummary
   recentMovements: StockMovement[]
   movementsTimeline: {
     date: string
@@ -203,10 +292,18 @@ export interface DashboardSummary {
   lossesByReason: {
     reason: LossReason
     lossesCount: number
+    lossValue: number
     totalsByUnit: DashboardQuantityByUnit[]
     products: DashboardProductQuantity[]
     otherProductsCount: number
   }[]
+}
+
+export interface ShrinkageSummary {
+  lossValue: number
+  entriesValue: number
+  percent: number | null
+  targetPercent: number
 }
 
 export interface DashboardQuantityByUnit {
@@ -227,7 +324,15 @@ export type SystemLogLevel = 'info' | 'warning' | 'error'
 export type SystemLogMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
 
 export type ActivityAction = 'criou' | 'alterou' | 'excluiu' | 'importou' | 'ajustou' | 'cancelou'
-export type ActivityEntity = 'produto' | 'categoria' | 'unidade' | 'usuario' | 'entrada' | 'perda' | 'estoque'
+export type ActivityEntity =
+  | 'produto'
+  | 'categoria'
+  | 'unidade'
+  | 'usuario'
+  | 'entrada'
+  | 'perda'
+  | 'estoque'
+  | 'contagem'
 
 export interface ActivityLog {
   id: string

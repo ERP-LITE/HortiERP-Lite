@@ -6,7 +6,9 @@ O HortiERP Lite é um sistema web modular para controle de estoque, entradas de 
 
 A ideia é começar com uma versão simples, funcional e vendável, focada em resolver uma dor clara: falta de controle de estoque e desperdícios/perdas de produtos.
 
-O sistema deve ser criado do zero, com arquitetura limpa, modular e preparada para evoluir futuramente para novos módulos, como PDV, emissão fiscal, integrações com balança, leitura de XML e relatórios avançados.
+O sistema deve ser criado do zero, com arquitetura limpa, modular e preparada para evoluir futuramente para novos módulos, como PDV, emissão fiscal, integrações com balança e relatórios avançados.
+
+A **leitura de XML** saiu dessa lista em 17/09/2026: a entrada de mercadoria já lê o XML da NF-e para preencher os itens. Continua valendo que o sistema **lê** nota e **não emite** nenhuma.
 
 Neste primeiro momento, NÃO implementar PDV fiscal, NFC-e, TEF, integração direta com balança ou emissão de cupom fiscal. Esses recursos devem ser pensados apenas como evolução futura.
 
@@ -27,6 +29,7 @@ Criar um MVP funcional com:
 - Controle de estoque;
 - Registro de perdas;
 - Baixa automática no estoque por perdas;
+- Contagem de estoque pelo celular, cega, com relatório de divergência antes de ajustar;
 - Histórico de movimentações;
 - Dashboard inicial;
 - Relatórios básicos;
@@ -34,7 +37,7 @@ Criar um MVP funcional com:
 - Cadastro público, em que a própria loja se cadastra e começa por um período de teste de 15 dias, com bloqueio de acesso ao fim dele e os dados preservados;
 - Estrutura modular para evolução futura.
 
-Acrescentado depois do escopo original, em 17/09/2026: o cadastro público e o período de teste. O pagamento da assinatura continua fora do sistema, feito pelo controle manual de mensalidades, e a integração com meio de pagamento (Stripe) é etapa seguinte, ainda não iniciada.
+Acrescentado depois do escopo original, em 17/09/2026: o cadastro público e o período de teste, a leitura do XML da nota fiscal, a margem alvo com preço sugerido, a quebra em percentual no painel e a contagem de estoque. O pagamento da assinatura continua fora do sistema, feito pelo controle manual de mensalidades, e a integração com meio de pagamento (Stripe) é etapa seguinte, ainda não iniciada.
 
 ---
 
