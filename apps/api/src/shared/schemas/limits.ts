@@ -30,3 +30,6 @@ export const LIMITES_NUMERO = {
 } as const
 
 export const SENHA_MAX_BYTES = 72
+
+/** Espelhado em `apps/web/src/lib/limits.ts` como `SENHA_MIN`. */
+export const SENHA_MIN_CARACTERES = 8

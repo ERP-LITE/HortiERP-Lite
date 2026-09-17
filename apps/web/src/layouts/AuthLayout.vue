@@ -2,6 +2,9 @@
 import { Sprout, Apple, Carrot, Grape, Citrus, LeafyGreen, Banana } from '@lucide/vue'
 import ThemeToggle from '@/components/ui/ThemeToggle.vue'
 import AppFooter from '@/components/AppFooter.vue'
+
+// O cadastro de empresa não cabe na largura do login, que é de um campo só por linha.
+const { size = 'sm' } = defineProps<{ size?: 'sm' | 'lg' }>()
 </script>
 
 <template>
@@ -22,7 +25,7 @@ import AppFooter from '@/components/AppFooter.vue'
     </div>
 
     <div class="relative z-10 flex flex-1 items-center justify-center px-4 py-16">
-      <div class="w-full max-w-sm">
+      <div class="w-full" :class="size === 'lg' ? 'max-w-3xl' : 'max-w-sm'">
         <div class="text-center mb-8">
           <div
             class="inline-flex items-center justify-center h-12 w-12 rounded-xl bg-primary-600 text-white mb-3 shadow-lg shadow-primary-600/20"

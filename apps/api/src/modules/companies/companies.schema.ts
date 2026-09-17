@@ -69,10 +69,25 @@ export const createCompanySchema = z.object({
 
 export const updateCompanySchema = z.object(companyFields).partial()
 
+/**
+ * Cadastro que a própria loja preenche. São os mesmos campos e as mesmas regras do cadastro feito
+ * pelo super_admin, mais o plano escolhido: um formulário com validação diferente do outro daria
+ * dois caminhos para o mesmo dado entrar no banco.
+ */
+export const publicSignupSchema = createCompanySchema.extend({
+  planId: z.string().uuid('Escolha um plano'),
+  // `literal(true)` e não `boolean()`: mandar `false` precisa ser recusado, não aceito como "não
+  // concordou". Sem aceite não há cadastro.
+  privacyAccepted: z.literal(true, {
+    errorMap: () => ({ message: 'É preciso concordar com o aviso de privacidade' }),
+  }),
+})
+
 export const setCompanyActiveSchema = z.object({
   active: z.boolean(),
 })
 
 export type CreateCompanyInput = z.infer<typeof createCompanySchema>
+export type PublicSignupInput = z.infer<typeof publicSignupSchema>
 export type UpdateCompanyInput = z.infer<typeof updateCompanySchema>
 export type SetCompanyActiveInput = z.infer<typeof setCompanyActiveSchema>

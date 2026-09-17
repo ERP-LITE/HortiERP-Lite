@@ -5,7 +5,7 @@ import { db } from './db.js'
 import { companies, products } from '../src/db/schema/index.js'
 import { createLoss } from './servicos.js'
 import { addDaysToIsoDate, todayIsoDate } from '../src/shared/utils/date.js'
-import { authCookie, createTenant, createUser, setupTestApp } from './helpers.js'
+import { authCookie, createTenant, createUser, setupTestApp, type TenantFixture } from './helpers.js'
 
 const ctx = setupTestApp()
 
@@ -147,14 +147,23 @@ describe('alertas operacionais do sino', () => {
 })
 
 describe('alertas de cobrança da plataforma', () => {
-  async function fixture(suffix: string) {
-    const target = await createTenant(`alerta-cobranca-${suffix}`)
+  /**
+   * Uma empresa-cliente por cobrança. O mês de referência sai do vencimento e só cabe uma cobrança
+   * por empresa por mês, mas atraso e vencimento próximo ficam a poucos dias de hoje e caem no
+   * mesmo mês na maior parte dos dias. Com um cliente só, o teste passaria ou falharia conforme o
+   * dia em que rodasse.
+   */
+  async function fixture(suffix: string, empresasCliente: number) {
+    const targets: TenantFixture[] = []
+    for (let indice = 0; indice < empresasCliente; indice++) {
+      targets.push(await createTenant(`alerta-cobranca-${suffix}-${indice}`))
+    }
     const [platform] = await db
       .insert(companies)
       .values({ name: `Plataforma ${suffix}` })
       .returning({ id: companies.id })
     const superAdmin = await createUser(platform.id, 'super_admin', `alerta-cobranca-${suffix}`)
-    return { target, superAdmin }
+    return { targets, superAdmin }
   }
 
   async function criarCobranca(cookie: string, companyId: string, dueDate: string, amount: number, paidAt?: string) {
@@ -176,12 +185,13 @@ describe('alertas de cobrança da plataforma', () => {
   }
 
   test('conta o atraso no sino e o vencimento próximo apenas como contexto', async () => {
-    const { target, superAdmin } = await fixture('atraso')
+    const { targets, superAdmin } = await fixture('atraso', 3)
+    const [atrasada, proxima, quitada] = targets
     const cookie = authCookie(ctx.app, superAdmin)
     const hoje = todayIsoDate()
-    await criarCobranca(cookie, target.companyId, addDaysToIsoDate(hoje, -10), 150)
-    await criarCobranca(cookie, target.companyId, addDaysToIsoDate(hoje, 3), 200)
-    await criarCobranca(cookie, target.companyId, addDaysToIsoDate(hoje, -40), 100, addDaysToIsoDate(hoje, -35))
+    await criarCobranca(cookie, atrasada.companyId, addDaysToIsoDate(hoje, -10), 150)
+    await criarCobranca(cookie, proxima.companyId, addDaysToIsoDate(hoje, 3), 200)
+    await criarCobranca(cookie, quitada.companyId, addDaysToIsoDate(hoje, -40), 100, addDaysToIsoDate(hoje, -35))
 
     const response = await ctx.app.inject({ method: 'GET', url: '/api/billings/alerts', headers: { cookie } })
 

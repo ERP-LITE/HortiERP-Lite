@@ -22,6 +22,9 @@ export const LIMITES_TEXTO = {
   busca: 160,
 } as const
 
+/** Espelho de `SENHA_MIN_CARACTERES` da API. O teto fica em `LIMITES_TEXTO.senha`. */
+export const SENHA_MIN = 8
+
 export const LIMITES_NUMERO = {
   quantidade: 999_999.999,
   valorUnitario: 9_999_999.99,

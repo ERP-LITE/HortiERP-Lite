@@ -1,4 +1,5 @@
 import { computed, ref, type Ref } from 'vue'
+import { useFieldErrors } from './useFieldErrors'
 import { toastError, toastSuccess } from '@/lib/alerts'
 import { resolveFormError } from '@/services/api'
 
@@ -26,16 +27,11 @@ export function useCrudModal<TForm, TEntity extends { id: string }, TCreated = u
   const editingId = ref<string | null>(null)
   const saving = ref(false)
   const form = ref(options.emptyForm()) as Ref<TForm>
-  const fieldErrors = ref<Record<string, string>>({})
   const isEditing = computed(() => editingId.value !== null)
 
-  function clearFieldErrors(...fields: string[]) {
-    if (fields.length === 0) {
-      fieldErrors.value = {}
-      return
-    }
-    for (const field of fields) delete fieldErrors.value[field]
-  }
+  // O espalhamento monta um objeto novo a cada leitura, que é o que dá ao observador um "antes"
+  // comparável. Raso de propósito: os campos destes formulários são valores simples.
+  const { fieldErrors, clearFieldErrors } = useFieldErrors(() => ({ ...(form.value as object) }))
 
   function openModal(entity: TEntity | null) {
     editingId.value = entity?.id ?? null

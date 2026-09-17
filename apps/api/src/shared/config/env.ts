@@ -38,24 +38,38 @@ const envSchema = z
           .array(z.string().url('CORS_ORIGIN deve conter apenas URLs válidas'))
           .min(1, 'CORS_ORIGIN deve ter ao menos uma origem'),
       ),
-    // Número de proxies na frente da API, não booleano. `true` confiaria em todos os saltos, e aí o
-    // `request.ip` passa a ser o valor mais à esquerda do X-Forwarded-For, que quem chama escreve:
-    // o limite de tentativas por IP viraria enfeite e o IP do log seria inventado.
+    // Endereço de quem pode falar pela API, não contagem de saltos nem booleano. Aceita IP, faixa
+    // CIDR, lista separada por vírgula ou o apelido `uniquelocal`, que cobre as faixas privadas
+    // onde os containers do Compose vivem. Os dois valores recusados abaixo erram para lados
+    // opostos e nenhum dos dois reclama sozinho.
     TRUST_PROXY: z
       .string()
+      .trim()
       .default('false')
       .transform((value, ctx) => {
         if (value === 'false') return false
-        const saltos = Number(value)
-        if (!Number.isInteger(saltos) || saltos < 1) {
+
+        if (value === 'true') {
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
             message:
-              'TRUST_PROXY deve ser `false` ou a quantidade de proxies na frente da API (1 com o gateway padrão). `true` não vale: confiaria em qualquer X-Forwarded-For enviado pelo cliente.',
+              'TRUST_PROXY `true` confiaria em qualquer X-Forwarded-For: o `request.ip` viraria o que quem chama escrever, o limite de tentativas por IP viraria enfeite e o IP do log seria inventado. Informe o endereço ou a faixa do proxy (`uniquelocal` cobre as faixas privadas do Docker).',
           })
           return z.NEVER
         }
-        return saltos
+
+        if (/^\d+$/.test(value)) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message:
+              'TRUST_PROXY por contagem de saltos não vale mais: desde o Fastify 5.12 ela recusa todos os peers (correção do GHSA-3m5p-2c4r-xxw2) e passa a valer o mesmo que `false`, sem avisar. Informe o endereço ou a faixa do proxy (`uniquelocal` cobre as faixas privadas do Docker).',
+          })
+          return z.NEVER
+        }
+
+        // A sintaxe em si quem confere é o proxy-addr, quando o Fastify monta a instância: errado
+        // ali, a API não sobe. O que não pode é passar batido, que é o caso dos dois acima.
+        return value
       }),
     INVOICE_STORAGE_PATH: z.string().min(1).default('./storage/invoices'),
     INVOICE_MAX_FILE_SIZE: z.coerce.number().int().positive().default(10 * 1024 * 1024),
@@ -81,6 +95,32 @@ const envSchema = z
     ERROR_ALERT_INTERVAL_SECONDS: z.coerce.number().int().min(60).default(900),
     // 1 = todo erro de servidor merece um olhar. Num sistema saudável esse número fica em zero.
     ERROR_ALERT_THRESHOLD: z.coerce.number().int().min(1).default(1),
+    RESEND_API_KEY: z
+      .string()
+      .trim()
+      .optional()
+      .transform((value) => value || undefined),
+    // Precisa ser de um domínio verificado na Resend. O endereço de exemplo `onboarding@resend.dev`
+    // só entrega para o dono da conta, então serve para desenvolvimento e não para cliente.
+    MAIL_FROM: z
+      .string()
+      .trim()
+      .optional()
+      .transform((value) => value || undefined),
+    // Base do link que vai no e-mail. Sem valor próprio cai na primeira origem do CORS, que em
+    // produção é exatamente o endereço público do sistema.
+    APP_PUBLIC_URL: z
+      .string()
+      .trim()
+      .optional()
+      .transform((value) => value?.replace(/\/+$/, '') || undefined)
+      .pipe(z.string().url('APP_PUBLIC_URL deve ser uma URL válida').optional()),
+    // Curto de propósito: o link é credencial de troca de senha viajando por e-mail, e caixa de
+    // entrada invadida é justamente o cenário que o prazo limita.
+    PASSWORD_RESET_TTL_MINUTES: z.coerce.number().int().min(5).max(1440).default(60),
+    // Janela em que um novo pedido para a mesma conta não dispara outro e-mail. Sem ela, qualquer
+    // pessoa entope a caixa de entrada de um usuário repetindo o formulário.
+    PASSWORD_RESET_COOLDOWN_MINUTES: z.coerce.number().int().min(1).max(60).default(2),
   })
   .superRefine((value, context) => {
     if (value.NODE_ENV !== 'production') return
@@ -118,7 +158,7 @@ const envSchema = z
         code: z.ZodIssueCode.custom,
         path: ['TRUST_PROXY'],
         message:
-          'TRUST_PROXY deve ser o número de proxies na frente da API (1 com o gateway padrão). Com false, todo cliente chega como o IP do gateway e o limite de tentativas passa a ser compartilhado por todos.',
+          'TRUST_PROXY deve ser o endereço ou a faixa do proxy na frente da API (`uniquelocal` com o gateway padrão). Com false, todo cliente chega como o IP do gateway e o limite de tentativas passa a ser compartilhado por todos.',
       })
     }
 
@@ -129,11 +169,31 @@ const envSchema = z
         message: 'CORS_ORIGIN deve usar HTTPS em produção',
       })
     }
+
   })
+
+/**
+ * Fora de produção o log faz as vezes da caixa de entrada, e é assim que se testa a redefinição sem
+ * conta na Resend. Em produção não há log para a pessoa ler, então o pedido é recusado.
+ */
+export function recuperacaoPorEmailDisponivel(opcoes: {
+  nodeEnv: string
+  resendApiKey?: string
+  mailFrom?: string
+}) {
+  if (opcoes.nodeEnv !== 'production') return true
+  return Boolean(opcoes.resendApiKey && opcoes.mailFrom)
+}
 
 const parsedSchema = envSchema.transform((value) => ({
   ...value,
   APP_DATABASE_URL: value.APP_DATABASE_URL ?? value.DATABASE_URL,
+  APP_PUBLIC_URL: value.APP_PUBLIC_URL ?? value.CORS_ORIGIN[0],
+  RECUPERACAO_POR_EMAIL_DISPONIVEL: recuperacaoPorEmailDisponivel({
+    nodeEnv: value.NODE_ENV,
+    resendApiKey: value.RESEND_API_KEY,
+    mailFrom: value.MAIL_FROM,
+  }),
 }))
 
 const parsed = parsedSchema.safeParse(process.env)
@@ -144,6 +204,14 @@ if (!parsed.success) {
 }
 
 export const env = parsed.data
+
+// Gritado no boot porque nada quebra até alguém precisar recuperar a senha, e aí é tarde.
+if (env.NODE_ENV === 'production' && !env.RECUPERACAO_POR_EMAIL_DISPONIVEL) {
+  console.warn(
+    '[ATENÇÃO] RESEND_API_KEY e/ou MAIL_FROM não definidas: "Esqueci minha senha" responderá que está indisponível. ' +
+      'O restante do sistema funciona normalmente. Para ligar, veja docs/deploy-producao.md.',
+  )
+}
 
 if (env.NODE_ENV !== 'production' && !process.env.APP_DATABASE_URL) {
   console.warn(

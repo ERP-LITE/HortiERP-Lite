@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import { homeRouteName } from '@/lib/roles'
 import { useAuthStore } from '@/stores/auth'
 
 const router = createRouter({
@@ -9,6 +10,35 @@ const router = createRouter({
       name: 'login',
       component: () => import('@/modules/auth/LoginView.vue'),
       meta: { public: true },
+    },
+    {
+      path: '/esqueci-senha',
+      name: 'esqueci-senha',
+      component: () => import('@/modules/auth/ForgotPasswordView.vue'),
+      meta: { public: true },
+    },
+    {
+      // Pública porque quem chega aqui está justamente sem conseguir entrar. Quem autentica é o
+      // token do link, não a sessão.
+      path: '/redefinir-senha',
+      name: 'redefinir-senha',
+      component: () => import('@/modules/auth/ResetPasswordView.vue'),
+      meta: { public: true },
+    },
+    {
+      // Pública porque quem se cadastra ainda não tem empresa nem sessão. É a única tela do sistema
+      // que cria empresa sem alguém autenticado do outro lado.
+      path: '/criar-conta',
+      name: 'criar-conta',
+      component: () => import('@/modules/assinatura/SignupView.vue'),
+      meta: { public: true },
+    },
+    {
+      // Autenticada, mas de propósito fora do bloqueio: é para cá que quem teve o teste vencido é
+      // mandado, então bloqueá-la deixaria a pessoa sem nenhuma tela para onde ir.
+      path: '/assinatura',
+      name: 'assinatura',
+      component: () => import('@/modules/assinatura/SubscriptionView.vue'),
     },
     {
       // Pública de propósito: a pessoa precisa poder ler o aviso **antes** de entrar no sistema,
@@ -115,6 +145,13 @@ const router = createRouter({
       props: { mode: 'technical' },
       meta: { roles: ['super_admin'] },
     },
+    {
+      // Precisa ser a última: casa com tudo que nenhuma rota acima pegou. Sem ela o nginx devolve o
+      // index.html para qualquer endereço e o Vue monta o layout com o miolo vazio, sem dizer nada.
+      path: '/:pathMatch(.*)*',
+      name: 'nao-encontrada',
+      component: () => import('@/modules/erros/NotFoundView.vue'),
+    },
   ],
 })
 
@@ -133,7 +170,7 @@ router.beforeEach(async (to) => {
   }
 
   if (to.name === 'login' && isAuthenticated) {
-    return { name: isSuperAdmin ? 'selecionar-empresa' : 'dashboard' }
+    return { name: homeRouteName(auth.user?.role) }
   }
 
   if (
@@ -143,7 +180,10 @@ router.beforeEach(async (to) => {
     to.name !== 'cobrancas' &&
     to.name !== 'selecionar-empresa' &&
     to.name !== 'logs-tecnicos' &&
-    to.name !== 'perfil'
+    to.name !== 'perfil' &&
+    // Fora da lista o super admin volta para a escolha de empresa, mas endereço inexistente merece
+    // a mesma resposta que os outros papéis recebem, senão o erro de digitação vira desvio mudo.
+    to.name !== 'nao-encontrada'
   ) {
     return { name: 'selecionar-empresa' }
   }

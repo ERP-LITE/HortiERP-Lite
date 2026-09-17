@@ -13,7 +13,7 @@ import Pagination from '@/components/ui/Pagination.vue'
 import SearchInput from '@/components/ui/SearchInput.vue'
 import PrintButton from '@/components/ui/PrintButton.vue'
 import BulkSelectionBar from '@/components/ui/BulkSelectionBar.vue'
-import TableCheckbox from '@/components/ui/TableCheckbox.vue'
+import BaseCheckbox from '@/components/ui/BaseCheckbox.vue'
 import SortableTableHeader from '@/components/ui/SortableTableHeader.vue'
 import ExpandableText from '@/components/ui/ExpandableText.vue'
 import StatusBadge from '@/components/ui/StatusBadge.vue'
@@ -139,7 +139,7 @@ onMounted(loadCategories)
         <thead class="bg-gray-50 dark:bg-gray-900/60">
           <tr>
             <th v-if="canManage" class="print:hidden w-12 px-4 py-3">
-              <TableCheckbox
+              <BaseCheckbox
                 :checked="allVisibleSelected"
                 label="Selecionar todas as categorias desta página"
                 @toggle="toggleAllVisible"
@@ -170,7 +170,7 @@ onMounted(loadCategories)
             @dblclick="canManage && openEditModal(category)"
           >
             <td v-if="canManage" class="print:hidden px-4 py-3" @dblclick.stop @click.stop>
-              <TableCheckbox
+              <BaseCheckbox
                 :checked="selectedIds.includes(category.id)"
                 :label="`Selecionar categoria ${category.name}`"
                 @toggle="toggleOne(category.id)"

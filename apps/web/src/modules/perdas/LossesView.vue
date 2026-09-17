@@ -28,6 +28,7 @@ import { cancelLoss, createLoss, listAllLosses, listLosses, updateLoss } from '@
 import { csvNumber } from '@/lib/csv'
 import { useAsyncState } from '@/composables/useAsyncState'
 import { useCrudModal } from '@/composables/useCrudModal'
+import { useFieldErrors } from '@/composables/useFieldErrors'
 import { useFilterModal } from '@/composables/useFilterModal'
 import { usePagination } from '@/composables/usePagination'
 import { usePermissions } from '@/composables/usePermissions'
@@ -74,7 +75,7 @@ const cancelModalOpen = ref(false)
 const cancelling = ref(false)
 const cancelTarget = ref<Loss | null>(null)
 const cancelForm = ref({ cancelReason: '' })
-const cancelErrors = ref<Record<string, string>>({})
+const { fieldErrors: cancelErrors } = useFieldErrors(() => ({ ...cancelForm.value }))
 
 const productOptions = computed(() => products.value.map((p) => ({ value: p.id, label: p.name })))
 const productFilterOptions = computed(() => [{ value: 'todos', label: 'Todos os produtos' }, ...productOptions.value])

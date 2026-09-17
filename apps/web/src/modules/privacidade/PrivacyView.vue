@@ -3,8 +3,8 @@ import { ArrowLeft, Sprout } from '@lucide/vue'
 import ThemeToggle from '@/components/ui/ThemeToggle.vue'
 import AppFooter from '@/components/AppFooter.vue'
 
-const atualizadoEm = '25 de agosto de 2026'
-const conteudoRevisado = 'sha256-W9VWvMCHkQYxxtXHvh/Xaam9aUXX93tPfQ+oyNxS4XM='
+const atualizadoEm = '16 de setembro de 2026'
+const conteudoRevisado = 'sha256-rMlbkCylias/qruOFv1ZDnmfw3UUUMJvFyPIci9hj/E='
 const suporte = '(47) 99154-0607'
 </script>
 
@@ -126,6 +126,12 @@ const suporte = '(47) 99154-0607'
             embaralhadas antes de sair do servidor e guardadas em outro provedor, no exterior. Quem
             armazena não tem como ler o conteúdo, porque a chave não fica com eles.
           </p>
+          <p class="mt-2">
+            Uma exceção, e é justo dizer qual: para <strong class="font-semibold">enviar o e-mail de redefinição
+            de senha</strong>, usamos um serviço de envio que precisa saber seu nome e seu endereço de e-mail. A
+            mensagem sai de um servidor no Brasil, mas o registro do envio (para quem foi e quando) fica em
+            servidores nos Estados Unidos, por 30 dias. Esse e-mail não leva senha nem dado do seu negócio.
+          </p>
         </section>
 
         <section>
@@ -152,6 +158,7 @@ const suporte = '(47) 99154-0607'
             <li>O sistema encerra a sessão sozinho depois de 30 minutos sem uso.</li>
             <li>Cada pessoa só alcança o que o perfil dela permite, e isso é verificado no servidor.</li>
             <li>As cópias de segurança são diárias, embaralhadas e testadas.</li>
+            <li>O link de redefinição de senha vale por pouco tempo, serve uma vez só e não fica legível no banco.</li>
           </ul>
         </section>
 
@@ -163,7 +170,10 @@ const suporte = '(47) 99154-0607'
             <li>Não há anúncio nem rastreamento de navegação dentro do sistema.</li>
             <li>Não guardamos dado de saúde, biometria, religião, opinião política ou nada parecido.</li>
             <li>Não existe nenhuma decisão automática do sistema a seu respeito: ele conta estoque, não avalia pessoas.</li>
-            <li>O sistema não envia e-mail, nem de aviso, nem de recuperação de senha.</li>
+            <li>
+              O único e-mail que o sistema envia é o de redefinição de senha, e só quando você pede.
+              Não mandamos aviso de estoque, novidade nem propaganda.
+            </li>
           </ul>
         </section>
 

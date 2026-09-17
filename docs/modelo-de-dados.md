@@ -27,6 +27,7 @@ erDiagram
   COMPANIES ||--o{ STOCK_MOVEMENTS : ""
   COMPANIES ||--o{ SYSTEM_LOGS : ""
   COMPANIES ||--o{ COMPANY_BILLINGS : recebe
+  USERS ||--o{ PASSWORD_RESET_TOKENS : pede
   CATEGORIES ||--o{ PRODUCTS : classifica
   UNITS ||--o{ PRODUCTS : mede
   STOCK_ENTRIES ||--o{ STOCK_ENTRY_ITEMS : contem
@@ -43,16 +44,50 @@ Raiz do multiempresa — cada linha é um cliente (frutaria/hortifrúti) contrat
 | Coluna | Tipo | Observação |
 |---|---|---|
 | `id` | uuid | PK |
-| `name`, `legalName` | text | nome fantasia e razão social; os registros anteriores à migration podem ter `legalName` nulo |
+| `name`, `legalName` | text | nome fantasia e razão social; os registros anteriores à migration podem ter `legalName` nulo. Os dois são **únicos entre empresas não excluídas** |
 | `document` | text | CNPJ normalizado, sem pontuação e em maiúsculas (14 posições, as 12 primeiras podendo ser letra no modelo alfanumérico), validado na API e único entre empresas não excluídas |
-| `stateRegistration` | text | inscrição estadual opcional |
-| `contactName`, `contactEmail`, `phone` | text | responsável e canais de contato; telefone é persistido apenas com dígitos |
+| `stateRegistration` | text | inscrição estadual opcional; única entre empresas não excluídas **apenas quando contém algum dígito**, porque "Isento" é a ausência de inscrição e se repete |
+| `contactName`, `contactEmail`, `phone` | text | responsável e canais de contato; telefone é persistido apenas com dígitos. O e-mail é único entre empresas não excluídas; nome e telefone **podem repetir**, porque o mesmo dono com duas lojas usa o mesmo contato |
 | `postalCode`, `street`, `addressNumber` | text | CEP normalizado, logradouro e número |
 | `complement`, `district`, `city`, `state` | text | complemento opcional, bairro, cidade e UF (sigla de duas letras, validada contra a lista das 27) |
 | `active` | boolean | default `true` — `false` = empresa suspensa, bloqueia login e requisições de todos os usuários dela sem alterar `users.active` |
+| `planId` | uuid | FK para `plans`, nulo nas empresas cadastradas pelo `super_admin` antes da assinatura existir |
+| `subscriptionStatus` | subscription_status | default `ativa`; `teste` só em quem se cadastrou sozinho |
+| `trialEndsOn` | date | último dia do teste, inclusive. `date` e não timestamp: a contagem é de dias corridos |
+| `privacyAcceptedAt` | timestamp | quando a pessoa marcou o aceite do aviso de privacidade no cadastro público; nulo nas empresas cadastradas pela plataforma, onde o aceite acontece na assinatura do contrato |
+| `stripeCustomerId`, `stripeSubscriptionId` | text | reservados para a integração de pagamento, ainda não preenchidos |
 | `createdAt`/`updatedAt`/`deletedAt` | timestamp | |
 
+Os cinco índices únicos (`document`, `name`, `legalName`, `stateRegistration`, `contactEmail`) são
+parciais em `deleted_at is null` e comparam por `lower(trim(...))`: excluir uma empresa devolve os
+valores para uso. Endereço, telefone e nome do contato não têm índice único, por decisão registrada em
+[decisões arquiteturais](./decisoes-arquiteturais.md).
+
 Os campos cadastrais novos são nuláveis no banco para que empresas criadas antes da migration continuem legíveis. A API exige os dados essenciais ao criar uma empresa nova; editar um registro legado pela tela também solicita sua regularização. CNPJ, telefone e CEP são armazenados sem máscara, que é responsabilidade da interface.
+
+### `plans`
+
+Lista de preços da plataforma. **Não tem coluna de empresa**, e é a única tabela nessa situação junto com a linha
+especial da plataforma: ela é lida na tela de cadastro, por quem ainda não tem empresa nenhuma.
+
+| Coluna | Tipo | Observação |
+|---|---|---|
+| `id` | uuid | PK |
+| `name` | text | nome do plano exibido na escolha |
+| `description` | text | uma linha sobre o que está incluso, opcional |
+| `monthlyAmount` | numeric(12,2) | mensalidade cobrada depois do teste |
+| `trialDays` | integer | duração do teste grátis, contada em dias corridos |
+| `stripePriceId` | text | reservado para a integração de pagamento |
+| `active` | boolean | default `true`; plano inativo some da tela de cadastro |
+| `createdAt`/`updatedAt`/`deletedAt` | timestamp | |
+
+O preço mora no banco, e não em constante no código, para mudá-lo não exigir publicação de versão: trocar o valor é
+um `UPDATE` nesta tabela. A migration `0011` semeia um plano único.
+
+As políticas de RLS desta tabela são **duas**, e a divisão é o ponto: `plans_leitura` libera o `SELECT` em qualquer
+escopo, porque preço é público e a tabela não guarda dado de cliente; `plans_escrita_plataforma` mantém
+`INSERT`/`UPDATE`/`DELETE` presos ao escopo de plataforma. Numa política única, o `USING (true)` necessário para a
+leitura valeria também para o `UPDATE`, e qualquer empresa autenticada poderia reescrever o próprio preço.
 
 ### `company_billings`
 
@@ -96,6 +131,29 @@ A unicidade vem do índice parcial `users_email_active_unique`, sobre `lower(ema
 - **`deleted_at is null`** — sem o filtro, o e-mail de um usuário excluído ficava reservado para sempre, e recontratar a mesma pessoa respondia "já existe um usuário com esse e-mail" apontando para alguém invisível em toda tela. É o mesmo padrão parcial que produtos, categorias e unidades já usavam; `assertUniqueUserEmail` aplica a mesma regra na checagem amigável.
 
 O bloqueio de uma empresa suspensa vem de `companies.active`, verificado no login e em toda requisição autenticada — `users.active` não espelha esse valor, para que reativar a empresa não devolva acesso a quem foi desativado à mão.
+
+### `password_reset_tokens`
+| Coluna | Tipo | Observação |
+|---|---|---|
+| `id` | uuid | PK |
+| `companyId` | uuid | FK `companies.id`. Não é usado para achar o token; existe para a linha caber na política de RLS e sair no apagamento definitivo da empresa |
+| `userId` | uuid | FK `users.id`, **`on delete cascade`** |
+| `tokenHash` | varchar(64) | SHA-256 do token, em hexadecimal. Único |
+| `expiresAt` | timestamptz | 1 hora por padrão (`PASSWORD_RESET_TTL_MINUTES`) |
+| `usedAt` | timestamptz | nulável. Preenchido torna o link inútil |
+| `createdAt` | timestamptz | base da carência entre dois pedidos (`PASSWORD_RESET_COOLDOWN_MINUTES`) |
+
+**O token em claro nunca é gravado.** A coluna guarda o SHA-256 dele, então um dump ou um backup não
+dá a ninguém o poder de redefinir senha. Não é bcrypt porque a busca é por igualdade exata e bcrypt
+não indexa; com 256 bits de aleatoriedade no token, não existe dicionário que ataque o resumo.
+
+**`on delete cascade` é a única exceção ao padrão do schema**, que em todo o resto usa `restrict` ou
+`set null` para preservar histórico. Aqui é o contrário de propósito: o pedido é rastro de um
+processo, não registro de negócio, e não deve sobreviver à conta que o originou.
+
+Usar um link marca `usedAt` em **todos** os pedidos em aberto daquele usuário, não só no usado: quem
+clicou duas vezes em "esqueci minha senha" não pode ficar com um link vivo sobrando na caixa de
+entrada. A retenção apaga a linha 7 dias depois do vencimento (`PASSWORD_RESET_KEEP_DAYS`).
 
 ### `categories`
 Classificação de produtos (ex: Frutas, Verduras). `id`, `companyId`, `name`, `description?`, `active`, timestamps, auditBy.
@@ -194,3 +252,6 @@ As rotas de consulta de log e os caminhos de healthcheck (`/health` e `/api/heal
 - `user_role`: `admin`, `gerente`, `operador`, `super_admin`
 - `movement_type`: `entrada`, `perda`, `ajuste`
 - `loss_reason`: `vencido`, `avariado`, `roubo_furto`, `erro_operacional`, `outro`
+- `subscription_status`: `teste`, `ativa`, `atrasada`, `cancelada`. Em português como os demais, e não nos nomes que
+  a Stripe usa: o valor aparece em tela, e traduzir na borda impede que um estado criado lá dentro entre no banco sem
+  alguém decidir o que ele significa aqui

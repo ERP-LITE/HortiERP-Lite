@@ -53,6 +53,21 @@ async function localizarParaLogin(email: string, password: string) {
   return contaUsavel
 }
 
+/**
+ * Travessia declarada: o e-mail é único global e quem pede a redefinição ainda não tem sessão.
+ * Devolve `null` em vez de erro porque quem chama não pode revelar se a conta existe.
+ */
+export async function findUsableUserByEmail(email: string) {
+  return comEscopoDePlataforma(async () => {
+    const found = await db.query.users.findFirst({
+      where: and(eq(users.email, email), isNull(users.deletedAt)),
+      with: { company: true },
+    })
+
+    return isAccountUsable(found)
+  })
+}
+
 // Travessia declarada: durante impersonação a conta de quem está logado é de outra empresa.
 export async function getUserProfile(companyId: string, userId: string) {
   return comEscopoDePlataforma(() => localizarPerfil(companyId, userId))
@@ -78,7 +93,11 @@ export async function changeOwnPassword(
   const currentPasswordMatches = await bcrypt.compare(currentPassword, user.passwordHash)
 
   if (!currentPasswordMatches) {
-    throw new AppError('Senha atual incorreta', 400, 'INVALID_CURRENT_PASSWORD')
+    // Com o campo declarado em `issues`, a tela mostra o aviso embaixo de "Senha atual" em vez de
+    // num parágrafo solto: é o erro mais comum desta tela, e é sobre um campo específico.
+    throw new AppError('Senha atual incorreta', 400, 'INVALID_CURRENT_PASSWORD', {
+      currentPassword: ['Senha atual incorreta'],
+    })
   }
 
   const passwordHash = await bcrypt.hash(newPassword, 10)

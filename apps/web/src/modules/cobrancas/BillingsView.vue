@@ -18,6 +18,7 @@ import MonthInput from '@/components/ui/MonthInput.vue'
 import SortableTableHeader from '@/components/ui/SortableTableHeader.vue'
 import ExpandableText from '@/components/ui/ExpandableText.vue'
 import { useAsyncState } from '@/composables/useAsyncState'
+import { useFieldErrors } from '@/composables/useFieldErrors'
 import { usePagination } from '@/composables/usePagination'
 import { useFilterModal } from '@/composables/useFilterModal'
 import { useTableSort } from '@/composables/useTableSort'
@@ -47,7 +48,6 @@ const search = ref('')
 const modalOpen = ref(false)
 const editingId = ref<string | null>(null)
 const markedPaid = ref(false)
-const fieldErrors = ref<Record<string, string>>({})
 
 function emptyFilters() {
   return { status: 'todos', period: { preset: 'todos', from: '', to: '' } as PeriodValue }
@@ -97,6 +97,7 @@ const emptyForm = (): BillingForm => ({
   notes: '',
 })
 const form = ref<BillingForm>(emptyForm())
+const { fieldErrors } = useFieldErrors(() => ({ ...form.value }))
 
 const statusOptions = [
   { value: 'todos', label: 'Todas as situações' },

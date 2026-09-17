@@ -71,6 +71,34 @@
       "when": 1787834923180,
       "tag": "0009_senha_alterada_em",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1787921323180,
+      "tag": "0010_recuperacao_de_senha",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1789000000000,
+      "tag": "0011_cadastro_publico_e_assinatura",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1789100000000,
+      "tag": "0012_nome_fantasia_unico",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1789200000000,
+      "tag": "0013_empresa_sem_duplicata",
+      "breakpoints": true
     }
   ]
 }

@@ -94,7 +94,7 @@ divergindo justamente na virada do dia, quando a diferença aparece pro usuário
 
 Empresas-cliente novas exigem cadastro comercial completo. Os campos acrescentados continuam nuláveis no PostgreSQL por compatibilidade com a empresa Plataforma e instalações anteriores; a obrigatoriedade fica na validação do endpoint de criação. Documentos são normalizados antes da persistência, e um índice parcial garante CNPJ único entre registros não excluídos mesmo sob requisições concorrentes.
 
-A consulta de CEP é uma conveniência do frontend, não uma fonte autoritativa nem uma condição para salvar: os campos podem ser corrigidos manualmente. O cliente tenta sequencialmente BrasilAPI, ViaCEP e OpenCEP, com timeout por provedor. Essa redundância evita indisponibilidade do cadastro quando um serviço gratuito falha e não acrescenta credenciais ou dados pessoais à requisição — somente os oito dígitos do CEP são enviados.
+A consulta de CEP é uma conveniência do frontend, não uma fonte autoritativa nem uma condição para salvar: os campos podem ser corrigidos manualmente. A rota é **pública** desde 17/09/2026, porque o cadastro que a própria loja preenche também a usa (ver a seção sobre cadastro público e período de teste). O cliente tenta sequencialmente BrasilAPI, ViaCEP e OpenCEP, com timeout por provedor. Essa redundância evita indisponibilidade do cadastro quando um serviço gratuito falha e não acrescenta credenciais ou dados pessoais à requisição — somente os oito dígitos do CEP são enviados.
 
 `super_admin` nunca é criável pela tela de cadastro de usuários de uma empresa-cliente (o Zod schema de `users` deliberadamente só aceita os outros 3 papéis). O primeiro acesso nasce pelo bootstrap; depois disso, um `super_admin` pode gerenciar outros usuários da plataforma na seção de configurações gerais. As rotas dedicadas sempre fixam `role: super_admin` e `companyId` na empresa Plataforma, e impedem que o usuário autenticado exclua a própria conta.
 
@@ -903,6 +903,60 @@ as duas ganharam a checagem em JavaScript na mesma mudança.
 A consequência prática é uma regra: **`required` é uma afirmação sobre a etiqueta, não sobre a
 validação**. Se o `validate()` da tela não cobre o campo, o asterisco está mentindo.
 
+### Campo com erro: um vermelho só, e ele some quando a pessoa corrige
+
+A mensagem sob o campo passava despercebida em tela de celular, então o campo com erro também ganhou
+borda e anel vermelhos. Três decisões seguraram isso em pé.
+
+**A aparência mora num lugar só.** `fieldClasses.ts` exporta `CLASSE_CAMPO_COM_ERRO`, e `BaseInput`,
+`BaseSelect` e `DateInput` apontam para lá. O `!` das classes não é preguiça: a borda padrão é
+`dark:border-gray-600`, que o Tailwind gera como `.dark\:border-gray-600:is(.dark *)`, duas classes de
+especificidade contra uma. Sem o `!`, o campo ficava vermelho no tema claro e não ficava no escuro,
+em silêncio.
+
+**Campo com erro não tem anel verde.** O anel de foco é `focus:ring-primary-500` e vencia o vermelho
+por especificidade, então clicar num campo errado dava borda vermelha com halo verde em volta, duas
+cores dizendo coisas opostas. O `focus:!ring-red-500` no token resolve: campo com erro é vermelho
+inteiro, focado ou não, e o foco muda a intensidade do anel, não a cor.
+
+**O erro some quando a pessoa mexe naquele campo.** Erro que continua vermelho enquanto se corrige
+ensina a ignorar o vermelho. Quem cuida disso é `useFieldErrors`, e ele apaga só o campo que mudou:
+corrigir o e-mail não pode dar a impressão de que a senha foi resolvida.
+
+O composable recebe **uma função** que monta o objeto de valores, não um objeto reativo. Isso é o que
+dá ao `watch` um "antes" de verdade: com `deep: true` sobre um objeto mutado no lugar, o Vue entrega
+o mesmo objeto nos dois argumentos e nada nunca parece ter mudado. De quebra, a função deixa a tela
+juntar campos que moram em `ref` separados (login, redefinição de senha) com os que moram num
+formulário só.
+
+O caso que derruba a solução ingênua é o reenvio: apagar o campo, enviar de novo e receber a **mesma**
+frase de erro. Como quem reexibe é o `validate()` da tela, e não o `watch`, o vermelho volta mesmo com
+a mensagem idêntica. Se fosse o observador a reexibir, ele não veria mudança nenhuma e o botão
+pareceria quebrado.
+
+**Lista de itens tem o erro na célula, não no formulário.** A entrada de mercadoria e o ajuste de
+estoque em lote têm produto e quantidade por linha, e corrigir a linha 3 não pode apagar o erro da
+linha 1. `useRowErrors` compara por índice **e** por campo. Linha adicionada ou removida embaralha os
+índices, e por isso as duas telas zeram a lista inteira de erros nessas ações, em vez de o composable
+tentar adivinhar o remanejamento.
+
+**Erro que é sobre um campo precisa chegar da API dizendo qual.** A troca de senha no Perfil era o
+contraexemplo: "Senha atual incorreta" voltava como mensagem solta, e a tela só podia mostrá-la num
+parágrafo acima do formulário, longe do campo a corrigir. Hoje o `AppError` declara o campo em
+`issues`, o `resolveFormError` transforma isso em erro de campo e a frase aparece embaixo de "Senha
+atual", como em qualquer outra tela. A regra que ficou: se o erro é sobre um campo, quem sabe disso é
+a API, e ela diz; o parágrafo do formulário é só para o que não pertence a campo nenhum.
+
+As regras da senha nova moram em `validateNewPassword`, compartilhado pela redefinição por link e pela
+troca no Perfil. Antes de existir, o Perfil validava menos: não checava o mínimo de caracteres nem o
+corte do bcrypt no 72º byte, então uma senha longa com acentos passava na tela e só falhava no
+servidor.
+
+Nenhum estado de erro de campo vive solto numa tela: todos vêm de `useFieldErrors` ou `useRowErrors`
+(o `useCrudModal` também, que só repassa o primeiro). O que continua sendo `ref` de string na tela é
+mensagem de formulário, não de campo: o aviso de planilha inválida na importação de produtos e a
+mensagem de topo dos detalhes da entrada.
+
 ### Um jeito só de escolher numa lista
 
 O `BaseSelect` tinha dois modos: o normal (botão com a seta que gira, lista flutuante e campo de
@@ -1110,6 +1164,261 @@ dentro da bolinha.
 Erro na consulta dos alertas não vira aviso na tela; o painel mostra que não foi possível consultar e a verificação se
 repete no intervalo seguinte. Alerta é informação secundária, e um aviso de erro sobre o formulário de quem está
 lançando uma entrada custa mais atenção do que a informação valia.
+
+## Cadastro público e período de teste
+
+### O que não pode se repetir entre empresas, e o que pode
+
+Cinco campos da empresa são únicos entre empresas não excluídas. A lista mora em
+`CAMPOS_UNICOS_DA_EMPRESA`, e acrescentar um campo é uma linha ali mais o índice na migração.
+
+| Campo | Por quê |
+|---|---|
+| CNPJ | identificador da empresa, único por definição |
+| Razão social | registrada na Junta Comercial, única na prática |
+| Inscrição estadual | registrada na Secretaria da Fazenda |
+| Nome fantasia | **não** é único no mundo real; entra por decisão de operação |
+| E-mail de contato | dois cadastros na mesma caixa de entrada são quase sempre o mesmo cadastro duas vezes |
+
+**O que fica de fora é decisão, não esquecimento.** Telefone, nome do contato e endereço podem
+repetir, porque cada um tem um caso legítimo frequente: o mesmo dono com duas lojas usa o mesmo
+celular, dois "João Silva" existem, e duas empresas dividem endereço em galeria, box de mercado
+municipal ou prédio compartilhado. O nome do administrador também repete, porque o e-mail dele já é
+único em todo o sistema e é ele que identifica a conta.
+
+As duas regras que não vêm do mundo real, nome fantasia e e-mail de contato, existem porque quem
+administra escolhe a empresa por uma lista de nomes: duas linhas idênticas ali levam a lançar
+cobrança, suspender acesso ou entrar em modo suporte na empresa errada. O CNPJ, que é o identificador
+de verdade, não aparece na hora de escolher.
+
+A consequência aceita fica registrada para quem encontrar isso depois: **um dia o nome fantasia vai
+recusar um cliente legítimo**, porque "Frutaria Bom Preço" existe em vários bairros. Quando acontecer,
+o caminho é tirar a linha de `CAMPOS_UNICOS_DA_EMPRESA` e derrubar o índice
+`companies_name_active_unique` juntos, e resolver a identificação na lista mostrando cidade ou CNPJ ao
+lado do nome. Deixar metade ligada seria o pior dos estados.
+
+### "Isento" não é uma inscrição estadual
+
+A unicidade da inscrição estadual vale **só quando o valor tem algum dígito**. "Isento" e "Não
+contribuinte" são a ausência de inscrição escrita por extenso, e são comuns: tratá-las como número
+registrado faria a segunda empresa isenta que aparecesse ser recusada, sem que ninguém entendesse o
+motivo.
+
+Isso vale nos dois lugares, no `valeSomenteSe` da lista de campos e no `WHERE` do índice parcial, e
+precisa continuar valendo nos dois: índice mais rígido que a checagem transformaria a mensagem boa
+num erro genérico de banco.
+
+### Duplicata reclama de todos os campos de uma vez
+
+A verificação roda em `Promise.allSettled`, não em `Promise.all`. Com `all`, quem colasse o cadastro
+inteiro de outra empresa veria um erro por vez, em ordem imprevisível, e precisaria enviar quatro
+vezes para descobrir os quatro problemas. Com `allSettled`, os erros viram um `issues` só, que é o
+formato que a tela já usa para pintar vários campos de vermelho na mesma resposta.
+
+Falha que não é duplicata sobe inteira em vez de virar erro de formulário: sem essa distinção, um
+banco fora do ar apareceria para o operador como "campo já em uso".
+
+Como sempre no schema, cada regra existe em dois lugares: a consulta dá a mensagem boa, e o índice
+único segura a corrida entre dois cadastros simultâneos, que passariam os dois pela consulta. Empresa
+excluída libera os valores de volta, porque os índices são parciais em `deleted_at is null`.
+
+As migrações `0012` e `0013` **não criam os índices em silêncio**: antes deles, um bloco `DO` procura
+duplicados e, se achar, aborta nomeando quais são. Sem isso, um banco que já tenha dados repetidos
+falharia com a mensagem crua do Postgres, sem dizer o que fazer.
+
+### A consulta de CEP precisou sair de dentro das rotas de `super_admin`
+
+`GET /address/cep/:cep` morava em `companies.routes.ts`, que tem `authenticate` e
+`requireRole('super_admin')` como ganchos do plugin inteiro. Fazia sentido enquanto o único
+formulário de endereço do sistema era o cadastro feito pela plataforma.
+
+Com o cadastro que a própria loja preenche, isso quebrou de um jeito difícil de diagnosticar: digitar
+o CEP devolvia `401`, o interceptador do front lia aquilo como sessão encerrada, e a pessoa era
+mandada para o login **no meio do preenchimento**, perdendo o que já tinha digitado, com a mensagem
+"Seu acesso foi encerrado" numa tela onde nunca houve acesso nenhum.
+
+A rota virou plugin próprio (`cep.routes.ts`), sem autenticação. Abrir não expõe nada: o CEP é dado
+público, a resposta vem de três provedores externos e o serviço reduz a entrada a exatamente oito
+dígitos **antes** de montar qualquer URL, então a rota não serve de atalho para buscar endereço
+arbitrário. O freio de 20 por minuto existe por outro motivo: cada chamada vira até três requisições
+a serviço gratuito de terceiro, e quem pagaria o abuso seria a reputação deste servidor lá.
+
+O teste que cobre isso usa um CEP inválido de propósito, recusado antes de qualquer ida à internet:
+assim ele prova que a rota é alcançável sem sessão sem depender de provedor externo no CI.
+
+### Em tela pública, 401 não é sessão encerrada
+
+O caso do CEP expôs um defeito mais geral do interceptador: ele desviava para o login em **qualquer**
+`401`, inclusive nas telas que abrem sem sessão. Ali a frase "Seu acesso foi encerrado" é falsa, não
+havia acesso, e o desvio ainda joga fora o formulário pela metade.
+
+O interceptador agora consulta `CAMINHOS_PUBLICOS` antes de desviar, tanto no `401` quanto no `402`.
+A lista vive em `lib/publicRoutes.ts`, **duplicada** em relação ao `meta: { public: true }` do
+roteador, e a duplicação é deliberada: o interceptador não pode importar o roteador, porque o
+roteador importa a store de autenticação, que importa o serviço de API, que é onde o interceptador
+mora. O ciclo se fecharia.
+
+O que impede a duplicata de virar divergência silenciosa é um teste que lê o arquivo do roteador,
+extrai os caminhos marcados como públicos e compara com a lista. É a mesma ideia do verificador de
+escopo por empresa: quando a checagem não cabe no tipo, ela vira teste.
+
+### Pagamento pela Stripe: em espera, e o que já está preparado
+
+Decidido em 17/09/2026 deixar a integração para depois, e subir antes o cadastro público com o teste
+de 15 dias. O motivo é de ordem: se o fluxo de cadastro não convencer cliente de verdade, a
+integração de pagamento não tem para quem cobrar.
+
+**O que já existe no banco**, sem uso ainda: `plans.stripe_price_id`, `companies.stripe_customer_id` e
+`companies.stripe_subscription_id`. São colunas reservadas, nulas em todas as linhas.
+
+**O que a cobrança é hoje.** `company_billings` continua sendo o controle manual das mensalidades, e
+continua fazendo sentido depois da Stripe: **Pix pela Stripe é só por convite para empresa
+brasileira**, então vai existir cliente pagando por fora. Taxa de implantação, desconto negociado e
+transferência de quem atrasou também não passam pela Stripe. O que muda com a integração é o papel da
+tela: de fonte da verdade para livro-caixa onde o aviso automático da Stripe também escreve, para uma
+tela só responder "quem pagou o quê" seja qual for a forma de pagamento.
+
+**Os passos, quando for a hora:**
+
+1. Conta na Stripe (aceita CPF ou MEI, sem taxa de abertura nem mensalidade), produto e preço criados
+   lá, e o identificador do preço gravado em `plans.stripe_price_id`.
+2. Sessão de pagamento hospedada (Checkout), com a pessoa indo para a página da Stripe. O sistema
+   **não** recebe dado de cartão, e assim não herda a responsabilidade de guardá-lo.
+3. Rota pública para o aviso da Stripe, atualizando `subscription_status` e as duas colunas de
+   identificador. É ela que liga o pagamento ao desbloqueio.
+4. Portal do cliente da própria Stripe para trocar cartão e cancelar, em vez de telas próprias.
+
+**Três armadilhas já levantadas, para não serem descobertas na hora:**
+
+- a assinatura do aviso é conferida sobre o corpo **cru** da requisição, e o Fastify converte para
+  JSON antes. Essa rota precisa de tratamento próprio de corpo, senão a conferência falha sempre;
+- a Stripe **reenvia** o aviso quando não recebe confirmação. Sem tratar repetição, um pagamento vira
+  duas linhas no livro-caixa;
+- o aviso precisa de endereço público alcançável por HTTPS, o que amarra na mesma pendência de domínio
+  próprio da redefinição de senha.
+
+Custo medido em 17/09/2026, para dimensionar: 3,99% + R$ 0,39 por cartão nacional, mais 0,7% do Stripe
+Billing na assinatura recorrente.
+
+### Sem Resend o sistema sobe; só a redefinição por e-mail fica indisponível
+
+A primeira versão exigia `RESEND_API_KEY` e `MAIL_FROM` para a API iniciar em produção. O raciocínio
+era evitar o pior desenho possível: aceitar o pedido de redefinição e deixar a pessoa esperando para
+sempre um e-mail que nunca sai, sem nada na tela denunciar.
+
+O raciocínio estava certo, o lugar estava errado. Derrubar a instalação inteira por causa de um
+recurso só é pior do que o recurso faltar, e travava um caso real: subir o sistema antes de existir
+domínio próprio, que é condição para a Resend entregar a qualquer destinatário.
+
+Hoje a exigência mora onde o problema acontece. Sem as duas variáveis, `requestPasswordReset` recusa
+com `503` e uma frase que diz o que fazer, e a API grita um aviso no boot para a falta não passar
+despercebida. O silêncio, que era o defeito a evitar, continua impossível.
+
+Uma exceção deliberada: **fora de produção a redefinição continua disponível sem as chaves**, porque
+ali `enviarEmail` escreve a mensagem e o link no log, e é assim que se testa o fluxo inteiro na
+máquina sem conta na Resend. Em produção não existe log que a pessoa possa ler.
+
+Essa recusa é o único ponto do fluxo que **não** usa a resposta única. Pode ser assim porque a
+indisponibilidade é do sistema inteiro, igual para e-mail cadastrado e não cadastrado: a mensagem não
+conta nada sobre quem tem conta.
+
+### O cadastro sem sessão é a única escrita alcançável de fora com o isolamento desligado
+
+`companies` tem RLS como as demais tabelas, e a política exige escopo de empresa ou escopo de plataforma. O cadastro
+que a própria loja preenche não tem nenhum dos dois: quem está se cadastrando ainda não tem empresa, e é justamente a
+empresa que o `INSERT` vai criar que viraria o escopo.
+
+Então `signUpCompany` roda inteiro em `comEscopoDePlataforma`, que desliga o isolamento por empresa. É a única
+travessia do sistema alcançável por código **não autenticado**, e foi desenhada com isso em mente:
+
+- a função **só insere**. Não lê, não lista e não devolve registro de empresa nenhuma;
+- o retorno é fechado e conferido por teste (`company`, `admin`, `trialEndsOn`), para um `select()` distraído no
+  futuro não virar vazamento silencioso;
+- a rota tem freio de 5 tentativas por hora, e não por minuto como o login: ninguém abre cinco lojas numa tarde, e
+  cada cadastro falso deixa empresa e usuário no banco, enquanto uma senha errada não deixa nada.
+
+O que **não** está resolvido: o CNPJ e o e-mail duplicados respondem com mensagem específica, o que confirma a quem
+ficar testando que aquele CNPJ já é cliente. Ficou assim de propósito, ao contrário da recuperação de senha, que
+responde sempre igual: ali a pessoa não precisa fazer nada com a resposta, aqui ela precisa saber por que o cadastro
+não passou. A confirmação por e-mail, que é o que fecharia essa porta de vez, depende do domínio próprio.
+
+### O aceite do aviso de privacidade é gravado, não só marcado
+
+A caixa de marcar no cadastro poderia apenas travar o botão. Ela não serve para nada assim: o valor do
+aceite está em **poder provar depois que foi dado**, e um `if` no navegador não deixa rastro nenhum.
+
+Então o aceite grava `companies.privacy_accepted_at` no mesmo `INSERT` que cria a empresa. Duas
+consequências no desenho:
+
+- na API o campo é `z.literal(true)`, não `z.boolean()`. Mandar `false` precisa ser **recusado**, e não
+  aceito como "não concordou": um cadastro sem aceite não pode existir, então não há o que gravar como
+  falso;
+- a coluna fica nula nas empresas cadastradas pela plataforma, e isso é correto, não é buraco de dado.
+  Ali o aceite acontece na assinatura do contrato, fora do sistema, e inventar uma data seria registrar
+  um aceite que ninguém deu naquele instante.
+
+A caixa de marcar não é componente novo. Era o `TableCheckbox`, usado na seleção em lote de quatro
+telas, e só o nome era específico de tabela: a API dele (`checked`, `label`, `toggle`) sempre foi
+genérica. Virou `BaseCheckbox` e ganhou o estado de erro do sistema, então ela fica vermelha junto com
+o resto do formulário em vez de ser o único campo que não avisa nada.
+
+### Os dados da empresa no perfil são só de leitura
+
+O administrador vê os dados cadastrais da própria empresa em **Perfil**, principalmente para conferir
+o que ele mesmo preencheu no cadastro. Não edita.
+
+Não é falta de tela: razão social e CNPJ constam do contrato, e deixar o cliente reescrevê-los sozinho
+criaria divergência entre o que o contrato diz e o que o sistema mostra, sem ninguém perceber. A tela
+diz isso em uma linha, em vez de deixar a pessoa procurar um botão que não existe.
+
+A rota `GET /company` **não recebe identificador de empresa**: lê a empresa da sessão. É isso que a
+torna inofensiva, e é o que um teste garante. Ela também mora fora de `companies.routes.ts`, porque
+aquele arquivo inteiro exige `super_admin`; aqui basta `admin`, e nenhuma travessia de plataforma é
+necessária, já que a política de RLS de `companies` deixa a empresa da sessão ler a própria linha.
+
+### O bloqueio mora no `authenticate`, não num guarda por módulo
+
+A alternativa natural seria um `preHandler` em cada módulo de negócio. Ela falha aberta: no dia em que alguém criar o
+módulo seguinte e esquecer de incluí-lo, o módulo nasce liberado, e nada acusa.
+
+O `authenticate` é o único caminho por onde toda rota autenticada passa, então a checagem é feita ali, com a situação
+lida na mesma consulta que já valida a sessão, sem custar ida nova ao banco. Um módulo novo nasce protegido sem que
+ninguém precise lembrar disso.
+
+Duas isenções por papel: o `super_admin`, porque a empresa da plataforma não assina nada, e a impersonação, porque o
+suporte precisa entrar justamente na empresa que travou.
+
+E uma lista curta de rotas que continuam abertas: ver a situação, trocar a senha, sair e exportar os dados pessoais.
+As três primeiras são necessárias para a pessoa resolver o bloqueio; sem elas ela não conseguiria nem descobrir por
+que está bloqueada. **A quarta é obrigação legal**: o direito de acesso do titular (LGPD, art. 18) não depende de a
+fatura estar paga, e bloquear a exportação de quem deixou de assinar transformaria régua de cobrança em recusa de um
+direito.
+
+A resposta é `402`, e o desvio para a tela de assinatura mora no interceptador do front, não em cada tela: a resposta
+vale para qualquer chamada, porque a pessoa continua autenticada e o que acabou foi o direito de usar.
+
+### O contador conta dias civis, e zero ainda é um dia
+
+`trialEndsOn` é `date`, não timestamp. Com hora, a última diária duraria um pedaço de dia diferente para cada
+empresa, conforme a hora em que ela se cadastrou, e duas lojas que assinaram no mesmo dia veriam números diferentes.
+
+A conta é `daysBetweenIsoDates(hoje, trialEndsOn)` no fuso de São Paulo, o mesmo utilitário que o resto do sistema já
+usa para "o dia de hoje". Disso saem duas regras que os testes fixam:
+
+- **zero é o último dia**, não o fim. O bloqueio é `diasRestantes < 0`. Quem entra na manhã do décimo quinto dia tem
+  o dia inteiro pela frente, e ler "0 dias restantes" com o sistema funcionando pareceria defeito de contagem; a
+  frase nesse dia é "Hoje é o último dia do seu teste";
+- o dia do cadastro conta como o primeiro dos quinze, então `trialEndsOn` é hoje + 14.
+
+Empresa em `teste` sem `trialEndsOn` é defeito de dado, e o lado seguro escolhido é o do cliente: ela **não** é
+bloqueada. Barrar alguém por causa de uma coluna vazia seria pior do que deixar passar um dia a mais.
+
+### Empresa cadastrada pelo super_admin não nasce em teste
+
+A coluna `subscriptionStatus` tem default `ativa`, e é ele que vale para todas as empresas que já existiam quando a
+migration rodou. Quem foi cadastrado na mão pelo `super_admin` é cliente de verdade e não pode acordar no dia seguinte
+dentro de um teste que nunca começou. Só `signUpCompany` grava `teste`, e ela é o caminho de quem se cadastrou
+sozinho.
 
 ## Retenção de dados pessoais: dois prazos, duas leis
 

@@ -34,15 +34,65 @@ O backend recusa iniciar em produção quando o JWT tem menos de 32 caracteres o
 no desenvolvimento a lista atende ao mesmo tempo o desktop (`http://localhost:5173`) e o celular no IP da máquina na
 rede local. Cada entrada é validada como URL, e em produção todas precisam ser HTTPS.
 
-`TRUST_PROXY` é a **quantidade de proxies na frente da API**, e o `docker-compose.production.yml` já traz `1` (o
-Caddy). Não troque por `true`: o Fastify passaria a confiar em todos os saltos e o `request.ip` viraria o primeiro valor
-do `X-Forwarded-For`, que é escrito por quem chama. Na prática, o limite de 10 tentativas de login por minuto deixaria
-de existir (bastaria mudar o cabeçalho a cada tentativa) e o IP gravado em `system_logs` passaria a ser inventado, o que
-esvazia a trilha de auditoria. O outro extremo, `false`, também não serve atrás do gateway: todo cliente chegaria como o
-IP do container do Caddy e os limites por IP passariam a ser compartilhados por todo mundo. Em produção a API **recusa
-subir** com `false`.
+`TRUST_PROXY` é **o endereço de quem pode falar pela API**, e o `docker-compose.production.yml` já traz
+`uniquelocal`: o apelido que o proxy-addr dá às faixas privadas, que é onde o Caddy vive. Serve porque o serviço `api`
+não publica porta nenhuma, então o único vizinho capaz de abrir conexão com ele está dentro das redes do Compose.
+Também aceita um IP, uma faixa CIDR ou uma lista separada por vírgula, caso o gateway mude de lugar.
+
+Três valores não servem, e a API recusa subir com qualquer um deles em produção:
+
+- `true` confiaria em qualquer `X-Forwarded-For`, e o `request.ip` viraria o primeiro valor do cabeçalho, que é escrito
+  por quem chama. Na prática o limite de 10 tentativas de login por minuto deixaria de existir (bastaria mudar o
+  cabeçalho a cada tentativa) e o IP gravado em `system_logs` passaria a ser inventado, o que esvazia a trilha de
+  auditoria.
+- **Um número** (a contagem de saltos que este arquivo pedia até o Fastify 5.11) deixou de funcionar. A correção do
+  GHSA-3m5p-2c4r-xxw2 fez o hop count recusar todos os peers, porque contar saltos não permite verificar quem é o
+  vizinho imediato. O efeito é o mesmo de `false`, e sem nenhum aviso: por isso o `env.ts` recusa o número em vez de
+  aceitá-lo calado. O valor novo vem no próprio `docker-compose.production.yml`, então quem atualiza o repositório já
+  recebe a correção; só precisa agir quem tiver sobrescrito `TRUST_PROXY` fora dele, e nesse caso a API recusa subir
+  até o valor ser trocado.
+- `false` não serve atrás do gateway: todo cliente chegaria como o IP do container do Caddy e os limites por IP
+  passariam a ser compartilhados por todo mundo.
 
 Evite caracteres reservados de URL na senha do PostgreSQL porque o Compose monta `DATABASE_URL` a partir dela.
+
+### Envio de e-mail (Resend)
+
+O único e-mail que o sistema manda é o de redefinição de senha. `RESEND_API_KEY` e `MAIL_FROM` são **opcionais**:
+sem elas a instalação sobe e funciona inteira, e apenas "Esqueci minha senha" responde que está indisponível. Ver
+[Subir sem a Resend configurada](#subir-sem-a-resend-configurada-é-suportado).
+
+Configuração, quando houver domínio próprio verificado:
+
+1. Crie a conta em [resend.com](https://resend.com). O plano gratuito dá 3.000 mensagens por mês e 100 por dia, o que é
+   muito mais do que a redefinição de senha consome.
+2. Em **Domains > Add Domain**, informe um **subdomínio** (`avisos.seudominio.com.br`, e não o domínio raiz) e escolha a
+   região **São Paulo (sa-east-1)**, a mais perto de quem vai receber. O subdomínio isola a reputação de envio: se um dia
+   o domínio principal for parar em lista de bloqueio, o e-mail do sistema não vai junto.
+3. Publique no seu DNS os registros que a Resend mostrar (SPF e DKIM em `TXT`, mais `MX` ou `CNAME`). A verificação
+   costuma sair em 15 minutos, mas o DNS pode levar até 72 horas.
+4. Depois de verificado, acrescente o registro **DMARC**. Sem ele, Gmail e Outlook tratam a mensagem com mais
+   desconfiança. Comece com `p=none` para observar antes de endurecer.
+5. Em **API Keys**, crie uma chave com permissão apenas de envio e restrita a esse domínio. Ela aparece uma única vez.
+   Guarde em `RESEND_API_KEY` no `.env.production`.
+
+**O domínio do remetente não precisa ser o mesmo do sistema.** `MAIL_FROM` tem de ser de um domínio verificado na
+Resend; `APP_PUBLIC_URL`, que é a base do link dentro da mensagem, aponta para onde o sistema roda. São coisas
+independentes.
+
+Dois valores não servem em `MAIL_FROM`:
+
+- `onboarding@resend.dev`, o remetente de exemplo da Resend, **só entrega para o e-mail do dono da conta**. Serve para
+  desenvolvimento e nunca para cliente.
+- Um domínio de DNS dinâmico do tipo `nip.io` ou `sslip.io` não pode ser verificado, porque a zona é de quem opera o
+  serviço e você não consegue publicar `TXT` nela.
+
+Fora de produção as duas variáveis podem ficar vazias: sem `RESEND_API_KEY` o conteúdo da mensagem, com o link, vai para
+o log do servidor. É o que permite percorrer o fluxo inteiro na máquina de quem desenvolve sem mandar e-mail a ninguém.
+
+**Um aviso sobre o endereço do sistema.** O link de redefinição carrega o valor de `APP_PUBLIC_URL`. Endereço com IP
+embutido no nome, como os de `nip.io`, é padrão conhecido de phishing e pesa contra a entrega justamente na mensagem em
+que ela mais importa. Um domínio próprio não é enfeite aqui, é taxa de entrega.
 
 ## Primeiro deploy e atualizações
 
@@ -86,6 +136,46 @@ sh deploy/deploy.sh /caminho/seguro/erp-production.env
 Depois do primeiro deploy, preserve a migration `0000` e publique toda alteração de banco como uma nova migration
 incremental. Nunca regenere, renomeie ou remova uma migration que já tenha sido aplicada. O Compose mantém banco,
 anexos e backups em volumes persistentes; não remova esses volumes durante atualizações.
+
+### Subir sem a Resend configurada é suportado
+
+`RESEND_API_KEY` e `MAIL_FROM` são **opcionais**. Sem elas a API sobe normalmente, o sistema inteiro
+funciona, e apenas "Esqueci minha senha" responde que está indisponível, orientando a falar com o
+administrador da empresa ou com o suporte. A API grita um aviso no log ao iniciar:
+
+```
+[ATENÇÃO] RESEND_API_KEY e/ou MAIL_FROM não definidas: "Esqueci minha senha" responderá que está
+indisponível. O restante do sistema funciona normalmente.
+```
+
+Enquanto estiver assim, a redefinição de senha de um usuário é feita pelo administrador da empresa
+dele, na tela de Usuários, e a da conta de plataforma por `npm run platform:reset-password` no
+servidor. Nenhum dos dois caminhos depende de e-mail.
+
+Para ligar depois, basta preencher as duas variáveis e reiniciar a API: nada mais muda. O que
+**precisa** existir antes é um domínio próprio verificado na Resend, porque `onboarding@resend.dev`
+só entrega para o e-mail do dono da conta e não serve para cliente.
+
+### As migrations `0012` e `0013` abortam se houver dado repetido entre empresas
+
+Elas criam os índices únicos de nome fantasia (`0012`) e de razão social, inscrição estadual e e-mail
+de contato (`0013`). Antes de cada índice, um bloco verifica se já existem empresas ativas com o mesmo
+valor. Se existirem, a migração **para** e diz quais são, em vez de falhar com a mensagem crua do
+Postgres. A atualização inteira para junto, e é de propósito: o banco não pode ficar meio migrado.
+
+Confira antes de atualizar, para não descobrir isso com o sistema fora do ar:
+
+```bash
+docker compose --env-file .env.production -f docker-compose.production.yml exec postgres \
+  psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c \
+  "select 'nome fantasia' as campo, lower(trim(name)) as valor, count(*) from companies where deleted_at is null group by 2 having count(*)>1
+   union all select 'razao social', lower(trim(legal_name)), count(*) from companies where deleted_at is null and legal_name is not null group by 2 having count(*)>1
+   union all select 'inscricao estadual', lower(trim(state_registration)), count(*) from companies where deleted_at is null and state_registration ~ '[0-9]' group by 2 having count(*)>1
+   union all select 'email de contato', lower(trim(contact_email)), count(*) from companies where deleted_at is null and contact_email is not null group by 2 having count(*)>1;"
+```
+
+Voltando alguma linha, resolva antes pela tela de Empresas: renomeie uma delas, ou suspenda e exclua a
+que não for usada. Só então atualize.
 
 Não copie `.env.production.example` por cima do `.env.production` existente. Preserve os segredos atuais e acrescente
 somente variáveis novas explicitamente documentadas na versão que será instalada.
@@ -529,6 +619,43 @@ docker compose --env-file .env.production -f docker-compose.production.yml exec 
 
 O resultado esperado nesse momento é uma única linha, com papel `super_admin` e contagem `1`. Não coloque
 `PLATFORM_ADMIN_PASSWORD` permanentemente no arquivo de ambiente e não deixe a senha no histórico do shell.
+
+### Recuperar a senha de um super administrador
+
+**A conta de plataforma não participa do "esqueci minha senha" por e-mail.** É decisão de projeto, não limitação: um
+super admin entra em qualquer empresa-cliente com permissão de administrador, então amarrar a senha dele a uma caixa de
+entrada faria a segurança dos dados de **todos** os clientes valer o que valer aquele e-mail, e o sistema não tem
+segundo fator para segurar isso. Pedir redefinição para um e-mail de plataforma devolve a mesma resposta de sempre e
+não gera link nenhum; a resposta é idêntica de propósito, senão a recusa entregaria quais e-mails são da plataforma.
+
+Restam dois caminhos, nenhum deles por e-mail.
+
+**Se houver outro super admin**, ele redefine a senha pela tela `/empresas`, no painel de usuários da plataforma. É o
+caminho normal, e é a razão de valer a pena manter **duas** contas de plataforma depois da validação inicial.
+
+**Se você tiver só uma conta e perdeu a senha dela**, use o comando no servidor:
+
+```bash
+# Confira quais contas de plataforma existem
+docker compose --env-file .env.production -f docker-compose.production.yml exec \
+  api node dist/scripts/resetPlatformPassword.js --list
+
+# Redefina, sem deixar a senha no histórico do shell
+read -rs NOVA_SENHA
+docker compose --env-file .env.production -f docker-compose.production.yml exec \
+  api node dist/scripts/resetPlatformPassword.js --email=voce@exemplo.com --password="$NOVA_SENHA"
+unset NOVA_SENHA
+```
+
+O comando **só alcança conta `super_admin`**, e isso é o que separa ferramenta de recuperação de porta dos fundos: ele
+não serve para entrar na conta de um cliente. Para essas, o super admin resolve pela tela de usuários da empresa. Ele
+também aplica a mesma regra de senha das telas, então não dá para usá-lo para instalar uma senha fraca.
+
+Redefinir marca `password_changed_at`, o que **encerra todas as sessões abertas daquela conta**. Quando o motivo da
+redefinição é suspeita de invasão, é exatamente o efeito desejado.
+
+A barreira deste caminho é o acesso ao servidor, que você já tem por fazer o deploy. Mesmo princípio do
+`data:erase-company`: operação que não deveria ter botão não tem botão.
 
 ## Rollback
 

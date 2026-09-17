@@ -19,6 +19,12 @@ export interface CompanyDetailsInput {
   state: string
 }
 
+/** Os dados da própria empresa, para o administrador conferir. Só leitura. */
+export async function fetchOwnCompany() {
+  const { data } = await api.get<CompanyDetailsInput>('/company')
+  return data
+}
+
 export interface CreateCompanyInput extends CompanyDetailsInput {
   adminName: string
   adminEmail: string

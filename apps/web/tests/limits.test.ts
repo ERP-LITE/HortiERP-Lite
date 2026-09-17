@@ -4,8 +4,9 @@ import {
   LIMITES_NUMERO as LIMITES_NUMERO_API,
   LIMITES_TEXTO as LIMITES_TEXTO_API,
   SENHA_MAX_BYTES,
+  SENHA_MIN_CARACTERES,
 } from '../../api/src/shared/schemas/limits.js'
-import { LIMITES_NUMERO, LIMITES_TEXTO } from '../src/lib/limits.js'
+import { LIMITES_NUMERO, LIMITES_TEXTO, SENHA_MIN } from '../src/lib/limits.js'
 
 describe('limites do frontend espelham os da API', () => {
   test('todo limite de texto do espelho tem o mesmo valor na API', () => {
@@ -28,6 +29,10 @@ describe('limites do frontend espelham os da API', () => {
 
   test('o teto de senha da tela é o mesmo teto de bytes do bcrypt', () => {
     assert.equal(LIMITES_TEXTO.senha, SENHA_MAX_BYTES)
+  })
+
+  test('o mínimo de senha da tela é o mesmo exigido pela API', () => {
+    assert.equal(SENHA_MIN, SENHA_MIN_CARACTERES)
   })
 
   test('quantidade e dinheiro cabem na precisão das colunas', () => {

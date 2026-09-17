@@ -11,3 +11,15 @@ export const lossReasonEnum = pgEnum('loss_reason', [
   'erro_operacional',
   'outro',
 ])
+
+/**
+ * Situação da assinatura da empresa-cliente. Em português como o resto dos enums do schema, e não
+ * nos nomes que a Stripe usa: o valor aparece em tela, e a tradução na borda evitaria que um estado
+ * novo criado lá dentro entrasse no banco sem ninguém decidir o que ele significa aqui.
+ */
+export const subscriptionStatusEnum = pgEnum('subscription_status', [
+  'teste',
+  'ativa',
+  'atrasada',
+  'cancelada',
+])

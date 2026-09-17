@@ -355,12 +355,68 @@ pedido, porque é o que o Marco Civil exige.
 - Tela `/logs/tecnicos`: somente o `super_admin`, fora do modo de impersonação, consulta requisições de toda a plataforma, identifica a empresa responsável e filtra por empresa, método, nível e período.
 - Os dois históricos são somente leitura e paginados.
 
+## Cadastro que a própria loja preenche e período de teste
+
+Tela pública `/criar-conta`, acessível pelo link no rodapé do login. É o único caminho do sistema que cria empresa
+sem alguém autenticado do outro lado.
+
+1. **Plano.** Primeira aba, antes de qualquer campo: a pessoa vê a duração do teste e quanto vai pagar depois dele.
+   Havendo um plano só, ele já vem marcado, mas continua visível. O teste não pede cartão.
+2. **Dados gerais**, **Endereço** e **Seu acesso** repetem exatamente as abas do cadastro feito pelo `super_admin`,
+   porque são os mesmos componentes: `FormTabs` desenha a faixa de abas, `CompanyFormFields` desenha os campos da
+   empresa e do endereço, `useCepLookup` preenche o endereço pelo CEP e `validateCompanyFields` valida. Um formulário
+   com validação própria daria dois caminhos diferentes para o mesmo dado entrar no banco.
+3. Na última aba, um **aceite explícito do aviso de privacidade**, com link que abre o aviso em outra
+   aba. Sem ele o cadastro não é enviado, e a API recusa: o campo é `literal(true)`, então mandar
+   `false` é erro, não omissão. O instante do aceite fica gravado em `companies.privacy_accepted_at`.
+4. `POST /signup` cria empresa e usuário administrador numa transação só, pela mesma função que o `super_admin` usa
+   (`createCompanyWithAdmin`), e grava `subscriptionStatus = 'teste'` com `trialEndsOn` no último dia do prazo.
+   **O dia do cadastro conta como o primeiro**, então 15 dias terminam 14 dias depois de hoje.
+5. Terminado o cadastro, a pessoa entra pelo login normal. Não há confirmação de e-mail ainda: ela depende de um
+   domínio próprio verificado no provedor de e-mail, o mesmo que a recuperação de senha espera.
+
+Durante o teste, uma faixa no topo do sistema mostra quantos dias faltam, e ela fica âmbar nos últimos três dias. A
+contagem é de **dias civis** no fuso de São Paulo: zero é o último dia, não "acabou", e é anunciado como
+"Hoje é o último dia do seu teste" em vez de "0 dias", que pareceria defeito com o sistema ainda funcionando.
+
+Passado o último dia, a API responde `402` em qualquer rota que não esteja na lista de liberadas, e a interface leva
+para `/assinatura`. Os dados continuam intactos: o que acaba é o direito de usar, não o cadastro. Continuam abertas as
+rotas necessárias para ver a situação, trocar a senha, sair e **exportar os dados pessoais**, esta última por
+obrigação legal, não por conveniência (ver [decisões arquiteturais](./decisoes-arquiteturais.md)).
+
+O pagamento ainda não acontece pelo sistema: a tela de assinatura orienta a falar com o suporte, e a liberação é
+feita mudando `subscriptionStatus` para `ativa`.
+
+## A tela de Perfil, em abas
+
+`Perfil` é dividida em abas pelo mesmo `FormTabs` do cadastro de empresa: **Minha conta**, **Empresa**
+(só para `admin`) e **Senha**. Empilhados num grid, os três blocos deixavam a tela comprida e
+desequilibrada, com um cartão ocupando a largura toda entre dois estreitos.
+
+As abas aqui **não são numeradas**, ao contrário das do cadastro: são seções independentes, e
+"1. Minha conta" sugeriria um caminho a percorrer que não existe. O `numbered` do componente é o que
+separa os dois usos.
+
+Na aba **Empresa**, quem tem papel `admin` vê os dados cadastrais da própria empresa: nome fantasia,
+razão social, CNPJ, inscrição estadual, responsável, e-mail, telefone e endereço. Serve para conferir
+o que foi preenchido no cadastro, principalmente por quem se cadastrou sozinho.
+
+**Só leitura.** Corrigir razão social ou CNPJ é assunto de contrato, e quem altera continua sendo a
+plataforma; a tela diz isso em vez de deixar a pessoa procurar um botão que não existe.
+
+Gerente e operador não veem a aba nem alcançam a rota (`GET /company` responde `403`): é informação
+cadastral que eles não usam e não podem corrigir. O `super_admin` em modo suporte entra como `admin` e
+vê os dados da empresa visitada, que é o que ele precisa ao atender.
+
+A rota **não recebe identificador de empresa**: ela lê a empresa da sessão. É isso que a torna
+inofensiva, e há teste garantindo que o administrador de uma empresa não alcança a outra.
+
 ## Cadastro de empresas-cliente e acesso como suporte
 
 Fluxo exclusivo do papel `super_admin` (dono da plataforma, não de nenhum cliente) — mecanismo completo descrito em [decisões arquiteturais](./decisoes-arquiteturais.md#empresa-da-plataforma-e-super_admin).
 
 1. Login do `super_admin` cai em `/selecionar-empresa`: lista todas as empresas-cliente (ativas clicáveis, suspensas desabilitadas) + um item pra "Configurações gerais do sistema" (`/empresas`).
-2. Em `/empresas`, cadastra uma nova empresa-cliente junto com o primeiro usuário admin dela numa única transação (`POST /companies`). Para manter o modal compacto, a criação é dividida em três abas: **Dados gerais** (identificação e contato), **Endereço** e **Administrador da empresa**; na edição aparecem somente as duas primeiras, pois usuários são gerenciados separadamente. Cada aba combina ícone e texto no desktop e mantém apenas o ícone no mobile, com rótulo acessível e tooltip. Ao completar oito dígitos no CEP, a interface tenta preencher o endereço por BrasilAPI, ViaCEP e OpenCEP, nessa ordem, com timeout individual e fallback automático; os campos permanecem editáveis e uma resposta atrasada de um CEP anterior é ignorada. O cadastro reúne nome fantasia, razão social, CNPJ, inscrição estadual opcional, responsável, e-mail, telefone e endereço completo. CNPJ, telefone e CEP são normalizados; o CNPJ passa pela validação dos dígitos verificadores e não pode se repetir entre empresas não excluídas. O campo aceita o **CNPJ alfanumérico** (letra maiúscula nas 12 primeiras posições, dígitos verificadores numéricos), o que vale para empresas abertas a partir de julho de 2026. Na mesma tela o `super_admin` edita esses dados, ativa/suspende o acesso (`PATCH /companies/:id/active` — suspender bloqueia login de todos os usuários daquela empresa imediatamente) e gerencia os demais usuários `super_admin` da plataforma (`/platform-users`). A própria conta autenticada não pode ser excluída.
+2. Em `/empresas`, cadastra uma nova empresa-cliente junto com o primeiro usuário admin dela numa única transação (`POST /companies`). Para manter o modal compacto, a criação é dividida em três abas: **Dados gerais** (identificação e contato), **Endereço** e **Administrador da empresa**; na edição aparecem somente as duas primeiras, pois usuários são gerenciados separadamente. Cada aba combina ícone e texto no desktop e mantém apenas o ícone no mobile, com rótulo acessível e tooltip. Ao completar oito dígitos no CEP, a interface tenta preencher o endereço por BrasilAPI, ViaCEP e OpenCEP, nessa ordem, com timeout individual e fallback automático; os campos permanecem editáveis e uma resposta atrasada de um CEP anterior é ignorada. O cadastro reúne nome fantasia, razão social, CNPJ, inscrição estadual opcional, responsável, e-mail, telefone e endereço completo. CNPJ, telefone e CEP são normalizados; o CNPJ passa pela validação dos dígitos verificadores e não pode se repetir entre empresas não excluídas. **Nome fantasia, razão social, inscrição estadual e e-mail de contato também não podem se repetir**, comparados sem diferenciar maiúsculas nem espaços nas pontas. Telefone, nome do responsável e endereço **podem** repetir, e o nome do administrador também: o e-mail dele já é único em todo o sistema. Quando vários campos repetem, a resposta reclama de todos de uma vez, em vez de um por envio. Os motivos de cada inclusão e de cada exclusão estão em [decisões arquiteturais](./decisoes-arquiteturais.md). O campo aceita o **CNPJ alfanumérico** (letra maiúscula nas 12 primeiras posições, dígitos verificadores numéricos), o que vale para empresas abertas a partir de julho de 2026. Na mesma tela o `super_admin` edita esses dados, ativa/suspende o acesso (`PATCH /companies/:id/active` — suspender bloqueia login de todos os usuários daquela empresa imediatamente) e gerencia os demais usuários `super_admin` da plataforma (`/platform-users`). A própria conta autenticada não pode ser excluída.
 3. Clicar numa empresa ativa em `/selecionar-empresa` "entra" nela (`POST /companies/:id/impersonate`): passa a ver e editar os dados daquela empresa com permissão de admin, mantendo seu próprio nome/e-mail de super_admin. A própria empresa "Plataforma" responde `403` nesse endpoint — ela nunca é uma empresa-cliente, e entrar nela exporia os `super_admin` na tela comum de usuários (ver [decisões arquiteturais](./decisoes-arquiteturais.md#empresa-da-plataforma-e-super_admin)).
 4. Uma faixa fixa no topo avisa que está em modo suporte, com botão pra voltar ao próprio perfil de super_admin sem logout (`POST /auth/exit-impersonation`).
 

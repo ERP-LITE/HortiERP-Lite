@@ -80,6 +80,10 @@ export function formatPhone(value: string | null | undefined) {
   return value ? formatInputMask(value, 'phone') : ''
 }
 
+export function formatCep(value: string | null | undefined) {
+  return value ? formatInputMask(value, 'cep') : ''
+}
+
 export function formatQuantity(value: string | number | null | undefined) {
   if (value === null || value === undefined || value === '') return '0'
   return Number(value).toLocaleString('pt-BR', { maximumFractionDigits: 3 })

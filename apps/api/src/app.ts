@@ -18,6 +18,8 @@ import { AppError } from './shared/errors/AppError.js'
 import { formatRetryDelay } from './shared/errors/frameworkMessages.js'
 import { authRoutes } from './modules/auth/auth.routes.js'
 import { companiesRoutes } from './modules/companies/companies.routes.js'
+import { cepRoutes } from './modules/companies/cep.routes.js'
+import { ownCompanyRoutes } from './modules/companies/own-company.routes.js'
 import { categoriesRoutes } from './modules/categories/categories.routes.js'
 import { unitsRoutes } from './modules/units/units.routes.js'
 import { productsRoutes } from './modules/products/products.routes.js'
@@ -31,8 +33,9 @@ import { reportsRoutes } from './modules/reports/reports.routes.js'
 import { logsRoutes } from './modules/logs/logs.routes.js'
 import { registerSystemLogsHook } from './modules/logs/logs.hook.js'
 import { billingsRoutes } from './modules/billings/billings.routes.js'
+import { subscriptionsRoutes } from './modules/subscriptions/subscriptions.routes.js'
 
-export function buildApp(options: { systemLogs?: boolean } = {}) {
+export function buildApp(options: { systemLogs?: boolean; rateLimit?: boolean } = {}) {
   const app = Fastify({
     trustProxy: env.TRUST_PROXY,
     logger: {
@@ -50,18 +53,23 @@ export function buildApp(options: { systemLogs?: boolean } = {}) {
     methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE'],
   })
 
-  app.register(rateLimit, {
-    max: 300,
-    timeWindow: '1 minute',
-    allowList: (request) =>
-      env.NODE_ENV !== 'production' && request.headers['user-agent'] === 'HortiERP-Load-Test/1.0',
-    errorResponseBuilder: (_request, context) =>
-      new AppError(
-        `Muitas tentativas em pouco tempo. Tente novamente em ${formatRetryDelay(context.ttl)}.`,
-        context.statusCode,
-        context.ban ? 'RATE_LIMIT_BANNED' : 'RATE_LIMITED',
-      ),
-  })
+  // Desligável só para teste, igual ao hook de log: o limitador é por IP e `app.inject` faz todas
+  // as chamadas do arquivo virem do mesmo endereço, então uma rota de janela longa esgotaria a cota
+  // no meio da suíte. Quem testa o próprio limitador deixa ligado.
+  if (options.rateLimit !== false) {
+    app.register(rateLimit, {
+      max: 300,
+      timeWindow: '1 minute',
+      allowList: (request) =>
+        env.NODE_ENV !== 'production' && request.headers['user-agent'] === 'HortiERP-Load-Test/1.0',
+      errorResponseBuilder: (_request, context) =>
+        new AppError(
+          `Muitas tentativas em pouco tempo. Tente novamente em ${formatRetryDelay(context.ttl)}.`,
+          context.statusCode,
+          context.ban ? 'RATE_LIMIT_BANNED' : 'RATE_LIMITED',
+        ),
+    })
+  }
 
   app.register(cookie)
 
@@ -105,6 +113,8 @@ export function buildApp(options: { systemLogs?: boolean } = {}) {
 
   app.register(authRoutes, { prefix: '/api' })
   app.register(companiesRoutes, { prefix: '/api' })
+  app.register(cepRoutes, { prefix: '/api' })
+  app.register(ownCompanyRoutes, { prefix: '/api' })
   app.register(categoriesRoutes, { prefix: '/api' })
   app.register(unitsRoutes, { prefix: '/api' })
   app.register(productsRoutes, { prefix: '/api' })
@@ -117,6 +127,7 @@ export function buildApp(options: { systemLogs?: boolean } = {}) {
   app.register(reportsRoutes, { prefix: '/api' })
   app.register(logsRoutes, { prefix: '/api' })
   app.register(billingsRoutes, { prefix: '/api' })
+  app.register(subscriptionsRoutes, { prefix: '/api' })
 
   return app
 }

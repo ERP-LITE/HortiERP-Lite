@@ -98,7 +98,7 @@ export async function createTenant(suffix: string, initialStock = '0'): Promise<
  * (sobe o app uma vez, trunca as tabelas entre testes, fecha app+pool no final)
  * e devolve um objeto que expõe a instância do app assim que `before` terminar.
  */
-export function setupTestApp(options: { systemLogs?: boolean } = {}) {
+export function setupTestApp(options: { systemLogs?: boolean; rateLimit?: boolean } = {}) {
   const ctx: { app: FastifyInstance } = { app: undefined as unknown as FastifyInstance }
 
   before(async () => {
@@ -106,7 +106,7 @@ export function setupTestApp(options: { systemLogs?: boolean } = {}) {
     await abrirDbDeTeste()
     // O hook de log fica desligado por padrão (ruído em toda requisição de teste);
     // quem testa o próprio hook liga explicitamente.
-    ctx.app = buildApp({ systemLogs: options.systemLogs ?? false })
+    ctx.app = buildApp({ systemLogs: options.systemLogs ?? false, rateLimit: options.rateLimit })
     await ctx.app.ready()
   })
 
@@ -126,14 +126,20 @@ export function setupTestApp(options: { systemLogs?: boolean } = {}) {
 
 export function authCookie(
   app: FastifyInstance,
-  user: FixtureUser,
-  options?: { companyId?: string; realCompanyId?: string; role?: Role },
+  user: Pick<FixtureUser, 'id' | 'companyId' | 'role'>,
+  options?: { companyId?: string; realCompanyId?: string; role?: Role; emitidoHaSegundos?: number },
 ) {
   const token = app.jwt.sign({
     sub: user.id,
     companyId: options?.companyId ?? user.companyId,
     role: options?.role ?? user.role,
     ...(options?.realCompanyId ? { realCompanyId: options.realCompanyId } : {}),
+    // `iat` no passado é o que permite testar a invalidação por troca de senha: a checagem compara
+    // segundos inteiros, então um token emitido no mesmo segundo da troca cai na tolerância de 1s e
+    // sobrevive de propósito. Ver `senhaTrocadaDepoisDoToken`.
+    ...(options?.emitidoHaSegundos
+      ? { iat: Math.floor(Date.now() / 1000) - options.emitidoHaSegundos }
+      : {}),
   })
   return `token=${token}`
 }

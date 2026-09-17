@@ -2,7 +2,11 @@
 
 Sistema web modular para controle de estoque, entradas de mercadorias, notas fiscais vinculadas e perdas voltado para hortifrutis, frutarias, verdureiras, sacolões e pequenos mercados.
 
-Multiempresa: cada empresa-cliente tem seus dados totalmente isolados (produtos, estoque, entradas, perdas, usuários). Empresas-cliente são cadastradas por um usuário `super_admin` pela tela `/empresas`, com identificação fiscal, contato, endereço e criação do primeiro administrador em uma única operação. O `super_admin` também controla manualmente as mensalidades dos clientes pela tela `/cobrancas`, sem integração com meios de pagamento.
+Multiempresa: cada empresa-cliente tem seus dados totalmente isolados (produtos, estoque, entradas, perdas, usuários).
+
+Uma empresa entra no sistema por dois caminhos. Ela mesma se cadastra pela tela pública `/criar-conta`, escolhendo o plano e começando por um período de teste de 15 dias, ou o `super_admin` a cadastra pela tela `/empresas`. Os dois caminhos usam os mesmos campos e as mesmas regras, e criam empresa e primeiro administrador numa operação só. Terminado o teste sem assinatura, o acesso é bloqueado e os dados permanecem intactos.
+
+O pagamento ainda **não acontece dentro do sistema**: o `super_admin` controla as mensalidades manualmente pela tela `/cobrancas`, sem integração com meio de pagamento.
 
 Ver [claude.md](./claude.md) para a visão completa do projeto.
 
@@ -28,7 +32,6 @@ ERP-LITE/
 ## Como rodar (desenvolvimento)
 
 ### Com Docker (recomendado)
-
 1. Copie os arquivos de ambiente:
    ```bash
    cp .env.example .env
@@ -59,6 +62,10 @@ ERP-LITE/
      - Gerente: `gerente@hortierp.com` / `gerente123`
      - Operador: `operador@hortierp.com` / `operador123`
    - Super admin: o e-mail/senha definidos no passo 4 (tela `/empresas`, para cadastrar novas empresas-cliente)
+
+   Em desenvolvimento não é preciso conta na Resend: sem `RESEND_API_KEY` o e-mail de redefinição de senha não é
+   enviado, e a mensagem inteira, com o link, aparece no log da API (`docker compose logs -f api`). Em produção a API
+   recusa subir sem a chave — ver [guia de deploy](./docs/deploy-producao.md).
 
 ### Sem Docker
 
@@ -102,7 +109,10 @@ identidade de e-mail sem depender de maiúsculas, identificação do usuário re
 (incluindo a recusa da empresa Plataforma), agregações do painel, os alertas do sino no cabeçalho (separação entre produto zerado e produto abaixo do mínimo, corte
 da lista, o que fica fora do contador e a recusa do alerta de cobrança a usuário de empresa-cliente), controle manual de cobranças, data retroativa de
 entradas e perdas (limites e coerência entre listagem, histórico e painel), encerramento das sessões abertas quando a
-senha muda (pela própria pessoa ou redefinida por um admin), o freio de tentativas de login por conta, a garantia de que
+senha muda (pela própria pessoa ou redefinida por um admin), o freio de tentativas de login por conta, a recuperação de senha por e-mail (token guardado só como
+resumo, uso único, validade, invalidação dos links irmãos, resposta idêntica para e-mail cadastrado e não
+cadastrado, o freio da própria rota, a recusa silenciosa de conta de plataforma e o rastro que a redefinição deixa no
+histórico de atividades), a garantia de que
 nenhuma mensagem de erro chega ao cliente em inglês e o tratamento de dados pessoais: expurgo dos logs por prazo, anonimização de usuário
 excluído (inclusive do nome que fica no histórico de atividades), exportação dos dados do próprio titular sem vazar
 atividade de colega, e a exclusão definitiva de uma empresa sem encostar na empresa vizinha.
@@ -119,8 +129,10 @@ container ao terminar. A suíte recusa executar se o nome do banco em `DATABASE_
 Em seguida rodam os testes unitários do frontend (`apps/web/tests`, sem banco nem navegador). Eles cobrem os módulos
 puros de `apps/web/src/lib` e os composables que não dependem da API: proteção contra fórmula nas planilhas exportadas,
 formatação de datas, valores e documentos, espelho dos limites de tamanho, leitura do detalhe da trilha de atividades,
-seleção de anexos de nota fiscal, isolamento do rascunho do filtro, a flexão em português das mensagens de exclusão e a trégua que impede
-a troca de senha de mandar ao login quem acabou de trocá-la.
+seleção de anexos de nota fiscal, isolamento do rascunho do filtro, a flexão em português das mensagens de exclusão, a
+trégua que impede a troca de senha de mandar ao login quem acabou de trocá-la, e o erro de campo que some quando a
+pessoa corrige aquele campo (sem apagar o erro dos outros, e voltando a aparecer no reenvio mesmo quando a frase é a
+mesma de antes).
 Depois vêm três verificações estáticas:
 
 - `npm run csp:hash` — confere se o hash de `script-src` na CSP ainda corresponde ao script inline de
@@ -142,10 +154,14 @@ Depois vêm três verificações estáticas:
 
 Manutenção de dados pessoais (rodada por linha de comando, não pela interface):
 
-- `npm run data:retention` — apaga log técnico e trilha de auditoria vencidos e anonimiza usuário excluído há mais que o
-  prazo. Aceita `--dry-run`. Em produção roda sozinho, semanalmente, no contêiner `retention`, e avisa um monitor externo
+- `npm run data:retention` — apaga log técnico e trilha de auditoria vencidos, remove pedido de redefinição de senha
+  vencido há mais de 7 dias e anonimiza usuário excluído há mais que o prazo. Aceita `--dry-run`. Em produção roda sozinho, semanalmente, no contêiner `retention`, e avisa um monitor externo
   quando termina bem ou quando falha (`RETENTION_HEARTBEAT_URL`) — ver
   [deploy em produção](./docs/deploy-producao.md).
+- `npm run platform:reset-password` — redefine a senha de um super administrador. A conta de plataforma fica **fora**
+  do "esqueci minha senha" por e-mail de propósito: ela alcança os dados de todos os clientes, e o sistema não tem
+  segundo fator para segurar uma caixa de entrada invadida. Aceita `--list` e só alcança conta `super_admin`, nunca a de
+  um cliente. Ver [deploy em produção](./docs/deploy-producao.md#recuperar-a-senha-de-um-super-administrador).
 - `npm run data:erase-company` — apaga em definitivo todos os dados de uma empresa e os arquivos de nota fiscal dela.
   Irreversível: exige `--id` e `--confirm` com o nome exato, e não tem equivalente na interface de propósito.
 

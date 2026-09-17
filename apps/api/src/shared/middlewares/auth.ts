@@ -3,7 +3,22 @@ import { and, eq, isNull } from 'drizzle-orm'
 import { db } from '../../db/client.js'
 import { comEscopoDePlataforma, usarEmpresa } from '../../db/scope.js'
 import { companies, users } from '../../db/schema/index.js'
+import { avaliarAssinatura } from '../../modules/subscriptions/subscriptions.service.js'
 import { AppError } from '../errors/AppError.js'
+
+/**
+ * Rotas que continuam abertas depois do teste vencido: as necessárias para ver a situação, resolvê-la
+ * e sair. `/auth/me/personal-data` está aqui por obrigação legal (LGPD, art. 18), não por
+ * conveniência: o direito de acesso não depende de a fatura estar paga.
+ */
+const ROTAS_LIBERADAS_SEM_ASSINATURA = new Set([
+  '/api/auth/me',
+  '/api/auth/me/personal-data',
+  '/api/auth/logout',
+  '/api/auth/password',
+  '/api/subscription',
+  '/api/plans',
+])
 
 export async function authenticate(request: FastifyRequest) {
   try {
@@ -21,7 +36,12 @@ export async function authenticate(request: FastifyRequest) {
   // Travessia declarada: durante impersonação o usuário validado é de outra empresa.
   const { user, targetCompany } = await comEscopoDePlataforma(async () => {
     const [encontrado] = await db
-      .select({ role: users.role, passwordChangedAt: users.passwordChangedAt })
+      .select({
+        role: users.role,
+        passwordChangedAt: users.passwordChangedAt,
+        subscriptionStatus: companies.subscriptionStatus,
+        trialEndsOn: companies.trialEndsOn,
+      })
       .from(users)
       .innerJoin(companies, eq(companies.id, users.companyId))
       .where(
@@ -69,8 +89,33 @@ export async function authenticate(request: FastifyRequest) {
     throw AppError.unauthorized('Sua senha foi alterada. Entre de novo.')
   }
 
+  assertAssinaturaEmDia(request, user)
+
   // Único ponto onde a conexão da requisição ganha uma empresa.
   await usarEmpresa(request.user.companyId)
+}
+
+/**
+ * Mora aqui, e não num `preHandler` por módulo, porque este é o único caminho por onde toda rota
+ * autenticada passa: uma lista de módulos falha aberta no dia em que alguém esquecer de incluir um.
+ */
+function assertAssinaturaEmDia(
+  request: FastifyRequest,
+  empresa: { subscriptionStatus: 'teste' | 'ativa' | 'atrasada' | 'cancelada'; trialEndsOn: string | null },
+) {
+  if (request.user.role === 'super_admin' || request.user.realCompanyId) return
+  if (ROTAS_LIBERADAS_SEM_ASSINATURA.has(request.routeOptions.url ?? '')) return
+
+  const { bloqueada, diasRestantes } = avaliarAssinatura(empresa)
+  if (!bloqueada) return
+
+  throw new AppError(
+    diasRestantes === null
+      ? 'A assinatura desta empresa foi cancelada. Fale com o suporte para reativar.'
+      : 'Seu período de teste terminou. Escolha um plano para continuar usando o sistema.',
+    402,
+    'ASSINATURA_NECESSARIA',
+  )
 }
 
 /**

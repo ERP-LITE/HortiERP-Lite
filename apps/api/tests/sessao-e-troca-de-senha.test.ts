@@ -3,7 +3,7 @@ import { describe, test } from 'node:test'
 import bcrypt from 'bcryptjs'
 import { db } from './db.js'
 import { companies, users } from '../src/db/schema/index.js'
-import { setupTestApp } from './helpers.js'
+import { authCookie, setupTestApp } from './helpers.js'
 
 const ctx = setupTestApp()
 
@@ -25,15 +25,9 @@ async function criarAdmin(email: string) {
   return user
 }
 
-/** Token com `iat` no passado: o de agora cai na tolerância de 1 segundo da checagem. */
-function cookieAntigo(user: { id: string; companyId: string; role: string }) {
-  const token = ctx.app.jwt.sign({
-    sub: user.id,
-    companyId: user.companyId,
-    role: user.role as 'admin' | 'super_admin',
-    iat: Math.floor(Date.now() / 1000) - 60,
-  })
-  return `token=${token}`
+/** Token com `iat` no passado: o de agora cairia na tolerância de 1 segundo da checagem. */
+function cookieAntigo(user: Parameters<typeof authCookie>[1]) {
+  return authCookie(ctx.app, user, { emitidoHaSegundos: 60 })
 }
 
 function cookieDaResposta(response: { cookies: Array<{ name: string; value: string }> }) {
@@ -62,6 +56,25 @@ describe('troca de senha encerra as sessões antigas', () => {
 
     assert.equal(troca.statusCode, 200)
     assert.equal((await euSou(antigo)).statusCode, 401)
+  })
+
+  /**
+   * O erro precisa vir com o campo declarado, e não só como mensagem: é assim que a tela consegue
+   * mostrá-lo embaixo de "Senha atual", que é o padrão de erro de campo do sistema, em vez de num
+   * parágrafo solto longe do campo que a pessoa precisa corrigir.
+   */
+  test('senha atual errada volta como erro do campo, não como mensagem solta', async () => {
+    const user = await criarAdmin('admin-senha-errada@test.local')
+
+    const troca = await ctx.app.inject({
+      method: 'PATCH',
+      url: '/api/auth/password',
+      headers: { cookie: cookieAntigo(user) },
+      payload: { currentPassword: 'nao-e-a-senha-dele', newPassword: SENHA_NOVA },
+    })
+
+    assert.equal(troca.statusCode, 400)
+    assert.deepEqual(troca.json().error.issues.currentPassword, ['Senha atual incorreta'])
   })
 
   test('quem trocou a senha continua conectado, com o cookie novo', async () => {

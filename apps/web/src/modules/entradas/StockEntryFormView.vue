@@ -10,6 +10,7 @@ import DateInput from '@/components/ui/DateInput.vue'
 import { useAsyncState } from '@/composables/useAsyncState'
 import { oldestEventDateIso, todayIso } from '@/lib/period'
 import { getApiErrorMessage } from '@/services/api'
+import { useFieldErrors, useRowErrors } from '@/composables/useFieldErrors'
 import { toastError, toastSuccess } from '@/lib/alerts'
 import { listAllProducts } from '@/services/productsService'
 import { createStockEntry, uploadStockEntryAttachment } from '@/services/stockEntriesService'
@@ -31,7 +32,6 @@ const saving = ref(false)
 
 const supplierName = ref('')
 const entryDate = ref(todayIso())
-const entryDateError = ref('')
 const notes = ref('')
 const invoiceNumber = ref('')
 const invoiceSeries = ref('')
@@ -40,9 +40,13 @@ const invoiceIssuedAt = ref('')
 const invoiceTotal = ref('')
 const attachments = ref<File[]>([])
 const attachmentsError = computed(() => invoiceSelectionError(attachments.value))
-const invoiceErrors = ref<Record<string, string>>({})
 const items = ref<ItemRow[]>([{ productId: '', quantity: '', unitCost: '' }])
-const itemErrors = ref<{ productId?: string; quantity?: string }[]>([])
+
+const { fieldErrors: invoiceErrors } = useFieldErrors(() => ({
+  entryDate: entryDate.value,
+  invoiceAccessKey: invoiceAccessKey.value,
+}))
+const { rowErrors: itemErrors } = useRowErrors<'productId' | 'quantity'>(() => items.value)
 
 const productOptions = computed(() => products.value.map((p) => ({ value: p.id, label: p.name })))
 
@@ -64,10 +68,9 @@ async function loadProducts() {
 
 function validate(): boolean {
   invoiceErrors.value = {}
-  entryDateError.value = ''
-  if (!entryDate.value) entryDateError.value = 'Informe a data da entrada'
-  else if (entryDate.value > todayIso()) entryDateError.value = 'A data não pode ser futura'
-  else if (entryDate.value < oldestEventDateIso()) entryDateError.value = 'A data é antiga demais'
+  if (!entryDate.value) invoiceErrors.value.entryDate = 'Informe a data da entrada'
+  else if (entryDate.value > todayIso()) invoiceErrors.value.entryDate = 'A data não pode ser futura'
+  else if (entryDate.value < oldestEventDateIso()) invoiceErrors.value.entryDate = 'A data é antiga demais'
 
   const chaveInvalida = invoiceKeyError(invoiceAccessKey.value)
   if (chaveInvalida) invoiceErrors.value.invoiceAccessKey = chaveInvalida
@@ -78,10 +81,10 @@ function validate(): boolean {
     return rowErrors
   })
 
+  // A data entrou em `invoiceErrors`, então a contagem abaixo já a cobre.
   return itemErrors.value.every((rowErrors) => Object.keys(rowErrors).length === 0) &&
     Object.keys(invoiceErrors.value).length === 0 &&
-    !attachmentsError.value &&
-    !entryDateError.value
+    !attachmentsError.value
 }
 
 function handleFiles(event: Event) {
@@ -147,7 +150,7 @@ onMounted(loadProducts)
           label="Data da entrada"
           :min="oldestEventDateIso()"
           :max="todayIso()"
-          :error="entryDateError"
+          :error="invoiceErrors.entryDate"
           required
         />
         <BaseInput v-model="supplierName" label="Fornecedor (opcional)" :maxlength="LIMITES_TEXTO.fornecedor" />
