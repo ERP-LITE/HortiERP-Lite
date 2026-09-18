@@ -1,4 +1,5 @@
 import Swal from 'sweetalert2'
+import { destravarRolagem, travarRolagem } from '@/lib/scrollLock'
 
 function isDarkMode() {
   return document.documentElement.classList.contains('dark')
@@ -24,6 +25,9 @@ export async function confirmAction(options: {
     confirmButtonColor: options.confirmButtonColor ?? '#2563eb',
     cancelButtonColor: '#6b7280',
     reverseButtons: true,
+    scrollbarPadding: false,
+    didOpen: travarRolagem,
+    willClose: destravarRolagem,
     ...themeOptions(),
   })
 

@@ -3,9 +3,10 @@ import { computed, ref } from 'vue'
 import { useCategoricalPalette } from './palette'
 import type { LossReason } from '@/types'
 import ChartTooltip from './ChartTooltip.vue'
+import { buildDetails, tooltipPosition } from './tooltipContent'
 import type { DashboardProductQuantity, DashboardQuantityByUnit } from '@/types'
 import { reasonLabels } from '@/lib/losses'
-import { formatChartNumber, formatCurrency } from '@/lib/format'
+import { formatCurrency } from '@/lib/format'
 
 const props = defineProps<{
   data: {
@@ -32,11 +33,9 @@ const sorted = computed(() => {
 function showTooltip(event: MouseEvent | FocusEvent, item: (typeof sorted.value)[number], color: string) {
   const bounds = chartContainer.value?.getBoundingClientRect()
   if (!bounds) return
-  const pointer = event instanceof MouseEvent
   tooltip.value = {
     visible: true,
-    x: pointer ? Math.min(Math.max(event.clientX, 140), window.innerWidth - 140) : bounds.left + bounds.width / 2,
-    y: pointer ? event.clientY : bounds.top + Math.max(bounds.height / 2, 76),
+    ...tooltipPosition(event, bounds, Math.max(bounds.height / 2, 76)),
     title: reasonLabels[item.reason] ?? item.reason,
     label: 'Quantidade perdida',
     value: `${item.lossesCount} ${item.lossesCount === 1 ? 'registro' : 'registros'}`,
@@ -46,17 +45,6 @@ function showTooltip(event: MouseEvent | FocusEvent, item: (typeof sorted.value)
       ...buildDetails(item.totalsByUnit, item.products, item.otherProductsCount),
     ],
   }
-}
-
-function buildDetails(
-  totals: DashboardQuantityByUnit[],
-  products: DashboardProductQuantity[],
-  otherProductsCount: number,
-) {
-  const lines = totals.map((item) => `Total: ${formatChartNumber(item.quantity)} ${item.unitAbbreviation}`)
-  lines.push(...products.map((item) => `${item.productName}: ${formatChartNumber(item.quantity)} ${item.unitAbbreviation}`))
-  if (otherProductsCount > 0) lines.push(`+ ${otherProductsCount} outros produtos`)
-  return lines
 }
 
 function hideTooltip() {

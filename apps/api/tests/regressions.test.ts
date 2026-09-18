@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
-import { and, eq } from 'drizzle-orm'
+import { and, eq, sql } from 'drizzle-orm'
 import { db } from './db.js'
-import { companies, users } from '../src/db/schema/index.js'
+import { companies, losses, products, stockEntries, stockMovements, users } from '../src/db/schema/index.js'
+import { orderByColumn } from '../src/shared/db/sorting.js'
 import { authCookie, createTenant, setupTestApp } from './helpers.js'
 
 const ctx = setupTestApp()
@@ -269,5 +270,30 @@ describe('cobranças só valem para empresa-cliente', () => {
     })
 
     assert.equal(response.statusCode, 201)
+  })
+})
+
+describe('ordenação das listagens não pode desligar o índice', () => {
+  // `desc ... nulls last` não casa com o índice, porque o padrão do Postgres em `desc` é
+  // `nulls first`. Em coluna obrigatória o sufixo não muda resultado nenhum e só faz a listagem
+  // varrer a tabela inteira: com 120 mil movimentações medimos 78 ms contra 0,3 ms.
+  function ordenacaoGerada(coluna: Parameters<typeof orderByColumn>[0], ordem: 'asc' | 'desc') {
+    return db.select().from(stockMovements).orderBy(orderByColumn(coluna, ordem)).toSQL().sql
+  }
+
+  it('coluna obrigatória ordena sem `nulls last`', () => {
+    assert.doesNotMatch(ordenacaoGerada(stockMovements.movementDate, 'desc'), /nulls last/)
+    assert.doesNotMatch(ordenacaoGerada(stockEntries.entryDate, 'desc'), /nulls last/)
+    assert.doesNotMatch(ordenacaoGerada(losses.lossDate, 'desc'), /nulls last/)
+    assert.doesNotMatch(ordenacaoGerada(products.name, 'asc'), /nulls last/)
+  })
+
+  it('coluna que aceita nulo mantém `nulls last`, senão o vazio subiria para o topo', () => {
+    assert.match(ordenacaoGerada(stockEntries.invoiceTotal, 'desc'), /nulls last/)
+    assert.match(ordenacaoGerada(products.sku, 'asc'), /nulls last/)
+  })
+
+  it('expressão crua continua conservadora, com `nulls last`', () => {
+    assert.match(ordenacaoGerada(sql`coalesce(${products.sku}, '')`, 'desc'), /nulls last/)
   })
 })

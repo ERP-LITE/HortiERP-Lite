@@ -34,6 +34,10 @@
 > na seção 8 (26 a 28). O **manual gerado antes desta data não menciona o sino** e precisa ser
 > regerado: é a novidade mais visível da tela para quem já usava o sistema.
 >
+> **Revisão técnica de 17/09/2026:** alinhados cadastro público, contagem, importação parcial e
+> histórico. A contagem exige conexão e confirmação de salvamento; ajustes de contagem não são
+> somados automaticamente ao percentual de perdas do painel.
+>
 > **Revisão de 16/09/2026:** entrou a **recuperação de senha pelo próprio usuário** (seção 7.1), com
 > reflexo na lista de capítulos (seção 4) e em duas perguntas da seção 8 (13 e 14). Esta revisão
 > **inverte** o que todas as versões anteriores deste briefing mandavam escrever: o sistema passou a
@@ -107,7 +111,7 @@ A equipe do cliente — dono/gerente da loja e os funcionários que mexem no est
 5. **Importar produtos por planilha** — capítulo próprio, é onde mais erram.
 6. **O dia a dia** — entrada de mercadoria, registro de perda, consulta de estoque.
 7. **Quando erraram o lançamento** — o capítulo que responde "lancei errado, e agora?".
-8. **Conferência de estoque (inventário)** — ajuste pontual e ajuste em lote.
+8. **Conferência de estoque (inventário)** — contagem cega, conferência e aplicação, além do ajuste pontual e em lote.
 9. **Painel e relatórios** — o que cada número significa, como gerar PDF, como exportar planilha.
 10. **Usuários e permissões** — quem pode o quê, com uma tabela.
 11. **Histórico de atividades** — para o administrador saber quem fez o quê.
@@ -144,6 +148,8 @@ Quem pode o quê:
 | Importar produtos por planilha | sim | sim | não |
 | Corrigir dados de uma entrada já lançada | sim | sim | não |
 | Corrigir ou cancelar uma perda | sim | sim | não |
+| Contar produtos numa contagem aberta | sim | sim | sim |
+| Abrir, conferir, reabrir, encerrar ou cancelar contagem | sim | sim | não |
 | Ajustar estoque (inventário) | sim | sim | não |
 | Cadastrar e editar usuários | **só ele** | não | não |
 | Ver o histórico de atividades | **só ele** | não | não |
@@ -310,8 +316,8 @@ cliente**, não copie.
   de quem tem dado guardado num sistema, e existe para a pessoa não precisar pedir a ninguém. Vale
   explicar em duas linhas, sem falar de lei nem de formato de arquivo: "é seu, e você baixa quando
   quiser". Não é exportação de relatório da loja — é o dado da própria pessoa.
-- A conta da empresa e o **primeiro administrador** (nome, e-mail e senha) são criados por mim, o
-  fornecedor, que entrega as credenciais direto ao cliente. Não existe autocadastro.
+- Além do cadastro público, o fornecedor pode criar a empresa e o **primeiro administrador**
+  e entregar as credenciais ao cliente. Esse caminho não inicia automaticamente um período de teste.
 - **Onde as mensagens aparecem:** erro em campo preenchido errado sai em vermelho embaixo do próprio
   campo, **e o campo ganha contorno vermelho**, para a pessoa achar o que precisa corrigir sem ler
   o formulário inteiro. Vale em todas as telas e nos dois temas, claro e escuro. **O vermelho some
@@ -632,8 +638,8 @@ Como funciona, na ordem:
 3. A lista já vem pronta, produto por produto, agrupada por categoria. **Não** é preciso procurar
    cada item numa lista, como no ajuste em lote.
 4. **Qualquer usuário conta**, inclusive o operador. Só quem é administrador ou gerente encerra.
-5. Cada quantidade digitada é **salva sozinha**, na hora. Dá para bloquear a tela, perder o sinal no
-   fundo da loja, atender um fornecedor e voltar depois de onde parou. Duas pessoas podem contar
+5. Cada quantidade digitada é **salva sozinha**, na hora. Espere aparecer **Salvo** antes de sair da tela. Se perder o sinal, o sistema mostra
+   **Não salvou. Tentar de novo**: restabeleça a conexão e tente novamente. Não há modo offline. Duas pessoas podem contar
    seções diferentes ao mesmo tempo, na mesma contagem.
 6. Terminado, **Conferir contagem**. Aí, e só aí, o sistema mostra a diferença. O estoque **ainda não
    muda** nesse passo, e vale repetir isso no manual.
@@ -697,7 +703,8 @@ Duas coisas que geram dúvida e precisam de explicação:
 - Nos detalhamentos, o sistema mostra os **5 maiores** de cada grupo e informa quantos ficaram de
   fora. Não é limite de cadastro, é para o gráfico continuar legível.
 - Produto sem saldo **conta** na quantidade de produtos da categoria, mas não aparece nas quantidades.
-- Produtos inativos não entram em nenhum número do painel.
+- Produtos inativos ficam fora dos indicadores de estoque atual e das categorias. Suas entradas,
+  perdas e movimentações anteriores continuam compondo o histórico do período.
 
 - A **contagem** de produtos com estoque baixo é completa, mas a **lista** que aparece embaixo mostra
   no máximo **10 produtos**. Vale uma frase, no mesmo espírito da observação sobre os "5 maiores".
@@ -756,7 +763,7 @@ vírgula — diga que abre direto no Excel, sem falar em CSV, ponto e vírgula o
 ### 7.12 Usuários
 
 Só o administrador. Cadastra nome, e-mail, perfil e senha, e pode desativar quem saiu da empresa. A
-senha precisa ter **no mínimo 8 caracteres** (e no máximo 72), informe isso, senão o administrador
+senha precisa ter **no mínimo 8 caracteres** (até 72 bytes; letras acentuadas ocupam mais de um byte), informe isso, senão o administrador
 topa com o aviso sem entender. A senha é digitada duas vezes, no campo **Senha** e em **Confirmar senha**: quem digita
 não é quem vai usar, e o campo é mascarado, então o erro de digitação só apareceria na hora em que o
 funcionário não conseguisse entrar. Existe também um **Gerar senha aleatória**, que preenche os dois
@@ -803,7 +810,7 @@ Quando há algo para olhar, o sino ganha uma **bolinha vermelha com um número**
 painel com o resumo. O número conta duas coisas, e só essas duas:
 
 - **Produtos sem estoque** — o saldo chegou a zero (ou abaixo).
-- **Produtos abaixo do mínimo** — ainda tem mercadoria, mas menos do que o estoque mínimo cadastrado
+- **Produtos abaixo do mínimo** — ainda tem mercadoria, mas quantidade igual ou menor que o estoque mínimo cadastrado
   para aquele produto.
 
 O painel lista os **5 produtos mais críticos**, com os zerados primeiro, mostrando quanto tem e qual
@@ -875,7 +882,7 @@ o capítulo correspondente:
 31. Repus a mercadoria e o sino continua marcando. Está travado? (Resposta curta: o sino se corrige
     sozinho depois do lançamento. Se ainda marcar, é porque a entrada não foi lançada, ou o produto
     continua abaixo do mínimo cadastrado — que é diferente de estar zerado.)
-28. O sino só avisa quando o produto zera. Dá para avisar antes de acabar?
+32. O sino só avisa quando o produto zera. Dá para avisar antes de acabar?
 
 ## 9. O que NÃO entra no manual
 
@@ -887,7 +894,8 @@ Importante, para não vazar coisa que não é do cliente:
   alertas visto do meu lado**: para mim ele mostra cobranças atrasadas, e o manual só descreve o sino
   do estoque, que é o que o cliente vê.
 - Nada de instalação, servidor, backup, banco de dados, atualização ou configuração técnica.
-- Nada de preço, contrato, plano ou suporte comercial — isso eu trato à parte.
+- Não definir preços nem condições comerciais. Explicar a escolha de plano, o período de teste e
+  o contato para liberação conforme a seção 7.1, sem inventar valores.
 - Não invente atalho de teclado, aplicativo de celular, integração com balança, emissão de nota,
   leitor de código de barras, controle de vendas ou controle financeiro. **O sistema não faz nada
   disso.** É controle de estoque: o que entra, o que se perde e o que tem.

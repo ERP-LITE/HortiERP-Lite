@@ -2,7 +2,6 @@
 @tailwind components;
 @tailwind utilities;
 
-
 @media screen and (pointer: coarse) {
   input,
   select,
@@ -123,6 +122,21 @@
     display: none;
   }
 
+  /* A caixa desenhada tem 18px, que o dedo erra. O `::after` transparente estica só a área de
+     toque até o tamanho da própria célula, sem mexer no desenho nem no layout do desktop. */
+  table.mobile-accordion-table tbody tr > td.mobile-accordion-selection [role='checkbox'] {
+    position: relative;
+  }
+
+  table.mobile-accordion-table tbody tr > td.mobile-accordion-selection [role='checkbox']::after {
+    content: '';
+    position: absolute;
+    top: -0.8rem;
+    right: -1.1rem;
+    bottom: -0.8rem;
+    left: -0.6rem;
+  }
+
   table.mobile-accordion-table tbody tr.mobile-accordion-open > td.mobile-accordion-actions {
     justify-content: flex-end;
     gap: 0.25rem;
@@ -155,6 +169,19 @@ input[type='number']::-webkit-inner-spin-button {
 input[type='number'] {
   -moz-appearance: textfield;
   appearance: textfield;
+}
+
+/**
+ * A rolagem do painel não pode transbordar para a página quando chega ao fim: a trava de rolagem
+ * (lib/scrollLock.ts) deixa a página rolável de propósito, para a barra dela não sumir.
+ */
+.app-modal-panel {
+  overscroll-behavior: contain;
+}
+
+/* O SweetAlert esconderia a barra de rolagem da página; quem trava a rolagem aqui é o scrollLock. */
+body.swal2-shown:not(.swal2-no-backdrop, .swal2-toast-shown) {
+  overflow: visible !important;
 }
 
 /* Scrollbar discreta e consistente nos conteúdos roláveis dos modais */

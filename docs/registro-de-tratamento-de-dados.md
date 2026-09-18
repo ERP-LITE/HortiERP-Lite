@@ -9,7 +9,7 @@
 > técnica de quem construiu o sistema e precisam ser confirmadas — sobretudo porque quem define
 > finalidade e base legal é o controlador, não o operador.
 >
-> Revisão: 25/08/2026.
+> Revisão técnica: 17/09/2026. As bases legais continuam sujeitas à revisão indicada acima.
 
 ---
 
@@ -52,7 +52,7 @@ fornecedor têm como recuperá-la — apenas substituí-la.
 | Dado | Onde fica | Observação |
 |---|---|---|
 | Razão social, nome fantasia, inscrição estadual | `companies` | dado de pessoa jurídica; não é dado pessoal |
-| **CNPJ ou CPF** (`document`) | `companies` | **é dado pessoal quando for CPF** — caso de MEI e de empresário individual |
+| **CNPJ** (`document`) | `companies` | o cadastro exige CNPJ válido, inclusive alfanumérico; não aceita CPF neste campo |
 | Nome, e-mail e telefone do contato | `companies.contact_name`, `contact_email`, `phone` | dado pessoal de pessoa física identificada |
 | Endereço completo | `companies` | endereço do estabelecimento |
 
@@ -71,9 +71,9 @@ o e-mail e a senha de quem vai administrar o sistema. Três consequências para 
   e não só uma caixa marcada que não deixa rastro;
 - a senha escolhida ali é guardada como **resumo criptográfico (bcrypt)**, nunca em texto, igual às
   demais senhas do sistema;
-- é o único ponto do sistema em que dado pessoal é gravado **sem autenticação prévia**. O controle
-  compensatório é o freio de 5 tentativas por hora por origem, e a rota só grava: não lê nem devolve
-  registro de nenhuma outra empresa.
+- o cadastro cria dados **sem autenticação prévia**, com limite de 5 tentativas por hora por origem.
+  Consulta plano e duplicidades, mas não devolve registros de outras empresas. Pedidos de redefinição
+  de senha também gravam dados sem sessão, seguindo as proteções próprias desse fluxo.
 
 Uma lacuna conhecida, já registrada na seção 9: **não há confirmação de e-mail** no cadastro, então
 alguém pode criar uma conta informando o e-mail de outra pessoa. O dado gravado é o que o titular
@@ -111,7 +111,7 @@ Declarar isto é tão importante quanto o inventário, porque muda o enquadramen
   seção 4 (nome e endereço do destinatário, via Resend). Esta linha dizia "nenhum envio de e-mail" e
   ficou falsa quando a recuperação de senha entrou; a seção 4 já estava certa, e as duas agora
   dizem a mesma coisa.
-- **A consulta de CEP não envia dado pessoal.** O frontend chama BrasilAPI, ViaCEP ou OpenCEP com
+- **A consulta de CEP não envia dado pessoal.** A API consulta BrasilAPI, ViaCEP ou OpenCEP com
   **apenas os oito dígitos do CEP**, sem nome, sem identificador e sem credencial.
 
 ---
@@ -122,8 +122,8 @@ Declarar isto é tão importante quanto o inventário, porque muda o enquadramen
 
 | Perfil | Alcance |
 |---|---|
-| Operador | lança entrada e perda; consulta estoque, painel e relatórios |
-| Gerente | tudo do operador, mais cadastros, correções e ajuste de estoque |
+| Operador | lança entrada e perda, registra quantidades na contagem; consulta estoque, painel e relatórios |
+| Gerente | tudo do operador, mais cadastros, correções, ajuste e mudanças de etapa da contagem |
 | Administrador | tudo; único que gerencia usuários e vê o histórico de atividades |
 
 A permissão é verificada **no servidor**, em cada rota, nunca apenas na tela.
@@ -141,10 +141,9 @@ O fornecedor tem um perfil de plataforma que pode **acessar a empresa do cliente
 ### 3.3 Isolamento entre empresas-cliente
 
 O isolamento tem duas camadas. Cada consulta filtra pela empresa da sessão, e o próprio banco recusa o
-que passa do escopo, por políticas de RLS (segurança em nível de linha) em 13 tabelas. Para que um
+que passa do escopo, por políticas de RLS (segurança em nível de linha). Até a migration `0016`, são 18 tabelas protegidas, incluindo planos com leitura pública. Para que um
 esquecimento não chegue a produção, existe uma verificação automática que lê o código e acusa
-consulta a tabela multiempresa em função que não menciona a empresa: hoje **118 consultas
-verificadas, nenhuma desprotegida**, e as poucas travessias propositais estão declaradas com
+consulta a tabela multiempresa em função que não menciona a empresa: o resultado atualizado é emitido por `npm run check:tenant-scope`, e as poucas travessias propositais estão declaradas com
 justificativa. Ela roda no CI e reprova o deploy.
 
 A segunda camada exigiu que a aplicação falasse com o banco por um papel **sem superusuário** —
@@ -204,7 +203,7 @@ Verificadas no código, não declaradas por otimismo:
 | Conta de plataforma fora da redefinição por e-mail | ✅ ela alcança os dados de todos os clientes; a recuperação é por outro super admin ou por comando no servidor |
 | Redefinição de senha registrada no histórico de atividades | ✅ o log técnico não identifica a conta, porque o pedido não tem sessão |
 | Permissão verificada no servidor em cada rota | ✅ |
-| Isolamento entre empresas verificado automaticamente | ✅ 118 consultas |
+| Isolamento entre empresas verificado automaticamente | ✅ verificador de escopo executado no CI |
 | Banco sem porta exposta à internet (rede interna do Docker) | ✅ |
 | Anexos com permissão restrita e entrega só por rota autenticada | ✅ |
 | Validação de tipo e assinatura dos arquivos enviados | ✅ |
@@ -212,7 +211,7 @@ Verificadas no código, não declaradas por otimismo:
 | Corpo de requisição fora do log | ✅ senha nunca vai para log |
 | Acesso do fornecedor registrado | ✅ |
 | Autenticação em dois fatores | ❌ não existe |
-| RLS no banco | ✅ política por empresa em 13 tabelas, sobre papel sem superusuário |
+| RLS no banco | ✅ 18 tabelas protegidas até `0016`, sobre papel sem superusuário; planos têm leitura pública |
 
 ---
 

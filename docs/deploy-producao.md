@@ -167,6 +167,12 @@ Uma observação de dependência: a `0015` acompanha a entrada do pacote `fast-x
 faz deploy pelo script padrão não precisa fazer nada, porque a imagem é reconstruída com o
 `package-lock.json` do repositório.
 
+### Migration `0016`: contagem de estoque
+
+Cria `stock_counts`, `stock_count_items`, o enum das etapas, índices e políticas de RLS.
+Não reescreve os saldos existentes. A versão anterior pode rodar com essas tabelas sem usá-las;
+num rollback, preserve as contagens já gravadas e suas tabelas.
+
 ### As migrations `0012` e `0013` abortam se houver dado repetido entre empresas
 
 Elas criam os índices únicos de nome fantasia (`0012`) e de razão social, inscrição estadual e e-mail
@@ -185,8 +191,9 @@ docker compose --env-file .env.production -f docker-compose.production.yml exec 
    union all select 'email de contato', lower(trim(contact_email)), count(*) from companies where deleted_at is null and contact_email is not null group by 2 having count(*)>1;"
 ```
 
-Voltando alguma linha, resolva antes pela tela de Empresas: renomeie uma delas, ou suspenda e exclua a
-que não for usada. Só então atualize.
+Voltando alguma linha, corrija os campos duplicados pela tela de Empresas antes de atualizar.
+Suspender não libera valores únicos, pois os índices ignoram somente registros excluídos.
+A tela não oferece exclusão de empresa; não apague dados para contornar uma duplicidade.
 
 Não copie `.env.production.example` por cima do `.env.production` existente. Preserve os segredos atuais e acrescente
 somente variáveis novas explicitamente documentadas na versão que será instalada.
@@ -243,7 +250,7 @@ Esta migration troca a restrição `users_email_unique` (sensível à caixa) pel
 `users_email_active_unique`, sobre `lower(email)` e restrito a `deleted_at is null`. Ela também **regrava os e-mails
 existentes em minúsculas**, que é a forma que a aplicação passa a usar para gravar e para procurar no login.
 
-Ela é a única migration até aqui que pode **falhar por causa dos dados** — e falha de propósito. Se duas contas não
+Ela pode **falhar por causa dos dados**, assim como as migrations `0012` e `0013` — e falha de propósito. Se duas contas não
 excluídas diferirem apenas pela caixa (`Maria@Loja.com` e `maria@loja.com`), o índice não pode ser criado, a migration
 inteira é revertida (roda em transação) e o container `migrate` encerra com código diferente de `0`, sem liberar a API
 nova. Fundir ou renomear duas contas distintas é decisão de negócio, não de migration.
@@ -361,8 +368,9 @@ docker compose --env-file .env.production -f docker-compose.production.yml exec 
   -c "SELECT count(DISTINCT tablename) AS tabelas, count(*) AS politicas FROM pg_policies WHERE schemaname='public';"
 ```
 
-Deve devolver **13 tabelas e 14 políticas** — a política extra é a da `0007`, que deixa o nome do
-operador da plataforma visível em "Registrado por". Se vier 0, as migrations não rodaram e o
+Com as migrations até `0016`, deve devolver **18 tabelas e 20 políticas**. A `0007` acrescenta
+a leitura do autor da plataforma; `0010` protege pedidos de senha, `0011` tem duas políticas para
+planos, `0015` protege vínculos do fornecedor e `0016` protege contagens e seus itens. Se vier 0, as migrations não rodaram e o
 isolamento voltou a depender só da aplicação: o sistema funciona, mas sem a segunda camada.
 
 **O backup continua no papel dono, e isso é deliberado.** `pg_dump` rodando com papel sujeito a RLS
@@ -508,7 +516,7 @@ evita encostar em API, gateway e banco. Recriar é necessário quando o que mudo
 
 ## Monitoramento externo
 
-Três sinais, em dois serviços. Nenhum deles mora no servidor de propósito: monitor que roda na mesma
+Quatro sinais, em dois serviços externos. Nenhum deles mora no servidor de propósito: monitor que roda na mesma
 máquina que ele vigia não avisa quando a máquina cai.
 
 | sinal | serviço | o que prova |
@@ -544,7 +552,7 @@ consegue enviar o sinal de sucesso**, e portanto calar o alarme sem que o backup
 moram apenas no `.env.production` (`BACKUP_HEARTBEAT_URL`, `RETENTION_HEARTBEAT_URL`), que fica fora
 do Git pela regra do `.gitignore`. Não colar em documento, em issue nem em mensagem.
 
-### O que estes três sinais não cobrem
+### O que estes sinais não cobrem
 
 - **Até 5 minutos de queda sem aviso**, que é o intervalo da verificação de disponibilidade no plano
   em uso.

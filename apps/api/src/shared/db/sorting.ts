@@ -2,12 +2,24 @@ import { asc, desc, sql, type SQL, type SQLWrapper } from 'drizzle-orm'
 
 export type SortOrder = 'asc' | 'desc'
 
+/**
+ * `nulls last` só entra onde a coluna aceita nulo. Em coluna obrigatória ele não muda o resultado e
+ * ainda custa caro: como o padrão do Postgres em `desc` é `nulls first`, pedir `nulls last` faz a
+ * ordenação deixar de casar com o índice, e a listagem passa a varrer a tabela inteira para ordenar
+ * 15 linhas. Expressão crua (`sql`) não sabe dizer se aceita nulo, e por segurança mantém o sufixo.
+ * Ver docs/decisoes-arquiteturais.md.
+ */
+function aceitaNulo(column: SQLWrapper) {
+  return (column as { notNull?: boolean }).notNull !== true
+}
+
 export function orderByColumn(
   column: SQLWrapper,
   sortOrder: SortOrder | undefined,
   defaultOrder: SortOrder = 'asc',
 ): SQL {
-  return (sortOrder ?? defaultOrder) === 'asc' ? sql`${asc(column)} nulls last` : sql`${desc(column)} nulls last`
+  const ordenacao = (sortOrder ?? defaultOrder) === 'asc' ? asc(column) : desc(column)
+  return aceitaNulo(column) ? sql`${ordenacao} nulls last` : sql`${ordenacao}`
 }
 
 export function orderByLabeledEnum(

@@ -90,7 +90,8 @@ bipar não funciona lá.
 
 **Importação.** Carga de produtos por planilha, com estoque inicial, conferência linha por linha antes
 de confirmar (o que vai entrar, o que vai ser criado, o que está sem custo) e
-recusa total se qualquer linha tiver problema (não importa metade). Produto sem custo preenchido
+importação parcial por escolha explícita: entram as linhas válidas e as recusadas podem ser baixadas
+para correção e reenvio. Sem essa escolha, qualquer problema impede a gravação. Produto sem custo preenchido
 aparece valendo R$ 0,00 nos relatórios até o valor ser informado, e o sistema avisa antes de
 confirmar.
 
@@ -459,7 +460,8 @@ sendo encerrar.
 A seção 3 não ganhou número novo: a contagem não tem limite de produtos nem de vezes por mês. Se
 alguém perguntar, a resposta é que não existe limite, e não um número inventado.
 
-**Cuidado com o encadeamento na conversa de venda.** A contagem torna o percentual de quebra do
-painel mais verdadeiro, porque expõe a perda que ninguém registra. Isso é argumento forte e honesto.
+**Cuidado com o encadeamento na conversa de venda.** A contagem revela divergências que não aparecem nos registros de perda. O ajuste gerado por ela
+**não entra automaticamente no percentual de quebra do painel**, cujo numerador continua sendo
+o valor das perdas não canceladas. Os dois indicadores se complementam.
 O que **não** pode ser dito é que o sistema reduz a quebra: ele mede, e quem reduz é a operação da
 loja.

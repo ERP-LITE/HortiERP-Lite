@@ -2,6 +2,7 @@
 import { computed, ref } from 'vue'
 import { STATUS_CRITICAL, STATUS_GOOD, STATUS_NEUTRAL, useChartInk } from './palette'
 import ChartTooltip from './ChartTooltip.vue'
+import { buildDetails, tooltipPosition } from './tooltipContent'
 import type { DashboardProductQuantity, DashboardQuantityByUnit } from '@/types'
 import { formatChartNumber } from '@/lib/format'
 
@@ -98,30 +99,15 @@ function showTooltip(
 ) {
   const bounds = chartContainer.value?.getBoundingClientRect()
   if (!bounds) return
-  const pointer = event instanceof MouseEvent
   tooltip.value = {
     visible: true,
-    x: pointer ? Math.min(Math.max(event.clientX, 140), window.innerWidth - 140) : bounds.left + bounds.width / 2,
-    y: pointer ? event.clientY : bounds.top + 100,
+    ...tooltipPosition(event, bounds, 100),
     title: formatDayLabel(date),
     label: type,
     value: `${count} ${count === 1 ? 'movimentação' : 'movimentações'}`,
     color: type === 'Entrada' ? STATUS_GOOD : type === 'Perda' ? STATUS_CRITICAL : STATUS_NEUTRAL,
-    details: buildDetails(quantities, products, otherProductsCount),
+    details: buildDetails(quantities, products, otherProductsCount, 'Nenhuma quantidade registrada'),
   }
-}
-
-function buildDetails(
-  quantities: DashboardQuantityByUnit[],
-  products: DashboardProductQuantity[],
-  otherProductsCount: number,
-) {
-  const totals = quantities.map((item) => `Total: ${formatChartNumber(item.quantity)} ${item.unitAbbreviation}`)
-  const productLines = products.map(
-    (item) => `${item.productName}: ${formatChartNumber(item.quantity)} ${item.unitAbbreviation}`,
-  )
-  if (otherProductsCount > 0) productLines.push(`+ ${otherProductsCount} outros produtos`)
-  return totals.length ? [...totals, ...productLines] : ['Nenhuma quantidade registrada']
 }
 
 function hideTooltip() {

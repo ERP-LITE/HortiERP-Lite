@@ -26,10 +26,9 @@ Tela `/produtos`. Rota `POST /products/import`, service `products.service.ts::im
 `gerente`, como os demais cadastros. O frontend lê o arquivo (`lib/productSpreadsheet.ts`) e envia as linhas já como
 JSON — a API nunca recebe o arquivo em si. Máximo de 2000 linhas por vez.
 
-**A operação é tudo-ou-nada.** Se qualquer linha estiver inválida, nada é gravado. Importar só as linhas boas
-obrigaria o usuário a corrigir o arquivo e reenviar, e aí as linhas já importadas voltariam como duplicadas; corrigir
-o arquivo inteiro de uma vez é o caminho mais previsível. Com `dryRun`, a mesma validação roda sem gravar nada — é o
-que a tela usa para mostrar a prévia antes de confirmar.
+**Por padrão, a operação é tudo-ou-nada.** Se qualquer linha estiver inválida, nada é gravado.
+A opção explícita `skipInvalid` permite importar só as válidas, conforme descrito adiante. Com
+`dryRun`, a mesma validação roda sem gravar nada; é o que a tela usa para mostrar a prévia antes de confirmar.
 
 Os erros voltam por número de linha, limitados a 200 por resposta; `omittedErrors` conta quantos ficaram de fora para
 a tela não fingir que a lista está completa.
@@ -432,7 +431,8 @@ pedido, porque é o que o Marco Civil exige.
 
 - Tela `/logs/atividades`: somente o `admin` consulta ações de escrita realizadas dentro da própria empresa. O `companyId` não é aceito da interface; é obtido obrigatoriamente da sessão.
 - Tela `/logs/tecnicos`: somente o `super_admin`, fora do modo de impersonação, consulta requisições de toda a plataforma, identifica a empresa responsável e filtra por empresa, método, nível e período.
-- Os dois históricos são somente leitura e paginados.
+- Os dois históricos são somente leitura e paginados. O filtro de tipo de registro de atividades
+  também aceita **Contagem**, para localizar abertura, aplicação e cancelamento de contagens.
 
 ## Cadastro que a própria loja preenche e período de teste
 

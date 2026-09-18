@@ -2,6 +2,7 @@
 import { computed, ref } from 'vue'
 import { useCategoricalPalette, useChartInk } from './palette'
 import ChartTooltip from './ChartTooltip.vue'
+import { buildDetails, tooltipPosition } from './tooltipContent'
 import type { DashboardProductQuantity, DashboardQuantityByUnit } from '@/types'
 import { formatChartNumber, formatPercent } from '@/lib/format'
 
@@ -56,11 +57,9 @@ const segments = computed(() => {
 function showTooltip(event: MouseEvent | FocusEvent, segment: (typeof segments.value)[number]) {
   const bounds = chartContainer.value?.getBoundingClientRect()
   if (!bounds) return
-  const pointer = event instanceof MouseEvent
   tooltip.value = {
     visible: true,
-    x: pointer ? Math.min(Math.max(event.clientX, 140), window.innerWidth - 140) : bounds.left + bounds.width / 2,
-    y: pointer ? event.clientY : bounds.top + 90,
+    ...tooltipPosition(event, bounds, 90),
     title: segment.label,
     label: 'Em estoque',
     value: `${segment.value} ${segment.value === 1 ? 'produto' : 'produtos'}`,
@@ -68,17 +67,6 @@ function showTooltip(event: MouseEvent | FocusEvent, segment: (typeof segments.v
     detail: `${formatPercent(segment.fraction * 100)} dos produtos em estoque`,
     details: buildDetails(segment.totalsByUnit, segment.products, segment.otherProductsCount),
   }
-}
-
-function buildDetails(
-  totals: DashboardQuantityByUnit[],
-  products: DashboardProductQuantity[],
-  otherProductsCount: number,
-) {
-  const lines = totals.map((item) => `Total: ${formatChartNumber(item.quantity)} ${item.unitAbbreviation}`)
-  lines.push(...products.map((item) => `${item.productName}: ${formatChartNumber(item.quantity)} ${item.unitAbbreviation}`))
-  if (otherProductsCount > 0) lines.push(`+ ${otherProductsCount} outros produtos`)
-  return lines
 }
 
 function hideTooltip() {

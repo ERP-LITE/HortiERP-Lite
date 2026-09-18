@@ -17,6 +17,7 @@ import StockCountTotalsCards from '@/components/contagem/StockCountTotalsCards.v
 import { useAsyncState } from '@/composables/useAsyncState'
 import { usePagination } from '@/composables/usePagination'
 import { usePermissions } from '@/composables/usePermissions'
+import { useFieldErrors } from '@/composables/useFieldErrors'
 import {
   cancelStockCount,
   countStockCountItem,
@@ -27,7 +28,7 @@ import {
   reviewStockCount,
   type SituacaoDoItem,
 } from '@/services/stockCountsService'
-import { getApiErrorMessage } from '@/services/api'
+import { getApiErrorMessage, resolveFormError } from '@/services/api'
 import { confirmAction, toastError, toastSuccess } from '@/lib/alerts'
 import { formatCurrency, formatDateTime } from '@/lib/format'
 import { LIMITES_TEXTO } from '@/lib/limits'
@@ -55,7 +56,9 @@ const mudandoEtapa = ref(false)
 
 const cancelModalOpen = ref(false)
 const cancelReason = ref('')
-const cancelFieldError = ref('')
+const { fieldErrors: cancelErrors, clearFieldErrors: clearCancelErrors } = useFieldErrors(() => ({
+  cancelReason: cancelReason.value,
+}))
 const cancelling = ref(false)
 
 const contando = computed(() => contagem.value?.status === 'em_andamento')
@@ -161,7 +164,7 @@ async function encerrar() {
 
 async function handleCancel() {
   if (!cancelReason.value.trim()) {
-    cancelFieldError.value = 'Explique o motivo do cancelamento'
+    cancelErrors.value.cancelReason = 'Explique o motivo do cancelamento'
     return
   }
 
@@ -173,7 +176,9 @@ async function handleCancel() {
     reload(loadItems)
     toastSuccess('Contagem cancelada sem mexer no estoque')
   } catch (error) {
-    cancelFieldError.value = getApiErrorMessage(error, 'Não foi possível cancelar a contagem')
+    const result = resolveFormError(error, 'Não foi possível cancelar a contagem')
+    cancelErrors.value = result.fieldErrors
+    if (result.message) toastError(result.message)
   } finally {
     cancelling.value = false
   }
@@ -181,7 +186,7 @@ async function handleCancel() {
 
 function abrirCancelamento() {
   cancelReason.value = ''
-  cancelFieldError.value = ''
+  clearCancelErrors()
   cancelModalOpen.value = true
 }
 
@@ -300,7 +305,7 @@ watch(situacao, () => reload(loadItems))
           label="Motivo do cancelamento"
           placeholder="Ex.: contamos a banca errada"
           :maxlength="LIMITES_TEXTO.motivo"
-          :error="cancelFieldError"
+          :error="cancelErrors.cancelReason"
           required
         />
         <div class="flex justify-end gap-2 pt-2">

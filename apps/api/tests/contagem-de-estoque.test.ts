@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { describe, test } from 'node:test'
-import { eq } from 'drizzle-orm'
+import { eq, sql } from 'drizzle-orm'
+import { setTimeout as esperar } from 'node:timers/promises'
 import { db } from './db.js'
 import { products, stockCountItems, stockCounts, stockMovements } from '../src/db/schema/index.js'
 import { db as dbDaAplicacao } from '../src/db/client.js'
@@ -9,6 +10,44 @@ import { authCookie, createTenant, setupTestApp, type FixtureUser } from './help
 import { divergenciaDaLinha, resumoDaContagem } from '../src/modules/stock-counts/divergencia.js'
 
 const ctx = setupTestApp()
+
+describe('lançamento concorrente com mudança de etapa', () => {
+  for (const status of ['em_conferencia', 'cancelada'] as const) {
+    test(`lançamento aguarda a transição para ${status} e não altera a contagem`, async () => {
+      const tenant = await createTenant(`corrida-${status}`, '18')
+      const contagem = await abrirContagem(tenant.admin)
+      let terminou = false
+      let resposta: ReturnType<typeof lancar> | undefined
+
+      await db.transaction(async (tx) => {
+        await tx.select().from(stockCounts).where(eq(stockCounts.id, contagem.id)).for('update')
+        resposta = lancar(tenant.operator, contagem.id, tenant.productId, 7)
+        void resposta.then(() => { terminou = true })
+
+        // Espera o lançamento chegar à trava (ou terminar indevidamente), sem depender da velocidade da máquina.
+        let bloqueado = false
+        for (let tentativa = 0; tentativa < 200 && !terminou; tentativa += 1) {
+          const resultado = await tx.execute<{ bloqueado: boolean }>(sql`
+            select exists (
+              select 1 from pg_stat_activity
+              where pg_backend_pid() = any(pg_blocking_pids(pid))
+            ) as bloqueado
+          `)
+          bloqueado = resultado.rows[0].bloqueado
+          if (bloqueado) break
+          await esperar(10)
+        }
+        assert.ok(terminou || bloqueado, 'o lançamento não chegou ao banco dentro do prazo')
+        await tx.update(stockCounts).set({ status }).where(eq(stockCounts.id, contagem.id))
+      })
+
+      const resultado = await resposta!
+      assert.equal(resultado.statusCode, 422, resultado.body)
+      const [item] = await db.select().from(stockCountItems).where(eq(stockCountItems.stockCountId, contagem.id))
+      assert.equal(item.countedQuantity, null)
+    })
+  }
+})
 
 function comoUsuario(user: FixtureUser) {
   return { cookie: authCookie(ctx.app, user) }
@@ -122,6 +161,19 @@ describe('cálculo de divergência da contagem', () => {
 })
 
 describe('contagem cega', () => {
+  test('o histórico aceita o filtro de contagem oferecido pela tela', async () => {
+    const tenant = await createTenant('contagem-filtro-atividade', '18')
+    const contagem = await abrirContagem(tenant.admin)
+    const resposta = await ctx.app.inject({
+      url: '/api/logs/activity?entity=contagem',
+      headers: comoUsuario(tenant.admin),
+    })
+    assert.equal(resposta.statusCode, 200, resposta.body)
+    assert.equal(resposta.json().total, 1)
+    assert.equal(resposta.json().data[0].entityId, contagem.id)
+    assert.equal(resposta.json().data[0].entity, 'contagem')
+  })
+
   test('em andamento a API não devolve saldo, custo nem divergência', async () => {
     const tenant = await createTenant('contagem-cega', '18')
     const contagem = await abrirContagem(tenant.admin)
@@ -135,7 +187,12 @@ describe('contagem cega', () => {
     assert.equal(item.unitCost, null)
     assert.equal(item.difference, null)
     assert.equal(item.differenceValue, null)
-    assert.ok(!resposta.body.includes('"18'), 'o saldo do sistema vazou na resposta')
+    // Confere os valores, não o texto cru: um uuid sorteado começando com "18" tornava o teste
+    // instável sem nada ter vazado.
+    assert.ok(
+      !Object.values(item).includes('18.000'),
+      `o saldo do sistema vazou na resposta: ${JSON.stringify(item)}`,
+    )
   })
 
   test('filtrar por divergentes é recusado enquanto a contagem está cega', async () => {

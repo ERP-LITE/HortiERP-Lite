@@ -68,8 +68,8 @@ ERP-LITE/
    - Super admin: o e-mail/senha definidos no passo 4 (tela `/empresas`, para cadastrar novas empresas-cliente)
 
    Em desenvolvimento não é preciso conta na Resend: sem `RESEND_API_KEY` o e-mail de redefinição de senha não é
-   enviado, e a mensagem inteira, com o link, aparece no log da API (`docker compose logs -f api`). Em produção a API
-   recusa subir sem a chave — ver [guia de deploy](./docs/deploy-producao.md).
+   enviado, e a mensagem inteira, com o link, aparece no log da API (`docker compose logs -f api`). Em produção, sem `RESEND_API_KEY` e `MAIL_FROM`, apenas a recuperação de senha fica
+   indisponível; a API continua funcionando — ver [guia de deploy](./docs/deploy-producao.md).
 
 ### Sem Docker
 
@@ -144,10 +144,10 @@ Depois vêm três verificações estáticas:
 - `npm run check:tenant-scope` — lê o código da API com o AST do TypeScript e acusa consulta a tabela multiempresa numa
   função que não menciona `companyId`. O banco também barra o que passa do escopo, pelas políticas de RLS, mas o erro que
   ele produz é consulta vazia — sintoma que se confunde com "não tem dado". A verificação existe para o esquecimento
-  aparecer no CI com arquivo e função; a verificação existe para o esquecimento aparecer no CI e não em produção. As poucas
+  aparecer no CI com arquivo e função, antes de chegar à produção. As poucas
   consultas transversais de propósito — login por e-mail, manutenção operacional e retenção de dados por data — estão
   declaradas com justificativa no próprio verificador. Ver
-  [decisões arquiteturais](./docs/decisoes-arquiteturais.md#o-verificador-que-substitui-a-rede-de-proteção-por-enquanto).
+  [decisões arquiteturais](./docs/decisoes-arquiteturais.md#o-verificador-estático).
 
 - `npm run check:privacy-date` — o aviso de privacidade em `/privacidade` traz a data da última revisão, e essa data é
   o sinal que o leitor usa para saber se as regras mudaram. O verificador guarda um resumo **do `<template>`**, ou seja
@@ -158,7 +158,7 @@ Depois vêm três verificações estáticas:
 
 Manutenção de dados pessoais (rodada por linha de comando, não pela interface):
 
-- `npm run data:retention` — apaga log técnico e trilha de auditoria vencidos, remove pedido de redefinição de senha
+- `npm run data:retention --workspace=apps/api` — apaga log técnico e trilha de auditoria vencidos, remove pedido de redefinição de senha
   vencido há mais de 7 dias e anonimiza usuário excluído há mais que o prazo. Aceita `--dry-run`. Em produção roda sozinho, semanalmente, no contêiner `retention`, e avisa um monitor externo
   quando termina bem ou quando falha (`RETENTION_HEARTBEAT_URL`) — ver
   [deploy em produção](./docs/deploy-producao.md).
@@ -166,7 +166,7 @@ Manutenção de dados pessoais (rodada por linha de comando, não pela interface
   do "esqueci minha senha" por e-mail de propósito: ela alcança os dados de todos os clientes, e o sistema não tem
   segundo fator para segurar uma caixa de entrada invadida. Aceita `--list` e só alcança conta `super_admin`, nunca a de
   um cliente. Ver [deploy em produção](./docs/deploy-producao.md#recuperar-a-senha-de-um-super-administrador).
-- `npm run data:erase-company` — apaga em definitivo todos os dados de uma empresa e os arquivos de nota fiscal dela.
+- `npm run data:erase-company --workspace=apps/api` — apaga em definitivo todos os dados de uma empresa e os arquivos de nota fiscal dela.
   Irreversível: exige `--id` e `--confirm` com o nome exato, e não tem equivalente na interface de propósito.
 
 O workflow em `.github/workflows/ci.yml` também executa os builds da API e do frontend, aplica as migrations em um

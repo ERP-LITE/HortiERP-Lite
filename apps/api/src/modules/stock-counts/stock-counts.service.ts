@@ -286,25 +286,24 @@ export async function countStockCountItem(
   productId: string,
   countedQuantity: number | null,
 ) {
-  const contagem = await buscarContagem(companyId, id)
-  if (contagem.status !== 'em_andamento') {
-    throw new AppError('Esta contagem não aceita mais lançamentos', 422, 'COUNT_NOT_OPEN')
-  }
+  return db.transaction(async (tx) => {
+    await travarContagem(tx, companyId, id, ['em_andamento'],
+      new AppError('Esta contagem não aceita mais lançamentos', 422, 'COUNT_NOT_OPEN'))
 
-  const contado = countedQuantity !== null
-  const [item] = await db
-    .update(stockCountItems)
-    .set({
-      countedQuantity: contado ? countedQuantity.toString() : null,
-      countedAt: contado ? new Date() : null,
-      countedBy: contado ? userId : null,
-    })
-    .where(and(eq(stockCountItems.stockCountId, id), eq(stockCountItems.productId, productId)))
-    .returning({ countedQuantity: stockCountItems.countedQuantity, countedAt: stockCountItems.countedAt })
+    const contado = countedQuantity !== null
+    const [item] = await tx
+      .update(stockCountItems)
+      .set({
+        countedQuantity: contado ? countedQuantity.toString() : null,
+        countedAt: contado ? new Date() : null,
+        countedBy: contado ? userId : null,
+      })
+      .where(and(eq(stockCountItems.stockCountId, id), eq(stockCountItems.productId, productId)))
+      .returning({ countedQuantity: stockCountItems.countedQuantity, countedAt: stockCountItems.countedAt })
 
-  if (!item) throw AppError.notFound('Este produto não faz parte da contagem')
-
-  return { productId, ...item }
+    if (!item) throw AppError.notFound('Este produto não faz parte da contagem')
+    return { productId, ...item }
+  })
 }
 
 async function trocarStatus(
@@ -324,19 +323,23 @@ async function trocarStatus(
 }
 
 export async function reviewStockCount(companyId: string, userId: string, id: string) {
-  await buscarContagem(companyId, id)
+  await db.transaction(async (tx) => {
+    await travarContagem(tx, companyId, id, ['em_andamento'],
+      new AppError('Esta contagem não está mais em andamento', 422, 'COUNT_NOT_OPEN'))
 
-  const [{ contados }] = await db
-    .select({ contados: count() })
-    .from(stockCountItems)
-    .where(and(eq(stockCountItems.stockCountId, id), isNotNull(stockCountItems.countedQuantity)))
+    const [{ contados }] = await tx
+      .select({ contados: count() })
+      .from(stockCountItems)
+      .where(and(eq(stockCountItems.stockCountId, id), isNotNull(stockCountItems.countedQuantity)))
 
-  if (contados === 0) {
-    throw new AppError('Conte ao menos um produto antes de conferir', 422, 'NOTHING_COUNTED')
-  }
+    if (contados === 0) {
+      throw new AppError('Conte ao menos um produto antes de conferir', 422, 'NOTHING_COUNTED')
+    }
 
-  const contagem = await trocarStatus(companyId, userId, id, ['em_andamento'], 'em_conferencia')
-  if (!contagem) throw new AppError('Esta contagem não está mais em andamento', 422, 'COUNT_NOT_OPEN')
+    await tx.update(stockCounts)
+      .set({ status: 'em_conferencia', updatedBy: userId, updatedAt: new Date() })
+      .where(and(eq(stockCounts.id, id), eq(stockCounts.companyId, companyId)))
+  })
 
   return getStockCount(companyId, id)
 }
@@ -368,7 +371,13 @@ async function congelarReferencia(tx: Transaction, companyId: string, id: string
   `)
 }
 
-async function travarContagem(tx: Transaction, companyId: string, id: string, status: StockCountStatus[]) {
+async function travarContagem(
+  tx: Transaction,
+  companyId: string,
+  id: string,
+  status: StockCountStatus[],
+  erroDeStatus = new AppError('Esta contagem já foi encerrada', 422, 'COUNT_ALREADY_CLOSED'),
+) {
   const [contagem] = await tx
     .select({ id: stockCounts.id, status: stockCounts.status, notes: stockCounts.notes })
     .from(stockCounts)
@@ -377,7 +386,7 @@ async function travarContagem(tx: Transaction, companyId: string, id: string, st
 
   if (!contagem) throw contagemNaoEncontrada()
   if (!status.includes(contagem.status)) {
-    throw new AppError('Esta contagem já foi encerrada', 422, 'COUNT_ALREADY_CLOSED')
+    throw erroDeStatus
   }
 
   return contagem

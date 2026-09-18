@@ -234,8 +234,9 @@ Tudo abaixo foi verificado no sistema. Nada aqui é aspiração.
   minutos, 15 por 15 minutos.
 - Recuperação de senha por link temporário de uso único, com validade de 1 hora. A senha nunca
   trafega por e-mail.
-- Isolamento entre clientes em duas camadas, uma na aplicação e outra no próprio banco de dados, com
-  verificação automática que reprova a publicação de código que escape do escopo.
+- Isolamento entre clientes em duas camadas, uma na aplicação e outra no próprio banco de dados.
+  A verificação automática acusa consultas em funções que não mencionam a empresa; ela não prova
+  sozinha que todo filtro está correto, e é complementada pelas políticas de banco e pelos testes.
 - Permissão verificada no servidor em cada operação, não apenas na tela.
 - Banco de dados sem porta exposta à internet.
 - Anexos de nota fiscal privados, entregues apenas a quem tem acesso à empresa, com validação de tipo

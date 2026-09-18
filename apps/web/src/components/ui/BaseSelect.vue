@@ -143,6 +143,7 @@ onBeforeUnmount(() => {
       v-if="open"
       ref="dropdown"
       :style="dropdownStyle"
+      data-sobreposto
       class="fixed z-[60] overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl ring-1 ring-black/5 dark:border-gray-600 dark:bg-gray-800 dark:ring-white/5"
     >
       <div class="border-b border-gray-100 p-2 dark:border-gray-700">

@@ -1,3 +1,5 @@
+import { databaseErrorCode, databaseErrorProperty, UNIQUE_VIOLATION } from './pgErrors.js'
+
 export const UNIQUE_CONSTRAINTS = {
   categories_company_name_active_unique: {
     field: 'name',
@@ -51,30 +53,12 @@ export const UNIQUE_CONSTRAINTS = {
 
 export type UniqueConstraintName = keyof typeof UNIQUE_CONSTRAINTS
 
-const UNIQUE_VIOLATION = '23505'
-
-function textProperty(value: unknown, property: string): string | undefined {
-  if (typeof value !== 'object' || value === null) return undefined
-  const found = (value as Record<string, unknown>)[property]
-  return typeof found === 'string' ? found : undefined
-}
-
 /**
  * Nome do índice violado quando o erro é de unicidade; `undefined` nos outros casos, e
- * string vazia quando é 23505 sem o driver informar o índice. Confere também o `cause`,
- * onde o Drizzle embrulha o erro do driver dentro de uma transação.
+ * string vazia quando é 23505 sem o driver informar o índice.
  */
 export function uniqueViolationConstraint(error: unknown): string | undefined {
-  const cause = typeof error === 'object' && error !== null ? (error as { cause?: unknown }).cause : undefined
+  if (databaseErrorCode(error) !== UNIQUE_VIOLATION) return undefined
 
-  const databaseError =
-    textProperty(error, 'code') === UNIQUE_VIOLATION
-      ? error
-      : textProperty(cause, 'code') === UNIQUE_VIOLATION
-        ? cause
-        : undefined
-
-  if (databaseError === undefined) return undefined
-
-  return textProperty(databaseError, 'constraint') ?? ''
+  return databaseErrorProperty(error, 'constraint') ?? ''
 }

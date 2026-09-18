@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, useId, watch } from 'vue'
 import { X } from '@lucide/vue'
+import { destravarRolagem, travarRolagem } from '@/lib/scrollLock'
 
 const props = withDefaults(
   defineProps<{
@@ -15,7 +16,6 @@ const emit = defineEmits<{ close: [] }>()
 const panel = ref<HTMLElement | null>(null)
 const titleId = useId()
 let previousFocus: HTMLElement | null = null
-let previousOverflow = ''
 
 const sizeClass = computed(() => ({ sm: 'max-w-md', md: 'max-w-xl', lg: 'max-w-3xl' })[props.size])
 
@@ -58,12 +58,11 @@ watch(
   async (open) => {
     if (open) {
       previousFocus = document.activeElement as HTMLElement | null
-      previousOverflow = document.body.style.overflow
-      document.body.style.overflow = 'hidden'
+      travarRolagem()
       await nextTick()
       panel.value?.focus()
     } else {
-      document.body.style.overflow = previousOverflow
+      destravarRolagem()
       previousFocus?.focus()
     }
   },
@@ -72,7 +71,7 @@ watch(
 onMounted(() => document.addEventListener('keydown', handleKeydown))
 onBeforeUnmount(() => {
   document.removeEventListener('keydown', handleKeydown)
-  if (props.open) document.body.style.overflow = previousOverflow
+  if (props.open) destravarRolagem()
 })
 </script>
 

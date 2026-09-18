@@ -236,6 +236,13 @@ dia seguinte — uma cobrança venceria hoje e apareceria como atrasada no fim d
 (`lib/period.ts`), com o relógio local do usuário, e a API usa `todayIsoDate()` (`shared/utils/date.ts`), fixado em
 `America/Sao_Paulo` porque os containers rodam em UTC.
 
+#### O alvo de toque da caixa de seleção
+
+A caixa desenhada tem 18px, que é o tamanho certo ao lado de um texto no desktop e pequeno demais para
+o dedo. Em vez de aumentá-la, o que mudaria toda listagem também no desktop, um `::after` transparente
+dentro da media query estica **só a área de toque** até a célula inteira. O desenho continua igual, o
+desktop não recebe regra nenhuma, e selecionar produto para exclusão em lote deixa de exigir pontaria.
+
 ### Filtro de período nas listagens
 
 O front manda a data civil escolhida pelo usuário, sem hora. `from` e `to` **nunca** são lidos com
@@ -264,6 +271,42 @@ telas — ajustar tamanho por view era o que fazia os botões saírem desalinhad
 Formulários com validação própria usam `novalidate`: mensagens nativas do navegador não competem com o retorno
 padronizado da aplicação. Campos inválidos recebem borda vermelha e uma mensagem em vermelho logo abaixo do
 componente, inclusive selects, competência e calendário.
+
+### Abrir modal não pode mexer na página de trás
+
+O `BaseModal` precisa impedir que a página de trás role junto com o conteúdo do modal. O caminho
+comum, `body { overflow: hidden }`, esconde a barra de rolagem: a área visível fica mais larga e **a
+página inteira escorrega cerca de 15px para o lado**, voltando ao fechar. Em navegador de desktop com
+barra clássica isso aparece em toda tela com conteúdo suficiente para rolar, que na prática é toda
+tela com tabela.
+
+Duas correções foram tentadas e recusadas, as duas por deixarem marca na tela:
+
+1. `html { scrollbar-gutter: stable }`, uma linha só. A faixa reservada continua desenhada quando a
+   barra some, e aparece um sulco vazio ao lado do conteúdo a cada modal aberto.
+2. `padding-right` no corpo do tamanho da barra. Acaba com o salto, mas o lugar da barra passa a
+   mostrar o fundo da página, o que continua sendo uma faixa visível encostada no conteúdo.
+
+O que vale é não tirar a barra da tela. A trava mora em `lib/scrollLock.ts` e funciona barrando o
+gesto: enquanto há sobreposto aberto, `wheel` e `touchmove` são cancelados na fase de captura, a menos
+que o alvo esteja dentro de um sobreposto. Nada no corpo é alterado, então nada se mexe e a barra
+continua desenhada com o cursor no mesmo lugar.
+
+O que conta como sobreposto está no seletor `SOBREPOSTOS`: `[role="dialog"]` cobre o painel do modal e
+o calendário do `DateInput`, `.swal2-container` cobre a confirmação, e `[data-sobreposto]` é o
+marcador da lista suspensa do `BaseSelect`. **Todo sobreposto novo levado para o corpo com `Teleport`
+precisa entrar nesse seletor**, senão o conteúdo dele não rola com o modal aberto.
+
+`overscroll-behavior: contain` no `.app-modal-panel` completa a trava: sem ele, rolar até o fim do
+modal continuaria a rolagem na página, que agora está rolável de propósito.
+
+O SweetAlert esconderia a barra por conta própria através de `body.swal2-shown`. A regra é anulada em
+`main.css` e `alerts.ts` chama a mesma trava em `didOpen`/`willClose`, com `scrollbarPadding: false`,
+para a confirmação se comportar igual ao modal. O contador de sobrepostos abertos permite confirmação
+por cima de modal: só o primeiro trava e só o último destrava.
+
+Arrastar o cursor da barra de rolagem com o mouse ainda rola a página. O navegador não deixa cancelar
+esse gesto, e é uma ação deliberada, diferente de rolar sem querer com a roda.
 
 ### Modal alto: um trecho elástico, nunca dois
 
@@ -438,6 +481,8 @@ mora num componente ou num composable, não copiada nas duas.
   diferentes, o que dava duas bolinhas visivelmente distintas na mesma aplicação. A cor é parâmetro, porque ali há
   decisão: contagem de filtro é informativa (`primary`), alerta é pendência (`danger`). O corte em `99+` vive no
   componente, para um número grande não esticar a bolinha por cima do ícone.
+- **`tooltipContent.ts`** compartilha a posição e o conteúdo dos balões dos três gráficos.
+  Cada gráfico preserva sua altura de ancoragem e seu texto quando não há quantidades.
 - **`StatusBadge`** e `lib/status.ts` guardam as palavras e a cor de ativo/inativo. A etiqueta, a
   opção do filtro e a coluna do CSV saem do mesmo lugar, com o gênero como parâmetro (unidade é
   "Inativa", produto é "Inativo") e um texto alternativo para o caso de Empresas, onde inativo se
@@ -453,11 +498,64 @@ quantas requisições disparar). Onde só há fiação, ela ficou explícita na 
 
 A expressão de ordenação sai de `shared/db/sorting.ts`, e não de `asc()`/`desc()` soltos em cada service, para que três decisões fiquem num lugar só:
 
-- **`nulls last` sempre.** No Postgres, `desc` traz os nulos primeiro por padrão. Sem isso, ordenar produtos por custo decrescente colocaria justamente os produtos *sem* custo cadastrado no topo da tela.
+- **`nulls last` só onde a coluna aceita nulo.** No Postgres, `desc` traz os nulos primeiro por padrão, então sem o sufixo ordenar produtos por custo decrescente colocaria justamente os produtos *sem* custo no topo da tela. Em coluna obrigatória, porém, o sufixo não muda resultado nenhum e sai caro: ele faz a ordenação deixar de casar com o índice e a listagem passa a varrer a tabela inteira para devolver 15 linhas. Ver a medição abaixo.
 - **Direção padrão explícita por módulo.** Cadastros assumem `asc` (nome), listagens temporais assumem `desc` (mais recente primeiro). Antes cada service repetia essa escolha na mão e elas divergiam entre módulos para quem chamasse a API sem mandar `sortOrder`.
 - **Enums ordenam pelo rótulo, não pela ordem de declaração.** `orderByLabeledEnum` monta um `CASE` que ordena `loss_reason` e `movement_type` na ordem alfabética dos textos exibidos na tela; ordenar pelo enum cru produziria uma sequência (`vencido → avariado → ...`) que não corresponde a nada visível. A exceção é `systemLogs.level`, que fica na ordem de declaração de propósito, porque ali ela equivale à ordem de severidade.
 
 Toda listagem aplica ainda um segundo critério estável (nome ou data) como desempate, e o frontend volta para a página 1 ao trocar a ordenação — o `useTableSort` recebe o `reload` já com esse reset.
+
+### O `nulls last` que desligava o índice
+
+A primeira versão colocava `nulls last` em toda ordenação, e isso custava caro em silêncio. Medido
+numa loja sintética com 120 mil movimentações e dois anos de uso:
+
+| Tela | Antes | Depois |
+|---|---|---|
+| Entradas | 298 ms | 14 ms |
+| Entradas com busca | 321 ms | 19 ms |
+| Movimentações | 212 ms | 67 ms |
+| Movimentações por período | 115 ms | 39 ms |
+| Perdas | 47 ms | 16 ms |
+| Logs de atividade | 76 ms | 35 ms |
+
+A consulta de movimentações sozinha saiu de 78 ms para 0,3 ms: com o sufixo o plano era
+`Seq Scan` nas 120 mil linhas mais `top-N heapsort`; sem ele, `Index Scan Backward` que para na
+décima quinta linha.
+
+A correção está em `aceitaNulo`, dentro de `sorting.ts`: o sufixo entra pela propriedade `notNull`
+da coluna do Drizzle. Expressão crua (`sql`) não sabe responder se aceita nulo e, por segurança,
+mantém o sufixo. Há teste de regressão em `regressions.test.ts` comparando o SQL gerado, porque este
+é o tipo de defeito que não quebra nada: ele só deixa o sistema lento e volta sem ninguém notar.
+
+### O que ainda custa, e por quê
+
+Duas coisas continuam caras e ficam declaradas em vez de escondidas:
+
+- **O `count(*)` da paginação é proporcional ao tamanho da tabela.** Depois da correção acima, a tela
+  de movimentações gasta 3 ms buscando as 15 linhas e 60 ms contando as 120 mil para montar o
+  "1–15 de 120000". É `Index Only Scan` com zero acesso ao heap, ou seja já é o melhor plano
+  possível; o custo é do total exato. Trocar por contagem aproximada mudaria o que a tela promete, e
+  essa é uma decisão de produto, não de banco.
+- **Busca que casa com quase todos os produtos.** `matchingProductIds` vira `product_id in (...)`, e
+  buscar por um pedaço de texto presente em 2000 produtos obriga o banco a cruzar 120 mil
+  movimentações antes de ordenar: 700 ms. Buscar por um nome de verdade ("banana") casa com poucos
+  produtos e responde em 3 ms. Reescrever como junção inverteria o problema, deixando o caso comum
+  mais lento para salvar o caso raro.
+
+Nas duas consultas de cada listagem (`Promise.all` com dados e total), vale lembrar que elas **não**
+rodam em paralelo: a requisição reserva uma conexão só, que é o que sustenta o escopo de empresa do
+RLS, e o driver serializa as consultas dessa conexão. O tempo da tela é a soma das duas, não a maior
+delas.
+
+### Identificadores de URL são validados antes do serviço
+
+`registerResourceParams` acrescenta uma validação ao final dos `preHandler` das rotas com
+`:id`, `:productId` ou `:attachmentId`. Autenticação e permissão continuam sendo verificadas
+primeiro. Um identificador fora do formato UUID retorna `404`, sem chegar à consulta SQL.
+O CEP tem formato próprio e não passa por essa validação.
+
+Não se traduz o código PostgreSQL `22P02` inteiro para `404`: ele também pode apontar um erro
+interno de conversão numérica. Esses erros continuam retornando `500` e sendo registrados.
 
 ## Integridade e índices
 
@@ -469,7 +567,8 @@ A única captura local de duplicidade que sobrou é a de `createCompanyWithAdmin
 
 ## Limites de tamanho dos campos
 
-Nenhuma coluna de texto do banco é `varchar`: são todas `text`, sem limite. Enquanto a validação
+Os campos textuais de cadastro usam `text`, sem limite no banco; o resumo do token de redefinição
+é uma exceção, com `varchar(64)`. Enquanto a validação
 também não tinha limite, um operador conseguia colar um texto de megabytes numa observação de perda
 ou num nome de produto, e a listagem inteira nascia deformada. Foi o que apareceu em teste, com uma
 observação repetida centenas de vezes empurrando as colunas para fora da tela.
@@ -525,7 +624,8 @@ antiga é uma decisão de hoje, não um evento do passado.
 
 A primeira camada é da aplicação, pelo `eq(tabela.companyId, …)` descrito no começo deste documento —
 é ela que produz a resposta certa. A segunda é **RLS** (segurança em nível de linha) no PostgreSQL,
-com política em 13 tabelas: ela não ajuda a acertar, ela existe para o dia em que a primeira errar.
+com políticas nas tabelas de negócio: ela existe para o dia em que a primeira errar. Até a migration
+`0016`, são 18 tabelas protegidas, incluindo planos com leitura pública e escrita restrita.
 Ver "Políticas de RLS por empresa" adiante.
 
 ### O verificador estático
@@ -558,7 +658,7 @@ Na primeira execução ele encontrou uma coisa real: `countAttachments` (`invoic
 anexos por entrada sem filtrar empresa, apoiado em a rota ter validado a entrada antes. Passou a
 filtrar — a tabela guarda `companyId` justamente para não depender do chamador.
 
-As três supressões declaradas no script são as travessias que ele acusaria: `/logs/technical`
+Entre as exceções justificadas no script estão: `/logs/technical`
 (cobranças e logs da plataforma), o login (procura por e-mail antes de existir sessão) e a limpeza de
 anexos órfãos (manutenção transversal por definição). Outras travessias legítimas — `isPlatformCompany`
 localizando a empresa Plataforma pelo `super_admin`, a gestão de usuários da plataforma, a validação de
@@ -610,8 +710,8 @@ tabela, então esse privilégio não tem por que existir em produção.
 
 #### Como isso é provado
 
-A suíte de integração inteira conecta pelo papel restrito — são os 138 testes existentes que provam
-que os privilégios bastam para toda a superfície da aplicação. Além deles, `tests/rls.test.ts` cria
+A suíte de integração inteira conecta pelo papel restrito, validando os privilégios nos cenários
+cobertos; a quantidade atual de testes é informada na execução. Além deles, `tests/rls.test.ts` cria
 uma tabela descartável e verifica o que a etapa em si precisava demonstrar:
 
 - o papel não tem `rolsuper`, `rolbypassrls` nem `rolcreaterole`;
@@ -658,7 +758,7 @@ app_empresa_atual()  -- NULLIF(current_setting('app.empresa', true), '')::uuid
 app_plataforma()     -- current_setting('app.plataforma', true) = 'on'
 ```
 
-E a política, igual nas 13 tabelas:
+E a política comum às tabelas com `company_id`:
 
 ```sql
 USING      (app_plataforma() OR company_id = app_empresa_atual())
@@ -712,7 +812,7 @@ derrubaria a sessão. A suíte não pegou porque havia teste de **entrada** em i
 
 ### Como isso é provado
 
-`tests/rls-politicas.test.ts`, cinco casos:
+`tests/rls-politicas.test.ts` cobre, entre outros casos:
 
 - **consulta sem filtro de empresa** devolve só a própria — é o caso que o verificador estático não
   pega, e o que motivou tudo isto;
@@ -970,7 +1070,7 @@ o gatilho do ano tem 7rem de largura, a lista flutuante ganhou largura mínima d
 busca não caberia na largura do gatilho), sempre limitada à largura da tela para não criar rolagem
 horizontal no celular.
 
-O `<select>` nativo que sobra é o "por página" da paginação: ali são três números num rodapé
+O `<select>` nativo que sobra é o "por página" da paginação: ali são quatro opções de quantidade num rodapé
 compacto, não um campo de formulário.
 
 Uma consequência de vocabulário na mesma mudança: a coluna e o filtro de ativo/inativo se chamam
@@ -1074,7 +1174,7 @@ consulta o histórico de movimentações, que é a fonte real desse fato.
 ### Endpoint próprio e leve, não o resumo do painel
 
 `GET /dashboard/summary` já calculava a contagem de estoque baixo, e a tentação era pendurar o sino nele. Não dá:
-aquele endpoint dispara cerca de onze consultas em paralelo, com `row_number()` sobre três subconsultas de
+aquele endpoint monta múltiplas consultas, serializadas na conexão reservada da requisição, com `row_number()` sobre três subconsultas de
 detalhamento, e foi desenhado para ser aberto sob demanda, uma vez por visita ao painel. O sino é consultado em
 intervalo fixo por **toda sessão aberta**, então cada consulta ali dentro se multiplica pelo número de usuários
 logados, e 90% do resultado seria descartado.
@@ -1322,16 +1422,16 @@ Essa recusa é o único ponto do fluxo que **não** usa a resposta única. Pode 
 indisponibilidade é do sistema inteiro, igual para e-mail cadastrado e não cadastrado: a mensagem não
 conta nada sobre quem tem conta.
 
-### O cadastro sem sessão é a única escrita alcançável de fora com o isolamento desligado
+### O cadastro sem sessão exige uma travessia explícita de plataforma
 
 `companies` tem RLS como as demais tabelas, e a política exige escopo de empresa ou escopo de plataforma. O cadastro
 que a própria loja preenche não tem nenhum dos dois: quem está se cadastrando ainda não tem empresa, e é justamente a
 empresa que o `INSERT` vai criar que viraria o escopo.
 
-Então `signUpCompany` roda inteiro em `comEscopoDePlataforma`, que desliga o isolamento por empresa. É a única
-travessia do sistema alcançável por código **não autenticado**, e foi desenhada com isso em mente:
+Então `signUpCompany` roda inteiro em `comEscopoDePlataforma`, que desliga o isolamento por empresa. Essa travessia é alcançável por código **não autenticado**, assim como os fluxos de recuperação
+de senha, que têm suas próprias validações. O cadastro foi desenhado com isso em mente:
 
-- a função **só insere**. Não lê, não lista e não devolve registro de empresa nenhuma;
+- a função consulta o plano e as duplicidades para criar a nova empresa; não lista nem devolve dados de outra empresa;
 - o retorno é fechado e conferido por teste (`company`, `admin`, `trialEndsOn`), para um `select()` distraído no
   futuro não virar vazamento silencioso;
 - a rota tem freio de 5 tentativas por hora, e não por minuto como o login: ninguém abre cinco lojas numa tarde, e
@@ -1713,6 +1813,16 @@ que sobra quando duas pessoas clicam no mesmo segundo, e esse caso vira `409` co
 
 Uma contagem compartilhada, em vez de uma por pessoa, também é o que permite duas pessoas contarem
 seções diferentes ao mesmo tempo sem combinarem nada.
+
+### Lançar quantidade e mudar etapa usam a mesma trava
+
+O lançamento de um item abre uma transação e trava a linha de `stock_counts` antes de conferir
+se o status ainda é `em_andamento`. A conferência também trava essa linha antes de contar os
+itens preenchidos e mudar de etapa. Encerramento e cancelamento já usavam essa trava.
+
+Sem isso, um lançamento podia ler "em andamento", esperar no banco e gravar depois de outra
+requisição cancelar ou conferir a contagem. Dois testes coordenam transações concorrentes e
+confirmam que a gravação atrasada é recusada sem alterar a quantidade.
 
 ### A referência é congelada no encerramento, não no início
 

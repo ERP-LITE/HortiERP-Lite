@@ -14,6 +14,7 @@ import { HEALTH_PATHS } from './shared/config/health.js'
 import { db } from './db/client.js'
 import { registerRequestScope } from './db/requestScope.js'
 import { errorHandler } from './shared/middlewares/errorHandler.js'
+import { registerResourceParams } from './shared/middlewares/resourceParams.js'
 import { AppError } from './shared/errors/AppError.js'
 import { formatRetryDelay } from './shared/errors/frameworkMessages.js'
 import { authRoutes } from './modules/auth/auth.routes.js'
@@ -90,6 +91,7 @@ export function buildApp(options: { systemLogs?: boolean; rateLimit?: boolean } 
   })
 
   app.setErrorHandler(errorHandler)
+  registerResourceParams(app)
   app.setNotFoundHandler(async () => {
     throw AppError.notFound('Endereço não encontrado')
   })

@@ -26,6 +26,7 @@ erDiagram
   COMPANIES ||--o{ LOSSES : ""
   COMPANIES ||--o{ STOCK_MOVEMENTS : ""
   COMPANIES ||--o{ SYSTEM_LOGS : ""
+  COMPANIES ||--o{ ACTIVITY_LOGS : ""
   COMPANIES ||--o{ COMPANY_BILLINGS : recebe
   USERS ||--o{ PASSWORD_RESET_TOKENS : pede
   CATEGORIES ||--o{ PRODUCTS : classifica
@@ -73,8 +74,8 @@ Os campos cadastrais novos são nuláveis no banco para que empresas criadas ant
 
 ### `plans`
 
-Lista de preços da plataforma. **Não tem coluna de empresa**, e é a única tabela nessa situação junto com a linha
-especial da plataforma: ela é lida na tela de cadastro, por quem ainda não tem empresa nenhuma.
+Lista de preços da plataforma. **Não tem coluna de empresa**: é lida na tela pública de cadastro.
+Também não têm `companyId` a raiz `companies` e as tabelas de itens, cujo escopo vem do registro pai.
 
 | Coluna | Tipo | Observação |
 |---|---|---|
@@ -258,7 +259,7 @@ Histórico append-only de toda variação de estoque — nunca é editado ou apa
 | `type` | enum `movement_type` | `entrada` \| `perda` \| `ajuste` |
 | `quantity` | numeric(12,3) | positiva em entradas, **negativa** em perdas, positiva ou negativa em ajustes (diferença entre saldo novo e antigo) |
 | `balanceAfter` | numeric(12,3) | saldo do produto após o movimento (snapshot, não recalculado) |
-| `referenceType`, `referenceId` | text/uuid | em `entrada`/`perda`, aponta pra `stock_entry`/`loss` que originou o movimento; em `ajuste`, depende da origem: `'adjustment'` (ajuste manual) e `'import'` (carga inicial por planilha) usam o próprio `productId` como referência, porque não existe entidade própria; `'loss_cancellation'` (estorno de perda cancelada) aponta pra `loss` estornada, de modo que a perda e o estorno ficam localizáveis pelo mesmo `referenceId` |
+| `referenceType`, `referenceId` | text/uuid | em `entrada`/`perda`, aponta pra `stock_entry`/`loss` que originou o movimento; em `ajuste`, depende da origem: `'adjustment'` (ajuste manual) e `'import'` (carga inicial por planilha) usam o próprio `productId` como referência, porque não existe entidade própria; `'loss_cancellation'` (estorno de perda cancelada) aponta pra `loss` estornada; `'stock_count'` aponta para a contagem que gerou o ajuste |
 | `notes` | text | nulável; só preenchido em `ajuste`, com o motivo digitado pelo usuário (ver [fluxo de ajuste manual](./fluxos-de-negocio.md#ajuste-manual-de-estoque)) |
 | `movementDate` | timestamp | **quando o fato aconteceu** — copiada da `entryDate` da entrada ou da `lossDate` da perda que originou o movimento. É a coluna que os filtros de período, o histórico e o dashboard usam |
 | `createdAt`, `createdBy` | timestamp/uuid | sem `updatedBy`/`deletedAt` — registro imutável; `createdAt` é **quando foi digitado**, e nas duas datas está a diferença entre o fato e o lançamento; `createdBy` identifica o usuário responsável quando informado |
@@ -276,6 +277,25 @@ ordenação.
 
 A relação Drizzle `createdByUser` resolve somente as colunas públicas `id` e `name` para o histórico e o resumo do dashboard. Como os campos de auditoria não possuem FK, a relação pode ser nula em registros antigos; a interface apresenta nesses casos “Usuário não identificado”.
 
+### `activity_logs`
+Registro append-only do que as pessoas fizeram dentro da empresa, em linguagem de negócio. É a fonte da tela **Logs de atividades**, aberta só para `admin`. Diferente de `system_logs`, que guarda a requisição HTTP, aqui fica o fato: quem criou, alterou, excluiu, importou, ajustou ou cancelou o quê.
+
+| Coluna | Tipo | Observação |
+|---|---|---|
+| `id` | uuid | PK |
+| `companyId` | uuid | FK obrigatória |
+| `actorId` | uuid | autor; sem FK, pelo mesmo motivo do `auditBy` (o autor pode morar na empresa Plataforma, em impersonação) |
+| `action` | text | `criou`, `alterou`, `excluiu`, `importou`, `ajustou` ou `cancelou` |
+| `entity` | text | `produto`, `categoria`, `unidade`, `usuario`, `entrada`, `perda`, `estoque` ou `contagem` |
+| `entityId` | uuid | o registro alcançado, quando existe |
+| `entityLabel` | text | como o registro se chamava **naquele momento**, para a linha continuar legível depois de o cadastro mudar de nome ou ser excluído |
+| `details` | jsonb | campos que mudaram, já traduzidos para o vocabulário da tela |
+| `createdAt` | timestamp | momento do fato |
+
+`action` e `entity` são `text` e não enum: o valor aceito é validado pelo Zod na consulta (`activityActionSchema` e `activityEntitySchema`) e pelo tipo `ActivityEntity` na gravação. Acrescentar uma entidade nova exige mexer nesses dois lugares e no rótulo da tela, e foi exatamente o que faltou quando a contagem de estoque entrou.
+
+A gravação nunca derruba a operação: `recordActivitySafe` engole a falha de propósito, porque perder a linha de auditoria é menos grave do que impedir a pessoa de lançar a perda. Os índices `(companyId, createdAt)` e `(companyId, entity, createdAt)` sustentam a listagem e o filtro por entidade. O serviço `retention` expurga por idade, com padrão de 1825 dias.
+
 ### `system_logs`
 Registro append-only das requisições processadas pela API, usado para diagnóstico técnico da plataforma e auditoria de atividades por empresa.
 
@@ -292,7 +312,7 @@ Registro append-only das requisições processadas pela API, usado para diagnós
 
 Índices por data, nível e empresa/data sustentam os filtros das telas. A tabela não possui edição ou exclusão pela aplicação.
 
-As rotas de consulta de log e os caminhos de healthcheck (`/health` e `/api/health`) **não** geram registro — sem isso, um monitor externo batendo de minuto em minuto acrescentaria cerca de 43 mil linhas por mês só de verificação de saúde. Ainda assim, `system_logs` e `activity_logs` crescem sem teto: não existe expurgo automático, e em instalação de longa duração são as tabelas que mais pesam no backup.
+As rotas de consulta de log e os caminhos de healthcheck (`/health` e `/api/health`) **não** geram registro — sem isso, um monitor externo batendo de minuto em minuto acrescentaria cerca de 43 mil linhas por mês só de verificação de saúde. O serviço `retention` remove semanalmente logs técnicos e atividades vencidos, conforme os prazos configurados (padrões de 180 e 1825 dias, respectivamente). Mesmo com expurgo, essas tabelas podem representar parte importante do backup.
 
 ## Enums (`apps/api/src/db/schema/enums.ts`)
 

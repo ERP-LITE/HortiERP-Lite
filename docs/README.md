@@ -20,7 +20,7 @@ Mantenha estes documentos atualizados conforme o sistema evolui — decisões e 
   reúne o que um modelo de linguagem precisa saber para redigir o **manual entregue ao cliente**. Fica aqui porque
   precisa ser revisado junto com os fluxos: mudança de comportamento que afeta o usuário final tem de aparecer nos dois
   lugares. Ele deliberadamente **omite** as telas da plataforma (empresas, cobranças, logs técnicos), que não pertencem
-  ao cliente. Os fatos foram conferidos contra o código em 24/08/2026, e o arquivo traz o endereço de acesso e o
+  ao cliente. O arquivo reúne revisões até 17/09/2026 e traz o endereço de acesso e o
   contato do suporte que o manual precisa citar — ao mudar comportamento visível ao usuário, corrija o briefing na
   mesma entrega.
 - [Briefing do contrato](./briefing-contrato.md) — o que o **contrato de prestação de serviço** precisa
